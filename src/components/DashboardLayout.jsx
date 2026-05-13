@@ -74,6 +74,7 @@ export default function DashboardLayout({ children }) {
 
   // --- NAVIGATION ROUTES ---
   const navItems = [
+    { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Directory', href: '/directory', icon: Users },
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
