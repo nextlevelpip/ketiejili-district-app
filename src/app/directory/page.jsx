@@ -3,11 +3,12 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
 import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit3, Save, Flame } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
 export default function Directory() {
   const [members, setMembers] = useState([]);
-  const [activeTab, setActiveTab] = useState('register'); // Defaulting to register tab based on your screenshot
+  const [assemblies, setAssemblies] = useState(['Central']); // Dynamic Assemblies List
+  const [activeTab, setActiveTab] = useState('register'); 
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -18,8 +19,7 @@ export default function Directory() {
   const [dob, setDob] = useState(''); 
   const [gender, setGender] = useState('');
   
-  const [localAssembly, setLocalAssembly] = useState('Central');
-  const [customAssembly, setCustomAssembly] = useState('');
+  const [localAssembly, setLocalAssembly] = useState('');
   
   const [group, setGroup] = useState('New Convert Class'); 
   const [customGroup, setCustomGroup] = useState('');
@@ -45,11 +45,27 @@ export default function Directory() {
   const [fDemo, setFDemo] = useState('All Ages');
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'members'), (snapshot) => {
+    // 1. Fetch Members
+    const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMembers(fetched.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
     });
-    return () => unsub();
+
+    // 2. Fetch Dynamic Assemblies from Settings
+    const q = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
+    const unsubAssemblies = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const fetchedAssemblies = snapshot.docs.map(doc => doc.data().name);
+        setAssemblies(fetchedAssemblies);
+        // Set default to the first assembly if currently blank
+        setLocalAssembly(prev => prev === '' ? fetchedAssemblies[0] : prev);
+      }
+    });
+
+    return () => {
+      unsubMembers();
+      unsubAssemblies();
+    };
   }, []);
 
   const showNotification = (type, message) => {
@@ -69,7 +85,7 @@ export default function Directory() {
 
   const resetForm = () => {
     setEditingId(null); setName(''); setPhone(''); setDob(''); setGender('');
-    setLocalAssembly('Central'); setCustomAssembly('');
+    setLocalAssembly(assemblies[0] || 'Central'); 
     setGroup('New Convert Class'); setCustomGroup('');
     setOccupation(''); setChurchRole('Member'); setSoulWinner(''); setWaterBaptized('');
     setMaritalStatus(''); setChildrenCount(''); setSpiritBaptism('');
@@ -78,30 +94,25 @@ export default function Directory() {
 
   // --- STRICT PHONE VALIDATION ---
   const handlePhoneChange = (e) => {
-    let val = e.target.value.replace(/\D/g, ''); // Strip all non-numbers
-    
-    // If they start typing without a zero, instantly add it for them!
+    let val = e.target.value.replace(/\D/g, ''); 
     if (val.length > 0 && val[0] !== '0') {
       val = '0' + val;
     }
-    
-    setPhone(val.slice(0, 10)); // Lock strictly to 10 digits
+    setPhone(val.slice(0, 10)); 
   };
 
  const handleSave = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // SECURITY GATE 1: Final Phone Validation
     if (phone.length !== 10) {
       showNotification('error', 'Phone number must be exactly 10 digits.');
       setIsSubmitting(false);
       return;
     }
 
-    // SECURITY GATE 2: The Duplicate Shield (Name + Phone + DOB + Gender)
     const isDuplicate = members.some(m => 
-      m.id !== editingId && // Ensure we don't block ourselves when editing a record!
+      m.id !== editingId && 
       (m.name || '').toLowerCase().trim() === name.toLowerCase().trim() && 
       m.phone === phone && 
       m.dob === dob && 
@@ -114,12 +125,12 @@ export default function Directory() {
       return;
     }
 
-    const finalAssembly = localAssembly === 'Add Custom Assembly' ? customAssembly : localAssembly;
     const finalGroup = group === 'Add Custom Group' ? customGroup : group;
+    const autoAgeGroup = calculateAge(dob) <= 12 ? "Children" : calculateAge(dob) <= 35 ? "Youth" : "Adult";
 
     const data = { 
         name, phone, dob, gender, 
-        localAssembly: finalAssembly, 
+        localAssembly, 
         group: finalGroup, 
         occupation, churchRole, 
         soulWinner: churchRole === 'New Convert' ? soulWinner : '',
@@ -127,7 +138,8 @@ export default function Directory() {
         maritalStatus, 
         childrenCount: maritalStatus && maritalStatus !== 'Single' ? childrenCount : 0,
         spiritBaptism, hasDisability, 
-        disabilityType: hasDisability === 'Yes' ? disabilityType : '' 
+        disabilityType: hasDisability === 'Yes' ? disabilityType : '',
+        ageGroup: autoAgeGroup // For analytics pie chart alignment
     };
 
     try {
@@ -151,8 +163,7 @@ export default function Directory() {
     setEditingId(m.id); setName(m.name || ''); setPhone(m.phone || ''); 
     setDob(m.dob || ''); setGender(m.gender || ''); setOccupation(m.occupation || '');
     
-    if (m.localAssembly === 'Central') { setLocalAssembly('Central'); }
-    else { setLocalAssembly('Add Custom Assembly'); setCustomAssembly(m.localAssembly || ''); }
+    setLocalAssembly(m.localAssembly || assemblies[0] || 'Central');
 
     if (m.group === 'New Convert Class') { setGroup('New Convert Class'); }
     else { setGroup('Add Custom Group'); setCustomGroup(m.group || ''); }
@@ -187,13 +198,9 @@ export default function Directory() {
     return matchesSearch && matchesAssem && matchesRole && matchesGen && matchesDemo;
   });
 
-  const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
-  
-  // ADDED MINISTERS WIVES AND PRESIDING ELDERS WIVES
   const churchRoles = ["Member", "New Convert", "Elder", "Deacon", "Deaconess", "District Minister", "District Minister's Wife", "Presiding Elder", "Presiding", "Presiding Deacon"];
   const disabilityTypes = ["Visually Impairment", "Deaf/Hard of Hearing", "Speech Impairment", "Physical/ Mobility Dis'ties", "Autism Spectrum Disorders", "Albinism", "Epilepsy", "Cerebral Palsy", "Mental Health Conditions", "Multiple Dis'ties", "Other Dis'ties"];
 
-  // UPDATED STYLES TO PERFECTLY MATCH YOUR SCREENSHOT
   const inputStyle = "w-full p-3.5 bg-gray-50/50 border border-gray-100 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl font-bold text-gray-800 outline-none transition-all text-sm";
   const labelStyle = "text-[10px] font-black text-gray-400 uppercase ml-1 mb-2 block tracking-widest";
 
@@ -208,7 +215,7 @@ export default function Directory() {
           </div>
         )}
 
-        {/* TAB BUTTONS (Styled exactly like the screenshot) */}
+        {/* TAB BUTTONS */}
         <div className="flex justify-center items-center gap-4 mb-8">
           <button onClick={() => { resetForm(); setActiveTab('register'); }} className={`px-6 py-3 rounded-[14px] font-bold flex items-center gap-2 transition-all ${activeTab === 'register' ? 'bg-blue-600 text-white shadow-md' : 'bg-white text-blue-600 hover:bg-gray-50 border border-gray-100'}`}>
             <UserPlus size={18}/> {editingId ? 'Edit Record' : 'Register Member'}
@@ -231,11 +238,8 @@ export default function Directory() {
                 <div>
                   <label className={labelStyle}>Phone Number *</label>
                   <input 
-                    required 
-                    type="tel" 
-                    placeholder="024XXXXXXX" 
-                    value={phone} 
-                    onChange={handlePhoneChange} 
+                    required type="tel" placeholder="024XXXXXXX" 
+                    value={phone} onChange={handlePhoneChange} 
                     className={`${inputStyle} tracking-widest`} 
                   />
                 </div>
@@ -253,16 +257,19 @@ export default function Directory() {
                     <option value="">- Select -</option><option value="Male">Male</option><option value="Female">Female</option>
                   </select>
                 </div>
+                
+                {/* DYNAMIC LOCAL ASSEMBLY DROPDOWN */}
                 <div>
                   <label className={labelStyle}>Local Assembly *</label>
                   <select required value={localAssembly} onChange={e => setLocalAssembly(e.target.value)} className={inputStyle}>
-                    <option value="Central">Central</option>
-                    <option value="Add Custom Assembly">+ Add Custom Assembly</option>
+                    {assemblies.map((assemblyName, index) => (
+                      <option key={index} value={assemblyName}>
+                        {assemblyName}
+                      </option>
+                    ))}
                   </select>
-                  {localAssembly === 'Add Custom Assembly' && (
-                    <input required autoFocus placeholder="Type Custom Assembly" value={customAssembly} onChange={e => setCustomAssembly(e.target.value)} className={`mt-2 ${inputStyle} border-blue-200 bg-blue-50`} />
-                  )}
                 </div>
+                
                 <div>
                   <label className={labelStyle}>Discipleship Group</label>
                   <select value={group} onChange={e => setGroup(e.target.value)} className={inputStyle}>
@@ -370,10 +377,13 @@ export default function Directory() {
                 <option value="All Roles">All Roles</option>
                 {churchRoles.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
+              
+              {/* DYNAMIC FILTER ASSEMBLIES DROPDOWN */}
               <select value={fAssem} onChange={e => setFAssem(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-xs outline-none focus:border-blue-500">
                 <option value="All Assemblies">All Assemblies</option>
-                {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
+                {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
+              
               <select value={fGen} onChange={e => setFGen(e.target.value)} className="p-3 bg-gray-50 border border-gray-100 rounded-xl font-bold text-xs outline-none focus:border-blue-500">
                 <option value="All Genders">All Genders</option>
                 <option value="Male">Male</option>

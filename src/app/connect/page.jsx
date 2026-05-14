@@ -1,163 +1,237 @@
 "use client";
 import { useState, useEffect } from 'react';
-import { Send, CheckCircle2, AlertCircle, Loader2, Heart, MapPin, Phone, User } from 'lucide-react';
-import { db } from '../firebase';
-import { collection, addDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase'; 
+import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { User, Phone, MapPin, Heart, Send, CheckCircle2, Calendar, Users } from 'lucide-react';
 
 export default function ConnectKiosk() {
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [assembly, setAssembly] = useState('');
-  const [connectionType, setConnectionType] = useState('');
-  const [notes, setNotes] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [error, setError] = useState('');
+  // --- DYNAMIC ASSEMBLIES STATE ---
+  // We start with a default so the app doesn't break if the database is empty
+  const [assemblies, setAssemblies] = useState(['Central']); 
 
-  // --- DYNAMIC ASSEMBLY FETCHING ---
-  const [uniqueAssemblies, setUniqueAssemblies] = useState([]);
+  // Form States
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    localAssembly: 'Central', 
+    gender: '',
+    dob: '',
+    connectionType: '',
+    message: ''
+  });
 
+  // --- FETCH ASSEMBLIES FROM FIREBASE ---
   useEffect(() => {
-    // Fetch existing members just to extract the live assembly names
-    const unsub = onSnapshot(collection(db, 'members'), (snapshot) => {
-      const fetchedMembers = snapshot.docs.map(doc => doc.data());
-      const assemblies = [...new Set(fetchedMembers.map(m => m.localAssembly).filter(Boolean))].sort();
-      setUniqueAssemblies(assemblies);
-      if (assemblies.length > 0) setAssembly(assemblies[0]); // Default to the first one
+    // This looks for a collection called 'assemblies' and gets their names
+    const q = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        const assemblyList = snapshot.docs.map(doc => doc.data().name);
+        setAssemblies(assemblyList);
+        
+        // Automatically set the default dropdown to the first assembly in the list
+        if (assemblyList.length > 0 && formData.localAssembly === 'Central') {
+          setFormData(prev => ({ ...prev, localAssembly: assemblyList[0] }));
+        }
+      }
     });
-    return () => unsub();
+    return () => unsubscribe();
   }, []);
 
-  const handlePhoneChange = (e) => {
-    let val = e.target.value.replace(/\D/g, '');
-    if (val.length > 0 && val[0] !== '0') val = '0' + val;
-    setPhone(val.slice(0, 10));
+ const handleChange = (e) => {
+    if (e.target.name === 'phone') {
+      // 1. Strip out anything that is not a number
+      let onlyNums = e.target.value.replace(/[^0-9]/g, '');
+      
+      // 2. If they type a number that doesn't start with 0, force a 0 at the front!
+      if (onlyNums.length > 0 && onlyNums[0] !== '0') {
+        onlyNums = '0' + onlyNums;
+      }
+      
+      // 3. Act like a brick wall at exactly 10 digits
+      onlyNums = onlyNums.substring(0, 10);
+      
+      setFormData({ ...formData, phone: onlyNums });
+      return;
+    }
+    
+    // For all other fields (name, gender, etc.)
+    setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
-    if (phone.length !== 10) {
-      setError('Please enter a valid 10-digit phone number.');
-      return;
-    }
-
-    setIsSubmitting(true);
+    setLoading(true);
 
     try {
       await addDoc(collection(db, 'pending_connections'), {
-        name,
-        phone,
-        localAssembly: assembly,
-        connectionType,
-        notes,
-        status: 'Pending',
-        timestamp: new Date().toISOString()
+        name: formData.fullName, 
+        phone: formData.phone,
+        localAssembly: formData.localAssembly,
+        gender: formData.gender,
+        dateOfBirth: formData.dob,
+        connectionType: formData.connectionType,
+        message: formData.message,
+        timestamp: serverTimestamp(),
+        status: 'Pending'
       });
-      setIsSuccess(true);
-    } catch (err) {
-      setError('Connection failed. Please check your internet and try again.');
-    } finally {
-      setIsSubmitting(false);
+      
+      setSuccess(true);
+      setTimeout(() => {
+        setSuccess(false);
+        setFormData({ 
+          fullName: '', phone: '', localAssembly: assemblies[0] || 'Central', 
+          gender: '', dob: '', connectionType: '', message: '' 
+        });
+      }, 4000);
+
+    } catch (error) {
+      alert("Submission failed. Please check your connection.");
     }
+    setLoading(false);
   };
 
-  if (isSuccess) {
+  // --- SUCCESS SCREEN ---
+  if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white p-8 md:p-12 rounded-[30px] shadow-xl text-center max-w-md w-full animate-fade-in border border-gray-100">
-          <div className="w-24 h-24 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
-            <CheckCircle2 size={48} />
+      <div className="min-h-screen bg-[#1e2749] flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
+          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600">
+            <CheckCircle2 size={40} />
           </div>
-          <h1 className="text-3xl font-black text-gray-900 mb-4">God Bless You!</h1>
-          <p className="text-gray-500 font-bold leading-relaxed mb-8">
-            Your connection details have been received by the Ketiejili District leadership. A pastor or leader will reach out to you shortly.
-          </p>
-          <button onClick={() => window.location.reload()} className="px-8 py-3 bg-gray-100 text-gray-600 font-black rounded-xl hover:bg-gray-200 transition-all text-sm w-full">
-            Submit Another Response
-          </button>
+          <h2 className="text-2xl font-black text-[#1e2749] mb-2">Connection Received!</h2>
+          <p className="text-gray-600 font-medium">Thank you for connecting with Ketiejili District. God richly bless you.</p>
         </div>
       </div>
     );
   }
 
-  const inputStyle = "w-full p-4 pl-12 bg-gray-50 border border-gray-200 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 rounded-2xl font-bold outline-none transition-all text-gray-800 text-sm";
-
+  // --- CLASSIC ENTRY SCREEN ---
   return (
-    <div className="min-h-screen bg-blue-950 flex flex-col items-center py-10 px-4 sm:px-6 relative overflow-hidden">
+    <div className="min-h-screen bg-[#1e2749] flex flex-col items-center pt-10 px-4">
       
-      {/* Background Decor */}
-      <div className="absolute top-0 left-0 w-full h-96 bg-blue-900 rounded-b-[100px] opacity-50"></div>
-
-      {/* BRANDING HEADER */}
-      <div className="text-center mb-8 animate-fade-in relative z-10 mt-4">
-        <img src="/logo.jpg" alt="Ketiejili Logo" className="w-24 h-24 rounded-full shadow-2xl object-cover mx-auto mb-4 border-4 border-white/20" />
-        <h1 className="text-2xl font-black text-white tracking-widest uppercase">Ketiejili District</h1>
-        <p className="text-blue-300 font-bold text-sm mt-1">Digital Connect Card</p>
+      <div className="flex flex-col items-center mb-8">
+        <img 
+          src="/logo.jpg" 
+          alt="Church of Pentecost" 
+          className="w-20 h-20 rounded-full mb-4 border-2 border-white shadow-lg object-cover"
+          onError={(e) => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=COP&background=fff&color=1e2749'; }}
+        />
+        <h1 className="text-2xl font-black text-white tracking-wider uppercase">Ketiejili District</h1>
+        <p className="text-sm font-bold text-blue-300">Digital Connect Card</p>
       </div>
 
-      {/* THE FORM */}
-      <div className="bg-white p-6 md:p-10 rounded-[32px] shadow-2xl w-full max-w-xl animate-fade-in relative z-10">
-        <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-purple-500"></div>
-        
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {error && (
-            <div className="p-4 bg-red-50 border border-red-100 text-red-700 font-bold rounded-xl flex items-center gap-3 text-sm">
-              <AlertCircle size={18} /> {error}
-            </div>
-          )}
+      <div className="w-full max-w-md bg-white rounded-t-3xl rounded-b-xl shadow-2xl overflow-hidden mb-10 relative">
+        <div className="h-1.5 w-full bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500"></div>
 
-          <div className="space-y-4">
-            <div className="relative">
-              <User className="absolute left-4 top-4 text-gray-400" size={18}/>
-              <input required type="text" placeholder="Your Full Name" value={name} onChange={e => setName(e.target.value)} className={inputStyle} />
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
+          
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <User size={18} className="text-gray-400" />
             </div>
+            <input 
+              type="text" name="fullName" value={formData.fullName} onChange={handleChange} required
+              placeholder="Your Full Name"
+              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all placeholder:text-gray-400"
+            />
+          </div>
 
-            <div className="relative">
-              <Phone className="absolute left-4 top-4 text-gray-400" size={18}/>
-              <input required type="tel" placeholder="Phone Number (e.g. 024...)" value={phone} onChange={handlePhoneChange} className={`${inputStyle} tracking-widest`} />
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Phone size={18} className="text-gray-400" />
             </div>
+            <input 
+            type="tel" name="phone" value={formData.phone} onChange={handleChange} required
+              pattern="^0[0-9]{9}$"
+              maxLength="10"
+              title="Phone number must be exactly 10 digits and start with 0"
+              placeholder="Phone Number (e.g. 024...)"
+              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all placeholder:text-gray-400"
+            />
+          </div>
 
+          {/* DYNAMIC LOCAL ASSEMBLY DROPDOWN */}
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <MapPin size={18} className="text-gray-400" />
+            </div>
+            <select 
+              name="localAssembly" value={formData.localAssembly} onChange={handleChange} required
+              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800 transition-all appearance-none"
+            >
+              {assemblies.map((assemblyName, index) => (
+                <option key={index} value={assemblyName}>
+                  {assemblyName}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
             <div className="relative">
-              <MapPin className="absolute left-4 top-4 text-gray-400" size={18}/>
-              <select required value={assembly} onChange={e => setAssembly(e.target.value)} className={`${inputStyle} appearance-none`}>
-                <option value="">- Select Assembly -</option>
-                {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Users size={16} className="text-gray-400" />
+              </div>
+              <select 
+                name="gender" value={formData.gender} onChange={handleChange} required
+                className="w-full pl-10 pr-2 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all appearance-none text-sm"
+              >
+                <option value="" disabled>Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
               </select>
             </div>
 
             <div className="relative">
-              <Heart className="absolute left-4 top-4 text-gray-400" size={18}/>
-              <select required value={connectionType} onChange={e => setConnectionType(e.target.value)} className={`${inputStyle} appearance-none`}>
-                <option value="">- Why are you connecting today? -</option>
-                <option value="First-Time Visitor">I am a First-Time Visitor</option>
-                <option value="New Convert">I recently gave my life to Christ</option>
-                <option value="Update Info">I am a member updating my info</option>
-                <option value="Prayer Request">I need Pastoral Prayer</option>
-              </select>
-            </div>
-
-            <div>
-              <textarea 
-                placeholder="Any prayer requests or messages for the Pastor? (Optional)" 
-                value={notes} 
-                onChange={e => setNotes(e.target.value)}
-                className="w-full p-4 bg-gray-50 border border-gray-200 focus:bg-white focus:border-blue-500 rounded-2xl font-bold outline-none transition-all text-gray-800 text-sm min-h-[120px] resize-none"
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Calendar size={16} className="text-gray-400" />
+              </div>
+              <input 
+                type="date" name="dob" value={formData.dob} onChange={handleChange} required
+                className="w-full pl-10 pr-2 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all text-sm"
               />
             </div>
           </div>
 
-          <button type="submit" disabled={isSubmitting || uniqueAssemblies.length === 0} className="w-full py-5 bg-blue-600 text-white font-black rounded-2xl shadow-lg shadow-blue-600/30 hover:bg-blue-700 hover:shadow-blue-600/50 transition-all flex items-center justify-center gap-3 uppercase tracking-widest text-sm mt-8">
-            {isSubmitting ? <Loader2 size={20} className="animate-spin" /> : <Send size={20} />}
-            {isSubmitting ? 'Sending securely...' : 'Submit Connection'}
-          </button>
-        </form>
-      </div>
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Heart size={18} className="text-gray-400" />
+            </div>
+            <select 
+              name="connectionType" value={formData.connectionType} onChange={handleChange} required
+              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800 transition-all appearance-none"
+            >
+              <option value="" disabled>- Why are you connecting today? -</option>
+              <option value="I am a First-Time Visitor">I am a First-Time Visitor</option>
+              <option value="I recently gave my life to Christ">I recently gave my life to Christ</option>
+              <option value="I am a member updating my info">I am a member updating my info</option>
+              <option value="I need Pastoral Prayer">I need Pastoral Prayer</option>
+            </select>
+          </div>
 
-      <div className="mt-8 text-center text-blue-300/50 text-[10px] font-black uppercase tracking-widest relative z-10">
-        Secured by Ketiejili Command
+          <div className="pt-2">
+            <textarea 
+              name="message" value={formData.message} onChange={handleChange} rows="3"
+              placeholder="Any prayer requests or messages for the Pastor? (Optional)"
+              className="w-full p-4 bg-gray-100/70 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-medium text-sm text-gray-700 transition-all resize-none placeholder:text-gray-400"
+            ></textarea>
+          </div>
+
+          <div className="pt-4">
+            <button 
+              type="submit" disabled={loading} 
+              className="w-full bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-bold tracking-wide py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md"
+            >
+              {loading ? 'SENDING...' : 'SUBMIT CONNECTION'} 
+              {!loading && <Send size={18} />}
+            </button>
+          </div>
+
+        </form>
       </div>
     </div>
   );

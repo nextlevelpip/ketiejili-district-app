@@ -106,11 +106,36 @@ export default function Home() {
   };
   const demoData = getDemographics();
 
-  const attendanceTrendData = [
-    { month: 'Jan', present: 110, absent: 25 }, { month: 'Feb', present: 125, absent: 20 },
-    { month: 'Mar', present: 140, absent: 15 }, { month: 'Apr', present: 150, absent: 10 },
-    { month: 'May', present: totalPresent > 0 ? totalPresent : 160, absent: totalAbsent > 0 ? totalAbsent : 5 },
-  ];
+ const getAttendanceTrend = () => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const trendMap = {};
+
+    // 1. Create a blank slate for the last 5 months
+    const currentMonthIndex = new Date().getMonth();
+    for (let i = 4; i >= 0; i--) {
+      let mIndex = currentMonthIndex - i;
+      if (mIndex < 0) mIndex += 12; // Handle changing years
+      trendMap[months[mIndex]] = { month: months[mIndex], present: 0, absent: 0 };
+    }
+
+    // 2. Pour your actual Firebase attendance logs into the months
+    attendanceLogs.forEach(log => {
+      if (!log.date) return;
+      const logDate = new Date(log.date);
+      const monthName = months[logDate.getMonth()];
+
+      if (trendMap[monthName]) {
+        Object.values(log.records).forEach(status => {
+          if (status === 'Present') trendMap[monthName].present++;
+          if (status === 'Absent') trendMap[monthName].absent++;
+        });
+      }
+    });
+
+    return Object.values(trendMap);
+  };
+
+  const attendanceTrendData = getAttendanceTrend();
 
   return (
     <DashboardLayout>
@@ -190,23 +215,38 @@ export default function Home() {
 
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
             <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2"><Activity className="text-blue-500" size={20} /> Age Demographics</h3>
-            <div className="h-48 flex-1">
-              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
+              {/* THE FIX: We added a wrapper div with a strict height of h-64 */}
+            <div className="h-64 w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={demoData} innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
-                    {demoData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                  <Pie
+                    data={demoData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {demoData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
                   </Pie>
-                  <Tooltip />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    itemStyle={{ fontWeight: 'bold' }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="flex justify-center gap-4 mt-4 flex-wrap">
-              {demoData.map(d => (
-                <div key={d.name} className="flex items-center gap-1 text-xs font-bold text-gray-600">
-                  <span className="w-3 h-3 rounded-full shadow-sm" style={{backgroundColor: d.color}}></span> {d.name}
-                </div>
-              ))}
-            </div>
+            <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
+            {demoData.map(demo => (
+              <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>
+                {demo.name}
+              </div>
+            ))}
+          </div>
           </div>
         </div>
 

@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-// We only import these ONCE now
 import { db, auth } from '../app/firebase'; 
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
 import { 
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
-  Settings, LogOut, Menu, Cloud, Activity
+  Settings, LogOut, Menu, Cloud, Lock,
+  Heart
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -18,32 +18,55 @@ export default function DashboardLayout({ children }) {
   const router = useRouter();
   const pathname = usePathname();
 
+  // --- THE WATCHMAN STATES ---
+  const [isLocked, setIsLocked] = useState(false);
+  const [unlockPin, setUnlockPin] = useState('');
+  const [pinError, setPinError] = useState('');
+
   // --- GLOBAL BRANDING STATES ---
   const [globalName, setGlobalName] = useState('KETIEJILI');
   const [globalSlogan, setGlobalSlogan] = useState('District Command');
   const [globalLogo, setGlobalLogo] = useState('/logo.jpg');
 
-  // --- MOCK USER ---
-  const currentUser = {
-    fullName: "Prince Kumabio",
-    role: "Master (District Minister)"
-  };
+  // --- REAL USER DATA ---
+  const [currentUser, setCurrentUser] = useState({
+    fullName: "Loading...",
+    role: "Verifying",
+    localPin: null
+  });
 
-  // --- FIREBASE SECURITY BOUNCER ---
+  // --- FIREBASE SECURITY & USER FETCH ---
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        // No ID? Kick them to the login gate.
         router.push('/login'); 
       } else {
-        // Authorized. Open the doors.
-        setIsAuthorized(true); 
+        // Find who this phone belongs to!
+        const deviceId = localStorage.getItem('ketiejili_device_id');
+        if (deviceId) {
+          const q = query(collection(db, 'users'), where('authorizedDevice', '==', deviceId));
+          const querySnapshot = await getDocs(q);
+          
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            setCurrentUser({
+              fullName: userData.fullName || "Admin User",
+              role: userData.role || "District Leader",
+              localPin: userData.localPin
+            });
+            setIsAuthorized(true); 
+          } else {
+            // Device not recognized in database, kick them out
+            signOut(auth);
+            router.push('/login');
+          }
+        }
       }
     });
     return () => unsubscribe();
   }, [router]);
 
-  // --- LISTEN FOR SETTINGS CHANGES GLOBALLY ---
+  // --- LISTEN FOR DISTRICT SETTINGS ---
   useEffect(() => {
     const unsubSettings = onSnapshot(doc(db, 'system_settings', 'general'), (docSnap) => {
       if (docSnap.exists()) {
@@ -56,8 +79,49 @@ export default function DashboardLayout({ children }) {
     return () => unsubSettings();
   }, []);
 
+  // --- THE AUTO-LOCK WATCHMAN ---
+  useEffect(() => {
+    let timeoutId;
+    const resetTimer = () => {
+      clearTimeout(timeoutId);
+      // 60000 ms = 60 seconds. 
+      timeoutId = setTimeout(() => {
+        if (isAuthorized) setIsLocked(true);
+      }, 60000); 
+    };
+
+    if (!isLocked) {
+      window.addEventListener('mousemove', resetTimer);
+      window.addEventListener('keypress', resetTimer);
+      window.addEventListener('click', resetTimer);
+      window.addEventListener('scroll', resetTimer);
+      window.addEventListener('touchstart', resetTimer);
+      resetTimer();
+    }
+
+    return () => {
+      clearTimeout(timeoutId);
+      window.removeEventListener('mousemove', resetTimer);
+      window.removeEventListener('keypress', resetTimer);
+      window.removeEventListener('click', resetTimer);
+      window.removeEventListener('scroll', resetTimer);
+      window.removeEventListener('touchstart', resetTimer);
+    };
+  }, [isAuthorized, isLocked]);
+
+  const handleUnlock = (e) => {
+    e.preventDefault();
+    if (unlockPin === currentUser.localPin) {
+      setIsLocked(false);
+      setUnlockPin('');
+      setPinError('');
+    } else {
+      setPinError('Incorrect PIN');
+    }
+  };
+
   const getInitials = (name) => {
-    if (!name) return "PK";
+    if (!name || name === "Loading...") return "PK";
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
   };
 
@@ -72,7 +136,6 @@ export default function DashboardLayout({ children }) {
     }
   };
 
-  // --- NAVIGATION ROUTES ---
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
@@ -87,11 +150,11 @@ export default function DashboardLayout({ children }) {
   ];
 
   const bottomNavItems = [
+    {name: 'Pastoral Prayers', href: "/prayers", icon: Heart },
     { name: 'User Accounts', href: '/accounts', icon: UserCog },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
 
-  // While checking security, show the clearance screen
   if (!isAuthorized) {
     return (
       <div className="min-h-screen bg-blue-950 flex items-center justify-center text-white font-black tracking-widest uppercase text-sm">
@@ -103,10 +166,47 @@ export default function DashboardLayout({ children }) {
     );
   }
 
+  // --- THE IDLE LOCK SCREEN OVERLAY ---
+  if (isLocked) {
+    return (
+      <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-center p-4 z-[100] relative">
+        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-900">
+            <Lock size={32} />
+          </div>
+          <h2 className="text-xl font-black text-blue-950 mb-1">Session Locked</h2>
+          <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-6">
+            Welcome back, {currentUser.fullName.split(' ')[0]}
+          </p>
+
+          {pinError && <p className="text-red-500 text-sm font-bold mb-4">{pinError}</p>}
+
+          <form onSubmit={handleUnlock}>
+            <input 
+              type="password" 
+              value={unlockPin}
+              onChange={(e) => setUnlockPin(e.target.value)}
+              placeholder="••••"
+              maxLength="4"
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-black text-3xl text-center tracking-[0.5em] mb-4"
+              autoFocus
+            />
+            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-colors">
+              Unlock Dashboard
+            </button>
+          </form>
+          
+          <button onClick={handleLogout} className="mt-4 text-xs font-bold text-red-500 hover:text-red-700">
+            Switch Account
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden text-gray-900 font-sans">
       
-      {/* MOBILE OVERLAY */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-gray-900/50 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -114,7 +214,6 @@ export default function DashboardLayout({ children }) {
         />
       )}
 
-      {/* SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
         <div className="p-6 border-b border-gray-100 flex flex-col gap-4">
           <div className="flex items-center gap-3">
@@ -125,7 +224,7 @@ export default function DashboardLayout({ children }) {
               onError={(e) => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=COP&background=1e3a8a&color=fff'; }} 
             />
             <div className="overflow-hidden">
-              <h1 className="font-black text-blue-950 leading-tight tracking-tight text-lg truncate">{globalName}</h1>
+              <h1 className="font-black text-blue-950 leading-tight tracking-tight text-lg truncate" title={globalName}>{globalName}</h1>
               <p className="text-[10px] font-extrabold text-blue-600 uppercase tracking-widest truncate">{globalSlogan}</p>
             </div>
           </div>
@@ -184,7 +283,6 @@ export default function DashboardLayout({ children }) {
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-10 shrink-0">
           <div className="flex items-center gap-4">

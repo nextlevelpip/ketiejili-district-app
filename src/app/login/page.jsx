@@ -1,168 +1,221 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, KeyRound, Loader2, AlertCircle, ArrowRight } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase'; 
+import { collection, query, where, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { signInAnonymously } from 'firebase/auth';
+import { Shield, Smartphone, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
 
-export default function Login() {
+export default function LoginPage() {
   const router = useRouter();
-  const [step, setStep] = useState(1); 
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
   
-  const [isLoading, setIsLoading] = useState(false);
+  // System States
+  const [step, setStep] = useState('phone'); // phone, setup, createPin, enterPin
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // User Inputs
+  const [phone, setPhone] = useState('');
+  const [setupCode, setSetupCode] = useState('');
+  const [pin, setPin] = useState('');
+  
+  // Hidden Data
+  const [userData, setUserData] = useState(null);
+  const [deviceId, setDeviceId] = useState('');
 
-  // --- BRANDING STATE ---
-  const [globalName, setGlobalName] = useState('KETIEJILI');
-  const [globalLogo, setGlobalLogo] = useState('/logo.jpg');
-
-  // Fetch Settings and Initialize Recaptcha
+  // 1. Generate or grab the Device ID when the app opens
   useEffect(() => {
-    // 1. Fetch the Logo and Name from Database
-    const fetchBranding = async () => {
-      try {
-        const settingsDoc = await getDoc(doc(db, 'system_settings', 'general'));
-        if (settingsDoc.exists()) {
-          const data = settingsDoc.data();
-          if (data.districtName) setGlobalName(data.districtName);
-          if (data.logoBase64) setGlobalLogo(data.logoBase64);
-        }
-      } catch (err) {
-        console.log("Could not fetch custom logo, using default.");
-      }
-    };
-    fetchBranding();
-
-    // 2. Initialize invisible reCAPTCHA
-    if (!window.recaptchaVerifier) {
-      window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-        'size': 'invisible',
-      });
+    let storedId = localStorage.getItem('ketiejili_device_id');
+    if (!storedId) {
+      storedId = 'DEV_' + Math.random().toString(36).substring(2, 15);
+      localStorage.setItem('ketiejili_device_id', storedId);
     }
+    setDeviceId(storedId);
   }, []);
 
-  const handleSendCode = async (e) => {
+  // 2. Check the phone number
+  const handlePhoneSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
     setError('');
-    setIsLoading(true);
-
-    let cleaned = phoneNumber.replace(/\D/g, ''); 
-    let formattedNumber = cleaned;
-    if (cleaned.startsWith('0')) {
-      formattedNumber = '+233' + cleaned.substring(1);
-    } else if (!cleaned.startsWith('233')) {
-      formattedNumber = '+233' + cleaned;
-    } else {
-      formattedNumber = '+' + cleaned;
-    }
 
     try {
-      const appVerifier = window.recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, formattedNumber, appVerifier);
-      setConfirmationResult(confirmation);
-      setStep(2); 
-    } catch (err) {
-      console.error(err);
-      if (err.code === 'auth/billing-not-enabled' || err.code === 'auth/quota-exceeded') {
-        setError('SMS quota exceeded. Please use a registered Test Number.');
-      } else {
-        setError('Failed to send SMS. Make sure you enter a valid 10-digit number.');
+      const q = query(collection(db, 'users'), where('phone', '==', phone));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        setError('Number not found in District Registry.');
+        setLoading(false);
+        return;
       }
-    } finally {
-      setIsLoading(false);
+
+      const userDoc = querySnapshot.docs[0];
+      const data = userDoc.data();
+      setUserData({ id: userDoc.id, ...data });
+
+      // The Gatekeeper Logic
+      if (data.authorizedDevice === deviceId) {
+        // Phone is recognized. Ask for local PIN.
+        setStep('enterPin');
+      } else {
+        // Phone is NOT recognized. Demand Master Setup Code.
+        setStep('setup');
+      }
+    } catch (err) {
+      setError('Connection failed. Try again.');
     }
+    setLoading(false);
   };
 
-  const handleVerifyCode = async (e) => {
+  // 3. Verify Master Setup Code
+  const handleSetupSubmit = async (e) => {
     e.preventDefault();
+    if (setupCode !== userData.setupCode) {
+      setError('Invalid Setup Code. Contact Master Admin.');
+      return;
+    }
     setError('');
-    setIsLoading(true);
+    setStep('createPin'); // Move to let them create their own PIN
+  };
 
+  // 4. Create Local PIN and Lock Device
+  const handleCreatePin = async (e) => {
+    e.preventDefault();
+    if (pin.length !== 4) {
+      setError('PIN must be exactly 4 digits.');
+      return;
+    }
+    setLoading(true);
     try {
-      await confirmationResult.confirm(verificationCode);
+      // Save the new Device ID and their personal PIN to the database
+      const userRef = doc(db, 'users', userData.id);
+      await updateDoc(userRef, {
+        authorizedDevice: deviceId,
+        localPin: pin,
+        setupCode: null // Destroy the Master Setup Code so it cannot be reused
+      });
+      
+      // Log them into Firebase silently
+      await signInAnonymously(auth);
       router.push('/');
     } catch (err) {
-      console.error(err);
-      setError('Invalid security code. Please try again.');
-    } finally {
-      setIsLoading(false);
+      setError('Failed to secure device.');
     }
+    setLoading(false);
   };
 
-  const inputStyle = "w-full px-4 py-4 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none transition-all text-gray-800 shadow-sm font-bold text-lg text-center tracking-widest";
+  // 5. Enter Existing PIN
+  const handleEnterPin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    if (pin !== userData.localPin) {
+      setError('Incorrect PIN.');
+      setLoading(false);
+      return;
+    }
+    
+    try {
+      await signInAnonymously(auth);
+      router.push('/');
+    } catch (err) {
+      setError('Login failed.');
+    }
+    setLoading(false);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
-      
-      {/* Background Styling */}
-      <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-10"></div>
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-600 rounded-full blur-[100px] opacity-20"></div>
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-emerald-600 rounded-full blur-[100px] opacity-20"></div>
-
-      <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl relative z-10 overflow-hidden">
+    <div className="min-h-screen bg-blue-950 flex flex-col items-center justify-center p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
         
-        {/* HEADER WITH DYNAMIC LOGO */}
-        <div className="bg-blue-50 p-8 text-center border-b border-blue-100">
-          <div className="w-24 h-24 bg-white rounded-full shadow-md mx-auto mb-4 flex items-center justify-center border-4 border-blue-100 overflow-hidden">
-             <img src={globalLogo} alt="District Logo" className="w-full h-full object-cover" />
+        <div className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 text-blue-900">
+            {step === 'phone' && <Smartphone size={32} />}
+            {step === 'setup' && <Shield size={32} />}
+            {(step === 'createPin' || step === 'enterPin') && <Lock size={32} />}
           </div>
-          <h1 className="text-2xl font-black text-blue-950 uppercase tracking-tight">{globalName} Command</h1>
-          <p className="text-xs font-extrabold text-blue-600 uppercase tracking-widest mt-1">Authorized Access Only</p>
+          <h1 className="text-2xl font-black text-blue-950 text-center uppercase tracking-tight">
+            Ketiejili Command
+          </h1>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+            Secure Access Gateway
+          </p>
         </div>
 
         {error && (
-          <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-3 text-red-700">
-            <AlertCircle size={20} className="shrink-0" />
-            <p className="text-sm font-bold">{error}</p>
+          <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm font-bold text-center mb-6 border border-red-100">
+            {error}
           </div>
         )}
 
-        <div className="p-8">
-          {step === 1 && (
-            <form onSubmit={handleSendCode} className="space-y-6 animate-fade-in">
-              <div className="text-center mb-6">
-                <p className="text-gray-500 font-bold text-sm">Enter your registered mobile number to receive your secure login code.</p>
-              </div>
+        {/* STEP 1: PHONE NUMBER */}
+        {step === 'phone' && (
+          <form onSubmit={handlePhoneSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Registered Mobile</label>
+              <input 
+                type="tel" 
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 0241234567"
+                className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold text-lg text-center"
+                required
+              />
+            </div>
+            <button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              {loading ? 'Scanning...' : 'Continue'} <ArrowRight size={18} />
+            </button>
+          </form>
+        )}
 
-              <div className="relative">
-                <Phone className="absolute left-4 top-4 text-gray-400" size={20}/>
-                <input type="tel" required placeholder="024 123 4567" value={phoneNumber} onChange={(e) => setPhoneNumber(e.target.value)} className={inputStyle} autoFocus />
-              </div>
+        {/* STEP 2: MASTER SETUP CODE */}
+        {step === 'setup' && (
+          <form onSubmit={handleSetupSubmit} className="space-y-4">
+            <div className="text-center mb-4">
+              <p className="text-sm font-bold text-gray-600">New device detected.</p>
+              <p className="text-xs text-gray-500 mt-1">Please enter the 6-digit authorization code provided by the Master Admin.</p>
+            </div>
+            <div>
+              <input 
+                type="text" 
+                value={setupCode}
+                onChange={(e) => setSetupCode(e.target.value)}
+                placeholder="000000"
+                maxLength="6"
+                className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-black text-2xl text-center tracking-[0.5em]"
+                required
+              />
+            </div>
+            <button type="submit" className="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              Verify Device <CheckCircle2 size={18} />
+            </button>
+          </form>
+        )}
 
-              <button type="submit" disabled={isLoading} className={`w-full py-4 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-3 text-white text-lg ${isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}>
-                {isLoading ? <><Loader2 size={24} className="animate-spin" /> Connecting...</> : <>Send Security Code <ArrowRight size={20}/></>}
-              </button>
-            </form>
-          )}
+        {/* STEP 3 & 4: PIN CREATION / ENTRY */}
+        {(step === 'createPin' || step === 'enterPin') && (
+          <form onSubmit={step === 'createPin' ? handleCreatePin : handleEnterPin} className="space-y-4">
+            <div className="text-center mb-4">
+              <p className="text-sm font-bold text-gray-600">
+                {step === 'createPin' ? 'Create your permanent 4-digit PIN.' : 'Enter your 4-digit PIN to unlock.'}
+              </p>
+            </div>
+            <div>
+              <input 
+                type="password" 
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                placeholder="••••"
+                maxLength="4"
+                className="w-full mt-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-black text-3xl text-center tracking-[0.5em]"
+                required
+              />
+            </div>
+            <button type="submit" disabled={loading} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 transition-colors">
+              {loading ? 'Securing...' : 'Unlock Command Centre'} <Lock size={18} />
+            </button>
+          </form>
+        )}
 
-          {step === 2 && (
-            <form onSubmit={handleVerifyCode} className="space-y-6 animate-fade-in">
-              <div className="text-center mb-6">
-                <p className="text-gray-500 font-bold text-sm">A 6-digit code has been sent to <span className="text-gray-900">{phoneNumber}</span>.</p>
-              </div>
-
-              <div className="relative">
-                <KeyRound className="absolute left-4 top-4 text-gray-400" size={20}/>
-                <input type="text" required maxLength="6" placeholder="• • • • • •" value={verificationCode} onChange={(e) => setVerificationCode(e.target.value)} className={inputStyle} autoFocus />
-              </div>
-
-              <button type="submit" disabled={isLoading || verificationCode.length !== 6} className={`w-full py-4 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-3 text-white text-lg ${(isLoading || verificationCode.length !== 6) ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
-                {isLoading ? <><Loader2 size={24} className="animate-spin" /> Verifying...</> : <>Verify & Access Command</>}
-              </button>
-
-              <div className="text-center pt-4">
-                <button type="button" onClick={() => setStep(1)} className="text-sm font-bold text-gray-400 hover:text-blue-600 transition-colors">
-                  Wrong number? Go back.
-                </button>
-              </div>
-            </form>
-          )}
-          <div id="recaptcha-container"></div>
-        </div>
       </div>
     </div>
   );
