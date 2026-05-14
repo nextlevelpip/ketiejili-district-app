@@ -145,8 +145,7 @@ export default function BulkSMS() {
     "District Minister", 
     "District Minister's Wife", 
     "Presiding Elder", 
-    "Presiding Elder's Wife", 
-    "Presiding Deacon",
+     "Presiding Deacon",
     "Presiding Brother" // Added Presiding Brother as requested
   ];
 
