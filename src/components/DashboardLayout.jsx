@@ -55,7 +55,7 @@ export default function DashboardLayout({ children }) {
               fullName: userData.name || userData.fullName || "Authorized Leader",
               role: userData.role || "District Leader",
               localPin: userData.localPin,
-              tierLevel: userData.tierLevel || 3 // GRAB THE CLEARANCE LEVEL HERE!
+              tierLevel: Number(userData.tierLevel) || 1 // Force it to be a numebr!
             });
             setIsAuthorized(true); 
           } else {
