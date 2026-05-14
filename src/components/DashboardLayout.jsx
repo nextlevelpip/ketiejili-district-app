@@ -28,11 +28,12 @@ export default function DashboardLayout({ children }) {
   const [globalSlogan, setGlobalSlogan] = useState('District Command');
   const [globalLogo, setGlobalLogo] = useState('/logo.jpg');
 
-  // --- REAL USER DATA ---
+  // --- REAL USER DATA (Now with Tier Level!) ---
   const [currentUser, setCurrentUser] = useState({
     fullName: "Loading...",
     role: "Verifying",
-    localPin: null
+    localPin: null,
+    tierLevel: 3 // Default to lowest clearance until proven otherwise
   });
 
   // --- FIREBASE SECURITY & USER FETCH ---
@@ -50,9 +51,11 @@ export default function DashboardLayout({ children }) {
           if (!querySnapshot.empty) {
             const userData = querySnapshot.docs[0].data();
             setCurrentUser({
-              fullName: userData.fullName || "Admin User",
+              // Support both 'name' and 'fullName' depending on how it was saved
+              fullName: userData.name || userData.fullName || "Authorized Leader",
               role: userData.role || "District Leader",
-              localPin: userData.localPin
+              localPin: userData.localPin,
+              tierLevel: userData.tierLevel || 3 // GRAB THE CLEARANCE LEVEL HERE!
             });
             setIsAuthorized(true); 
           } else {
@@ -136,6 +139,7 @@ export default function DashboardLayout({ children }) {
     }
   };
 
+  // --- MASTER LIST OF ALL POSSIBLE LINKS ---
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
@@ -150,10 +154,44 @@ export default function DashboardLayout({ children }) {
   ];
 
   const bottomNavItems = [
-    {name: 'Pastoral Prayers', href: "/prayers", icon: Heart },
+    { name: 'Pastoral Prayers', href: "/prayers", icon: Heart },
     { name: 'User Accounts', href: '/accounts', icon: UserCog },
     { name: 'Settings', href: '/settings', icon: Settings },
   ];
+
+  // --- THE DOOR FILTERS (SECURITY LOGIC) ---
+  const authorizedNavItems = navItems.filter(item => {
+    if (currentUser.tierLevel === 1) return true; // Supreme Command sees all
+    
+    if (currentUser.tierLevel === 2) {
+      // Presiding Elders see everything EXCEPT Data Export
+      const restricted = ['Data Export'];
+      return !restricted.includes(item.name);
+    }
+    
+    if (currentUser.tierLevel === 3) {
+      // Group Leaders ONLY see Operational Tools
+      const allowed = ['Directory', 'Attendance', 'Discipleship Tracker'];
+      return allowed.includes(item.name);
+    }
+    return false;
+  });
+
+  const authorizedBottomNavItems = bottomNavItems.filter(item => {
+    if (currentUser.tierLevel === 1) return true; // Supreme Command sees all
+    
+    if (currentUser.tierLevel === 2) {
+      // Presiding Elders cannot access Master Settings or User Accounts
+      const restricted = ['User Accounts', 'Settings'];
+      return !restricted.includes(item.name);
+    }
+    
+    if (currentUser.tierLevel === 3) {
+      // Group Leaders have no access to bottom admin tools
+      return false; 
+    }
+    return false;
+  });
 
   if (!isAuthorized) {
     return (
@@ -238,7 +276,7 @@ export default function DashboardLayout({ children }) {
           <div className="px-3 pb-2">
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Main Menu</p>
           </div>
-          {navItems.map((item) => {
+          {authorizedNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/');
             return (
@@ -257,7 +295,7 @@ export default function DashboardLayout({ children }) {
         </nav>
 
         <div className="p-4 border-t border-gray-100 space-y-1 bg-gray-50/50">
-          {bottomNavItems.map((item) => {
+          {authorizedBottomNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             return (
