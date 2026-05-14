@@ -97,7 +97,7 @@ export default function BulkSMS() {
   const smsPages = Math.ceil(characterCount / 160) || 1;
   const totalCostEstimate = validRecipients.length * smsPages * 0.04; // 4 pesewas per page
 
-  const handleSendSMS = async (e) => {
+const handleSendSMS = async (e) => {
     e.preventDefault();
     if (validRecipients.length === 0) {
       showNotification('error', 'No valid recipients found matching these filters.');
@@ -111,9 +111,32 @@ export default function BulkSMS() {
     setIsSending(true);
 
     try {
-      // 1. In the future, you will trigger the real Arkesel/Hubtel API here.
-      
-      // 2. Log the successful broadcast to your Firebase history
+      // 1. Format numbers to international format (024... becomes 23324...)
+      const formattedPhones = validRecipients.map(m => {
+        let num = m.phone.replace(/\D/g, '');
+        if (num.startsWith('0')) {
+          return '233' + num.substring(1);
+        }
+        return num;
+      });
+
+      // 2. Transmit through our Secure Server Bridge
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          recipients: formattedPhones
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Transmission failed at the bridge.');
+      }
+
+      // 3. Log the successful broadcast to your Firebase history
       await addDoc(collection(db, 'sms_logs'), {
         messageBody: message,
         recipientCount: validRecipients.length,
@@ -122,7 +145,7 @@ export default function BulkSMS() {
         timestamp: new Date().toISOString()
       });
 
-      showNotification('success', `Broadcast successfully dispatched and logged for ${validRecipients.length} members!`);
+      showNotification('success', `Broadcast successfully dispatched to ${validRecipients.length} members!`);
       setMessage('');
       
     } catch (error) {
