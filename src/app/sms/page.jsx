@@ -1,11 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone } from 'lucide-react';
+import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone, ShieldAlert } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 
 export default function BulkSMS() {
+  const [isAuthorized, setIsAuthorized] = useState(null); // null = checking, false = denied, true = allowed
   const [members, setMembers] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [activeTab, setActiveTab] = useState('compose'); // 'compose' or 'history'
@@ -20,24 +21,42 @@ export default function BulkSMS() {
   const [targetGender, setTargetGender] = useState('All Genders');
   const [targetDemo, setTargetDemo] = useState('All Ages');
 
+  // --- STRICT TIER 1 SECURITY CHECK ---
+  useEffect(() => {
+    const checkClearance = () => {
+      const userStr = localStorage.getItem('ketiejili_user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        if (user.tierLevel === 1) {
+          setIsAuthorized(true);
+          return;
+        }
+      }
+      setIsAuthorized(false); // Deny access!
+    };
+    checkClearance();
+  }, []);
+
   // --- FETCH DIRECTORY & LOGS ---
   useEffect(() => {
-    // Fetch Members
-    const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
-      const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMembers(fetched);
-    });
+    if (isAuthorized) {
+      // Fetch Members
+      const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
+        const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setMembers(fetched);
+      });
 
-    // Fetch SMS History
-    const unsubLogs = onSnapshot(collection(db, 'sms_logs'), (snapshot) => {
-      const fetchedLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort by newest first
-      fetchedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-      setSmsLogs(fetchedLogs);
-    });
+      // Fetch SMS History
+      const unsubLogs = onSnapshot(collection(db, 'sms_logs'), (snapshot) => {
+        const fetchedLogs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // Sort by newest first
+        fetchedLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        setSmsLogs(fetchedLogs);
+      });
 
-    return () => { unsubMembers(); unsubLogs(); };
-  }, []);
+      return () => { unsubMembers(); unsubLogs(); };
+    }
+  }, [isAuthorized]);
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
@@ -115,9 +134,43 @@ export default function BulkSMS() {
   };
 
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
-  const churchRoles = ["Member", "New Convert", "Elder", "Deacon", "Deaconess", "District Minister", "District Minister's Wife", "Presiding Elder", "Presiding Elder's Wife", "Presiding Deacon"];
+  
+  // --- UPDATED CHURCH ROLES WITH PRESIDING TITLES ---
+  const churchRoles = [
+    "Member", 
+    "New Convert", 
+    "Elder", 
+    "Deacon", 
+    "Deaconess", 
+    "District Minister", 
+    "District Minister's Wife", 
+    "Presiding Elder", 
+    "Presiding Elder's Wife", 
+    "Presiding Deacon",
+    "Presiding Brother" // Added Presiding Brother as requested
+  ];
 
   const filterSelectStyle = "p-3 bg-gray-50/50 border border-gray-100 rounded-xl font-bold text-sm outline-none focus:border-blue-500 focus:bg-white transition-all w-full text-gray-700";
+
+  // --- ACCESS DENIED SCREEN ---
+  if (isAuthorized === false) {
+    return (
+      <DashboardLayout>
+        <div className="min-h-[80vh] flex flex-col items-center justify-center text-center p-6 animate-fade-in">
+          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 text-red-600 shadow-lg">
+            <ShieldAlert size={48} />
+          </div>
+          <h1 className="text-4xl font-black text-slate-900 uppercase tracking-tight mb-2">Restricted Area</h1>
+          <p className="text-gray-500 font-bold max-w-md">
+            The District Communication Hub is strictly reserved for Tier 1 Supreme Command.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // --- LOADING SCREEN ---
+  if (isAuthorized === null) return <DashboardLayout><div className="p-8 text-center font-bold text-gray-500 flex justify-center items-center gap-2"><Loader2 className="animate-spin" /> Verifying Security Clearance...</div></DashboardLayout>;
 
   return (
     <DashboardLayout>
