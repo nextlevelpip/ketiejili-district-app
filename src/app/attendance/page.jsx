@@ -325,12 +325,22 @@ export default function Attendance() {
                           <p className="font-black text-gray-900">{absentee.name}</p>
                           <p className="text-xs font-bold text-gray-400 mt-0.5">{absentee.phone}</p>
                         </div>
-                        {/* THE NEW MESSAGE & CALL BUTTONS */}
+                        {/* THE UPGRADED WHATSAPP & CALL BUTTONS */}
                         <div className="flex gap-2">
-                          <a href={`sms:${absentee.phone}`} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Send SMS">
+                          <a 
+                            href={`https://wa.me/${absentee.phone?.startsWith('0') ? '233' + absentee.phone.substring(1) : absentee.phone}?text=${encodeURIComponent(`Calvary greetings ${absentee.name.split(' ')[0]}! We missed you at ${currentReport.serviceType} today. We pray all is well with you and your family. Please let us know if there is anything we can pray with you about. God bless you! - Ketiejili District`)}`}
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" 
+                            title="Send WhatsApp Follow-up"
+                          >
                             <MessageSquare size={18} />
                           </a>
-                          <a href={`tel:${absentee.phone}`} className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Call">
+                          <a 
+                            href={`tel:${absentee.phone}`} 
+                            className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" 
+                            title="Call Member"
+                          >
                             <PhoneCall size={18} />
                           </a>
                         </div>
