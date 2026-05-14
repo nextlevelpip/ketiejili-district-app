@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../components/DashboardLayout";
+import PastorScheduleWidget from '../components/PastorScheduleWidget'; 
 import { Users, Flame, Wind, TrendingUp, Shield, Heart, Trophy, Activity, Target, Droplet } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { db } from './firebase';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { db, auth } from './firebase';
+import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 // --- REUSABLE WIDGETS ---
 const MassiveKpiCard = ({ title, value, icon: Icon, bgColor, textColor }) => (
@@ -36,23 +38,44 @@ const MinistryCard = ({ title, primaryValue, secondaryText, icon: Icon, bgClass,
 export default function Home() {
   const [members, setMembers] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
+  const [userTier, setUserTier] = useState(3); // Default to lowest security tier
 
-  // --- FIREBASE CONNECTION ---
+  // --- FIREBASE CONNECTION & SECURITY CHECK ---
   useEffect(() => {
+    // 1. Fetch Members & Logs
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       setMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
     const unsubLogs = onSnapshot(collection(db, 'attendance_logs'), (snapshot) => {
       setAttendanceLogs(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
-    return () => { unsubMembers(); unsubLogs(); };
+
+    // 2. Fetch Current User Tier Level
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const deviceId = localStorage.getItem('ketiejili_device_id');
+        if (deviceId) {
+          const q = query(collection(db, 'users'), where('authorizedDevice', '==', deviceId));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const userData = querySnapshot.docs[0].data();
+            setUserTier(Number(userData.tierLevel) || 3);
+          }
+        }
+      }
+    });
+
+    return () => { 
+      unsubMembers(); 
+      unsubLogs(); 
+      unsubscribeAuth(); 
+    };
   }, []);
 
   // --- REAL-TIME DATA CALCULATIONS ---
   const totalMembers = members.length;
   const totalSouls = members.filter(m => m.churchRole === 'New Convert').length;
   
-  // Restored Water Baptism calculation for the top row
   const waterBaptized = members.filter(m => m.waterBaptismStatus === 'Yes').length;
   const spiritBaptized = members.filter(m => m.spiritBaptism === 'Yes').length;
 
@@ -67,7 +90,6 @@ export default function Home() {
   const pendingWater = members.filter(m => m.waterBaptismStatus !== 'Yes').length;
   const pendingSpirit = members.filter(m => m.spiritBaptism !== 'Yes').length;
 
-  // Calculate Overall Faithfulness for the graph
   let totalPresent = 0; let totalAbsent = 0;
   attendanceLogs.forEach(log => {
     Object.values(log.records).forEach(status => {
@@ -110,15 +132,13 @@ export default function Home() {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const trendMap = {};
 
-    // 1. Create a blank slate for the last 5 months
     const currentMonthIndex = new Date().getMonth();
     for (let i = 4; i >= 0; i--) {
       let mIndex = currentMonthIndex - i;
-      if (mIndex < 0) mIndex += 12; // Handle changing years
+      if (mIndex < 0) mIndex += 12; 
       trendMap[months[mIndex]] = { month: months[mIndex], present: 0, absent: 0 };
     }
 
-    // 2. Pour your actual Firebase attendance logs into the months
     attendanceLogs.forEach(log => {
       if (!log.date) return;
       const logDate = new Date(log.date);
@@ -141,7 +161,7 @@ export default function Home() {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in max-w-7xl mx-auto pb-10">
         
-        {/* ROW 1: CORE SPIRITUAL METRICS (Restored Water Baptism) */}
+        {/* ROW 1: CORE SPIRITUAL METRICS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MassiveKpiCard title="Total Members" value={totalMembers} icon={Users} bgColor="bg-blue-900" textColor="text-blue-100" />
           <MassiveKpiCard title="Total Souls Won" value={totalSouls} icon={Flame} bgColor="bg-emerald-600" textColor="text-emerald-100" />
@@ -149,7 +169,7 @@ export default function Home() {
           <MassiveKpiCard title="Holy Spirit Baptisms" value={spiritBaptized} icon={Wind} bgColor="bg-purple-600" textColor="text-purple-100" />
         </div>
 
-        {/* ROW 2: STRUCTURAL & MINISTRY FOCUS (Restored Presbytery Breakdown) */}
+        {/* ROW 2: STRUCTURAL & MINISTRY FOCUS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <MinistryCard 
             title="Welfare Focus" 
@@ -185,8 +205,10 @@ export default function Home() {
           />
         </div>
 
-        {/* ROW 3: CHARTS */}
+        {/* ROW 3: CHARTS & DYNAMIC ITINERARY */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Attendance Trend Chart */}
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2 mb-6">
               <TrendingUp className="text-blue-500" size={20} /> Attendance & Faithfulness Trend
@@ -213,64 +235,90 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col">
-            <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2"><Activity className="text-blue-500" size={20} /> Age Demographics</h3>
-              {/* THE FIX: We added a wrapper div with a strict height of h-64 */}
-            <div className="h-64 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={demoData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {demoData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip 
-                    contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    itemStyle={{ fontWeight: 'bold' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
-            {demoData.map(demo => (
-              <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>
-                {demo.name}
+          {/* DYNAMIC 3RD COLUMN: Shows Itinerary for Tier 1, Demographic Pie for others */}
+          <div className="lg:col-span-1 h-[400px]">
+            {userTier === 1 ? (
+              <div className="h-full animate-fade-in">
+                <PastorScheduleWidget userTier={userTier} />
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-full animate-fade-in">
+                <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                  <Activity className="text-blue-500" size={20} /> Age Demographics
+                </h3>
+                <div className="flex-1 relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={demoData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                        {demoData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                      </Pie>
+                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} itemStyle={{ fontWeight: 'bold' }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
+                  {demoData.map(demo => (
+                    <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>
+                      {demo.name}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ROW 4: LEADERBOARD */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8">
-          <h3 className="text-xl font-extrabold text-amber-500 flex items-center gap-3 mb-6"><Trophy size={24} strokeWidth={2.5} /> Faithful Servants Leaderboard</h3>
-          {leaderboard.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {leaderboard.map((member, index) => (
-                <div key={member.id} className="flex items-center gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/30">
-                  <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-black flex items-center justify-center shadow-md">#{index + 1}</div>
-                  <div>
-                    <h4 className="font-extrabold text-gray-900">{member.name}</h4>
-                    <p className="text-xs font-bold text-gray-500">{member.localAssembly} • {member.churchRole}</p>
+        {/* ROW 4: LEADERBOARD & DEMOGRAPHICS (For Tier 1 only, since Tier 2/3 sees Demographics in Row 3) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className={`${userTier === 1 ? 'lg:col-span-2' : 'lg:col-span-3'} bg-white rounded-2xl shadow-sm border border-gray-100 p-6 md:p-8`}>
+            <h3 className="text-xl font-extrabold text-amber-500 flex items-center gap-3 mb-6"><Trophy size={24} strokeWidth={2.5} /> Faithful Servants Leaderboard</h3>
+            {leaderboard.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {leaderboard.map((member, index) => (
+                  <div key={member.id} className="flex items-center gap-4 p-4 rounded-xl border border-amber-100 bg-amber-50/30">
+                    <div className="w-10 h-10 rounded-full bg-amber-500 text-white font-black flex items-center justify-center shadow-md">#{index + 1}</div>
+                    <div>
+                      <h4 className="font-extrabold text-gray-900">{member.name}</h4>
+                      <p className="text-xs font-bold text-gray-500">{member.localAssembly} • {member.churchRole}</p>
+                    </div>
+                    <div className="ml-auto text-center">
+                      <div className="text-xl font-black text-emerald-600">{member.presentCount}</div>
+                      <div className="text-[10px] uppercase font-bold text-gray-400">Services</div>
+                    </div>
                   </div>
-                  <div className="ml-auto text-center">
-                    <div className="text-xl font-black text-emerald-600">{member.presentCount}</div>
-                    <div className="text-[10px] uppercase font-bold text-gray-400">Services</div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-400 italic text-sm font-bold bg-gray-50 p-6 rounded-xl border border-gray-100 text-center">No attendance data has been recorded yet.</p>
+            )}
+          </div>
+
+          {/* Show Demographics down here for Tier 1 so they don't miss out on it! */}
+          {userTier === 1 && (
+            <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col h-full animate-fade-in">
+              <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center gap-2">
+                <Activity className="text-blue-500" size={20} /> Age Demographics
+              </h3>
+              <div className="h-64 w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={demoData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value">
+                      {demoData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} itemStyle={{ fontWeight: 'bold' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
+                {demoData.map(demo => (
+                  <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>
+                    {demo.name}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          ) : (
-            <p className="text-gray-400 italic text-sm font-bold bg-gray-50 p-6 rounded-xl border border-gray-100 text-center">No attendance data has been recorded yet.</p>
           )}
         </div>
 
