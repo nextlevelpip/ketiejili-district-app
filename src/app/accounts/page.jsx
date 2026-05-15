@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { UserPlus, UserCog, Trash2, CheckCircle2, AlertCircle, Loader2, Lock, Smartphone, MessageSquare } from 'lucide-react';
+import { UserPlus, UserCog, Trash2, CheckCircle2, AlertCircle, Loader2, Lock, Smartphone, MessageSquare, MessageCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -21,20 +21,17 @@ export default function UserAccounts() {
 
   // --- FIREBASE CONNECTION ---
   useEffect(() => {
-    // 1. Fetch all members for the dropdown
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       const fetchedMembers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       fetchedMembers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setMembers(fetchedMembers);
     });
 
-    // 2. Fetch existing authorized users from the 'users' collection (Used by Login Gateway)
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const fetchedUsers = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSystemUsers(fetchedUsers);
     });
 
-    // 3. Fetch Master Assemblies
     const qAssemblies = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubAssemblies = onSnapshot(qAssemblies, (snapshot) => {
       if (!snapshot.empty) setAssemblies(snapshot.docs.map(doc => doc.data().name));
@@ -48,7 +45,6 @@ export default function UserAccounts() {
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
   };
 
-  // --- DYNAMIC DEFINITIONS ---
   const roles = ["District Minister", "District Secretary", "Presiding Elder", "Group Leader", "Group Secretary"];
 
   const getTierLevel = (role) => {
@@ -57,7 +53,6 @@ export default function UserAccounts() {
     return 3;
   };
 
-  // --- ADD NEW SYSTEM USER ---
   const handleCreateAccount = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -71,7 +66,6 @@ export default function UserAccounts() {
 
     const selectedMember = members.find(m => m.id === selectedMemberId);
 
-    // Check if member's phone is already authorized
     if (systemUsers.some(user => user.phone === selectedMember.phone)) {
       showNotification('error', 'This member already has a system account.');
       setIsSubmitting(false);
@@ -90,25 +84,23 @@ export default function UserAccounts() {
         role: accessRole,
         tierLevel: tierLevel,
         assignedAssembly: isTier1 ? 'All Assemblies' : assignedAssembly,
-        setupCode: setupCode, // Temporary 6-digit code for first login
+        setupCode: setupCode, 
         authorizedDevice: null,
         localPin: null,
         status: 'Active',
         createdAt: new Date().toISOString()
       });
       
-      showNotification('success', `Account created! Give ${selectedMember.name} this Setup Code: ${setupCode}`);
+      showNotification('success', `Account created! Setup Code: ${setupCode}`);
       setSelectedMemberId(''); setAccessRole(''); setAssignedAssembly('');
       
     } catch (error) {
-      console.error(error);
       showNotification('error', 'Failed to create account. Check your connection.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --- RESET DEVICE LOCK ---
   const handleResetDevice = async (id, userName) => {
     if (!window.confirm(`Reset device lock for ${userName}? They will need a new Setup Code to log in.`)) return;
     
@@ -125,7 +117,6 @@ export default function UserAccounts() {
     }
   };
 
-  // --- REVOKE ACCESS ---
   const handleRevokeAccess = async (id, name, role) => {
     if (role === 'District Minister' && systemUsers.filter(u => u.role === 'District Minister').length <= 1) {
       showNotification('error', 'SYSTEM HALTED: Cannot delete the final District Minister account.');
@@ -142,14 +133,45 @@ export default function UserAccounts() {
     }
   };
 
-  // --- WHATSAPP HANDOVER GENERATOR ---
   const getWhatsAppLink = (user) => {
     if (!user.phone) return '#';
     let formattedPhone = user.phone.replace(/\D/g, '');
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
     
-    const msg = `Praise the Lord ${user.name.split(' ')[0]}! \n\nYou have been granted official access to the Ketiejili Command Centre. \n\n*Your Setup Code is:* ${user.setupCode}\n\nPlease go to https://tinyurl.com/kddapp to secure your account and set your private PIN. God bless you!`;
+    const msg = `Praise the Lord ${user.name.split(' ')[0]}!\n\nYou have been granted official access to the Ketiejili Command Centre.\n\n*Your Setup Code is:* ${user.setupCode}\n\nPlease go to https://tinyurl.com/kddapp to secure your account and set your private PIN. God bless you!`;
     return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  // ==========================================
+  // NEW: DIRECT IN-APP SMS FOR SETUP CODES
+  // ==========================================
+  const handleSendSetupSMS = async (user) => {
+    const message = `Praise the Lord ${user.name.split(' ')[0]}! You have been granted access to the Ketiejili Command Centre. Your Setup Code is: ${user.setupCode}. Go to https://tinyurl.com/kddapp to secure your account.`;
+    
+    if (!window.confirm(`Send this official SMS to ${user.name}?\n\n"${message}"`)) return;
+
+    let formattedPhone = user.phone?.replace(/\D/g, '');
+    if (!formattedPhone) return showNotification('error', 'User does not have a valid phone number.');
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+
+    try {
+      showNotification('success', 'Transmitting Setup Code to network...');
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          recipients: [formattedPhone]
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'API Connection Failed');
+
+      showNotification('success', `Setup Code delivered to ${user.name}!`);
+    } catch (err) {
+      showNotification('error', `Transmission Failed: ${err.message}`);
+    }
   };
 
   const inputStyle = "w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all text-sm text-gray-700 shadow-sm font-bold";
@@ -159,7 +181,6 @@ export default function UserAccounts() {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in max-w-6xl mx-auto relative pb-10">
         
-        {/* NOTIFICATION BANNER */}
         {notification.message && (
           <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
             {notification.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
@@ -169,7 +190,6 @@ export default function UserAccounts() {
 
         <h1 className="text-3xl font-black text-blue-950 uppercase tracking-tight mb-8">Secure Access Manager</h1>
 
-        {/* ================= USER MANAGEMENT FORM ================= */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 md:p-8 mb-8">
           <h2 className="text-xl font-extrabold text-blue-900 flex items-center gap-3 mb-6">
             <UserCog size={24} className="text-blue-600" /> Grant Access
@@ -177,7 +197,6 @@ export default function UserAccounts() {
           
           <form onSubmit={handleCreateAccount} className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              
               <div className="md:col-span-1">
                 <label className={labelStyle}>Select Member Profile</label>
                 <select required value={selectedMemberId} onChange={e => setSelectedMemberId(e.target.value)} className={inputStyle}>
@@ -214,12 +233,10 @@ export default function UserAccounts() {
                   {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><UserPlus size={16} /> Generate Key</>}
                 </button>
               </div>
-
             </div>
           </form>
         </div>
 
-        {/* ================= AUTHORIZED PERSONNEL TABLE ================= */}
         <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
           <div className="p-6 border-b border-gray-100">
             <h3 className="text-lg font-extrabold text-gray-900">Authorized Personnel</h3>
@@ -259,16 +276,26 @@ export default function UserAccounts() {
                             <span className="text-[10px] font-black text-orange-600 uppercase block">Pending Setup</span>
                             <span className="text-sm font-black font-mono tracking-widest text-orange-800">{user.setupCode}</span>
                           </div>
-                          {/* THE MAGICAL WHATSAPP HANDOVER BUTTON */}
-                          <a 
-                            href={getWhatsAppLink(user)} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="p-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors shadow-sm flex items-center justify-center" 
-                            title="Send Setup Code via WhatsApp"
-                          >
-                            <MessageSquare size={16} />
-                          </a>
+                          <div className="flex gap-2">
+                            {/* WHATSAPP BUTTON */}
+                            <a 
+                              href={getWhatsAppLink(user)} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="p-2.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-lg transition-colors shadow-sm flex items-center justify-center" 
+                              title="WhatsApp Setup Code"
+                            >
+                              <MessageCircle size={16} />
+                            </a>
+                            {/* DIRECT API SMS BUTTON */}
+                            <button 
+                              onClick={() => handleSendSetupSMS(user)} 
+                              className="p-2.5 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-lg transition-colors shadow-sm flex items-center justify-center" 
+                              title="SMS Setup Code"
+                            >
+                              <MessageSquare size={16} />
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg inline-flex text-emerald-700">
@@ -296,7 +323,6 @@ export default function UserAccounts() {
             </table>
           </div>
         </div>
-
       </div>
     </DashboardLayout>
   );

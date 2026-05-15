@@ -1,16 +1,17 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit3, Save, Flame } from 'lucide-react';
+import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit3, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
 export default function Directory() {
   const [members, setMembers] = useState([]);
-  const [assemblies, setAssemblies] = useState(['Central']); // Dynamic Assemblies List
+  const [assemblies, setAssemblies] = useState(['Central']); 
   const [activeTab, setActiveTab] = useState('register'); 
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
   // --- FORM STATES ---
   const [editingId, setEditingId] = useState(null);
@@ -45,19 +46,20 @@ export default function Directory() {
   const [fDemo, setFDemo] = useState('All Ages');
 
   useEffect(() => {
-    // 1. Fetch Members
+    // Check Tier Level for SMS Button
+    const userStr = localStorage.getItem('ketiejili_user');
+    if (userStr) setCurrentUser(JSON.parse(userStr));
+
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMembers(fetched.sort((a, b) => (a.name || '').localeCompare(b.name || '')));
     });
 
-    // 2. Fetch Dynamic Assemblies from Settings
     const q = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubAssemblies = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const fetchedAssemblies = snapshot.docs.map(doc => doc.data().name);
         setAssemblies(fetchedAssemblies);
-        // Set default to the first assembly if currently blank
         setLocalAssembly(prev => prev === '' ? fetchedAssemblies[0] : prev);
       }
     });
@@ -67,6 +69,8 @@ export default function Directory() {
       unsubAssemblies();
     };
   }, []);
+
+  const isTier1 = currentUser?.tierLevel === 1 || currentUser?.tierLevel === "1";
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
@@ -92,7 +96,6 @@ export default function Directory() {
     setHasDisability('No'); setDisabilityType('');
   };
 
-  // --- STRICT PHONE VALIDATION ---
   const handlePhoneChange = (e) => {
     let val = e.target.value.replace(/\D/g, ''); 
     if (val.length > 0 && val[0] !== '0') {
@@ -139,7 +142,7 @@ export default function Directory() {
         childrenCount: maritalStatus && maritalStatus !== 'Single' ? childrenCount : 0,
         spiritBaptism, hasDisability, 
         disabilityType: hasDisability === 'Yes' ? disabilityType : '',
-        ageGroup: autoAgeGroup // For analytics pie chart alignment
+        ageGroup: autoAgeGroup 
     };
 
     try {
@@ -180,6 +183,35 @@ export default function Directory() {
         await deleteDoc(doc(db, 'members', id));
         showNotification('success', 'Member Purged.');
       } catch (err) { showNotification('error', 'Purge Failed.'); }
+    }
+  };
+
+  // ==========================================
+  // API DIRECT SMS LOGIC
+  // ==========================================
+  const handleSendDirectSMS = async (member) => {
+    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! We pray this message finds you well. God bless you! - Ketiejili District`;
+    const message = window.prompt(`[TIER 1] Send Official SMS to ${member.name}:`, defaultMsg);
+    
+    if (!message) return;
+
+    let formattedPhone = member.phone?.replace(/\D/g, '');
+    if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+
+    try {
+      showNotification('success', 'Transmitting message to network...');
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, recipients: [formattedPhone] })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'API Connection Failed');
+      showNotification('success', `Official SMS delivered to ${member.name}!`);
+    } catch (err) {
+      showNotification('error', `Transmission Failed: ${err.message}`);
     }
   };
 
@@ -429,7 +461,45 @@ export default function Directory() {
                               {age !== null ? `${age} yrs` : 'No DOB'}
                             </div>
                           </td>
-                          <td className="p-5 font-mono font-bold text-gray-600">{m.phone}</td>
+                          <td className="p-5">
+                            <div className="font-mono font-bold text-gray-600 mb-2">{m.phone}</div>
+                            
+                            {/* THE TRINITY COMMUNICATION BUTTONS */}
+                            <div className="flex gap-2">
+                              {/* WhatsApp Button */}
+                              <a 
+                                href={`https://wa.me/${m.phone?.startsWith('0') ? '233' + m.phone.substring(1) : m.phone}`}
+                                target="_blank" rel="noopener noreferrer"
+                                className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm" 
+                                title="WhatsApp"
+                              >
+                                <MessageCircle size={14} />
+                              </a>
+                              
+                              {/* Phone Call Button */}
+                              <a 
+                                href={`tel:${m.phone}`} 
+                                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all shadow-sm" 
+                                title="Call"
+                              >
+                                <PhoneCall size={14} />
+                              </a>
+
+                              {/* TIER 1 SECURED API SMS BUTTON */}
+                              {isTier1 && (
+                                <button 
+                                  onClick={() => handleSendDirectSMS(m)}
+                                  className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm relative group/btn" 
+                                  title="Send Official District SMS (Tier 1)"
+                                >
+                                  <MessageSquare size={14} />
+                                  <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full flex items-center justify-center border border-white shadow-sm">
+                                    <Shield size={6} className="text-white" />
+                                  </div>
+                                </button>
+                              )}
+                            </div>
+                          </td>
                           <td className="p-5">
                             <div className="flex justify-center gap-2">
                               <button onClick={() => handleEdit(m)} className="p-2 text-blue-500 bg-blue-50 hover:bg-blue-600 hover:text-white rounded-lg transition-colors"><Edit3 size={16}/></button>
