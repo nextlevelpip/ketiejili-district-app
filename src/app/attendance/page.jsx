@@ -1,14 +1,14 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare } from 'lucide-react';
+import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 
 export default function Attendance() {
   const [members, setMembers] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
-  const [activeTab, setActiveTab] = useState('mark'); 
+  const [activeTab, setActiveTab] = useState('reports'); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ type: '', message: '' });
@@ -20,16 +20,17 @@ export default function Attendance() {
   const [assembly, setAssembly] = useState('Central');
   const [group, setGroup] = useState('All Groups (Whole Assembly)');
   const [attendanceRecords, setAttendanceRecords] = useState({});
-  const [activeSubGroup, setActiveSubGroup] = useState(''); // Handles the Group-by-Group marking
+  const [activeSubGroup, setActiveSubGroup] = useState('');
 
-  // --- REPORT STATES ---
-  const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
-  const [reportService, setReportService] = useState('Sunday Service');
+  // --- REPORT STATES (RANGE FILTER) ---
+  const [reportStartDate, setReportStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]); 
+  const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0]);
+  const [reportService, setReportService] = useState('All Services');
   const [reportAssembly, setReportAssembly] = useState('Central');
 
   // --- ANALYTICS STATES ---
   const [analyticsAssembly, setAnalyticsAssembly] = useState('All Assemblies');
-  const [analyticsServiceType, setAnalyticsServiceType] = useState('All Services'); // NEW: Service Type Filter
+  const [analyticsServiceType, setAnalyticsServiceType] = useState('All Services');
 
   useEffect(() => {
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
@@ -51,11 +52,9 @@ export default function Attendance() {
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
   };
 
-  // --- LOGIC FOR GROUP-BY-GROUP MARKING ---
   const assemblyMembers = members.filter(m => m.localAssembly === assembly);
   const availableGroups = [...new Set(assemblyMembers.map(m => m.group || 'Unassigned'))];
 
-  // Set the first group active when assembly changes
   useEffect(() => {
     const groups = [...new Set(members.filter(m => m.localAssembly === assembly).map(m => m.group || 'Unassigned'))];
     setActiveSubGroup(groups[0] || '');
@@ -63,15 +62,13 @@ export default function Attendance() {
 
   const targetMembers = assemblyMembers.filter(m => {
     if (group !== 'All Groups (Whole Assembly)') return m.group === group;
-    return true; // If marking whole assembly, we grab everyone to save them together
+    return true;
   });
 
-  // The members currently visible on the screen based on the SubGroup tab clicked
   const displayedMembers = group === 'All Groups (Whole Assembly)' 
     ? assemblyMembers.filter(m => (m.group || 'Unassigned') === activeSubGroup)
     : assemblyMembers.filter(m => m.group === group);
 
-  // Smart Default: Everyone is present initially
   useEffect(() => {
     if (activeTab === 'mark' && targetMembers.length > 0) {
       const defaults = {};
@@ -115,6 +112,43 @@ export default function Attendance() {
     }
   };
 
+  // ==========================================
+  // NEW: DIRECT IN-APP SMS FUNCTION
+  // ==========================================
+  const handleSendDirectSMS = async (member, serviceType) => {
+    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! We missed you at ${serviceType === 'All Services' ? 'church' : serviceType} recently. We pray all is well with you. God bless you! - Ketiejili District`;
+    
+    const message = window.prompt(`Send Official District SMS to ${member.name}:`, defaultMsg);
+    
+    if (!message) return; // Stop if they cancel
+
+    let formattedPhone = member.phone?.replace(/\D/g, '');
+    if (!formattedPhone) {
+      showNotification('error', 'Member does not have a valid phone number.');
+      return;
+    }
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+
+    try {
+      showNotification('success', 'Transmitting message to network...');
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          recipients: [formattedPhone]
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'API Connection Failed');
+
+      showNotification('success', `Official SMS delivered to ${member.name}!`);
+    } catch (err) {
+      showNotification('error', `Transmission Failed: ${err.message}`);
+    }
+  };
+
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
   const uniqueGroups = [...new Set(members.map(m => m.group).filter(Boolean))];
   const serviceTypesList = [
@@ -123,15 +157,33 @@ export default function Attendance() {
     "Youth Ministry Meeting", "++ Add Custom ++"
   ];
 
-  const currentReport = attendanceLogs.find(log => 
-    log.date === reportDate && log.assembly === reportAssembly && 
-    (log.serviceType === reportService || reportService === 'All Services')
-  );
+  const matchingLogs = attendanceLogs.filter(log => {
+    return log.date >= reportStartDate && 
+           log.date <= reportEndDate && 
+           (reportAssembly === 'All Assemblies' || log.assembly === reportAssembly) &&
+           (reportService === 'All Services' || log.serviceType === reportService);
+  });
+
+  const absenteeStats = {};
+  matchingLogs.forEach(log => {
+    members.forEach(m => {
+      if (reportAssembly !== 'All Assemblies' && m.localAssembly !== reportAssembly) return;
+
+      if (log.records && log.records[m.id] === 'Absent') {
+        if (!absenteeStats[m.id]) {
+          absenteeStats[m.id] = { member: m, absentCount: 0, datesMissed: [] };
+        }
+        absenteeStats[m.id].absentCount += 1;
+        absenteeStats[m.id].datesMissed.push(log.date);
+      }
+    });
+  });
+
+  const absenteeList = Object.values(absenteeStats).sort((a, b) => b.absentCount - a.absentCount);
 
   const inputStyle = "w-full p-3.5 bg-white border border-gray-200 rounded-xl font-bold text-sm text-gray-800 outline-none focus:border-blue-500 transition-all";
   const labelStyle = "text-[10px] font-black text-gray-400 uppercase ml-1 mb-2 block tracking-widest";
 
-  // NEW: Advanced Faithfulness Calculation with Service Type
   const getFaithfulness = (memberId) => {
     const memberLogs = attendanceLogs.filter(log => {
       const hasRecord = log.records && log.records[memberId];
@@ -189,7 +241,6 @@ export default function Attendance() {
         {activeTab === 'mark' && (
           <div className="bg-white p-6 md:p-8 rounded-[24px] shadow-sm border border-gray-100 animate-fade-in">
             <form onSubmit={handleSave} className="space-y-8">
-              
               <div className="bg-gray-50/50 p-6 rounded-2xl border border-gray-100 grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div>
                   <label className={labelStyle}>Date</label>
@@ -225,7 +276,6 @@ export default function Attendance() {
                   <span className="text-blue-600 font-black text-sm">{targetMembers.length} Souls Total</span>
                 </div>
 
-                {/* THE GROUP-BY-GROUP NAVIGATOR */}
                 {group === 'All Groups (Whole Assembly)' && availableGroups.length > 0 && (
                   <div className="flex gap-2 overflow-x-auto mb-6 pb-2 border-b border-gray-100">
                     {availableGroups.map(g => {
@@ -244,7 +294,6 @@ export default function Attendance() {
                   </div>
                 )}
 
-                {/* THE VISIBLE MEMBERS TO MARK */}
                 <div className="space-y-3">
                   {displayedMembers.length === 0 ? (
                     <div className="p-10 text-center text-gray-400 font-bold italic border border-dashed rounded-2xl">No members found in this group.</div>
@@ -283,14 +332,19 @@ export default function Attendance() {
         {/* ================= TAB 2: ABSENTEE REPORT ================= */}
         {activeTab === 'reports' && (
           <div className="bg-white p-6 md:p-8 rounded-[24px] shadow-sm border border-gray-100 animate-fade-in space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div>
-                <label className={labelStyle}>Search Date</label>
-                <input type="date" value={reportDate} onChange={e => setReportDate(e.target.value)} className={inputStyle} />
+                <label className={labelStyle}>Start Date</label>
+                <input type="date" value={reportStartDate} onChange={e => setReportStartDate(e.target.value)} className={inputStyle} />
+              </div>
+              <div>
+                <label className={labelStyle}>End Date</label>
+                <input type="date" value={reportEndDate} onChange={e => setReportEndDate(e.target.value)} className={inputStyle} />
               </div>
               <div>
                 <label className={labelStyle}>Assembly</label>
                 <select value={reportAssembly} onChange={e => setReportAssembly(e.target.value)} className={inputStyle}>
+                  <option value="All Assemblies">All Assemblies</option>
                   {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </div>
@@ -304,41 +358,55 @@ export default function Attendance() {
             </div>
 
             <div className="bg-gray-50/50 rounded-2xl border border-gray-100 overflow-hidden min-h-[300px] flex flex-col">
-              {currentReport ? (
+              {matchingLogs.length > 0 ? (
                 <div className="p-6">
-                   <div className="flex justify-between items-center mb-6">
+                   <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
                      <div>
-                       <h3 className="font-black text-gray-900 text-xl">{currentReport.serviceType}</h3>
-                       <p className="text-sm font-bold text-gray-500 mt-1">{currentReport.assembly} • {new Date(currentReport.date).toLocaleDateString()}</p>
+                       <h3 className="font-black text-gray-900 text-xl">Absentee Scan Results</h3>
+                       <p className="text-sm font-bold text-gray-500 mt-1">Found data from {matchingLogs.length} logged service(s).</p>
                      </div>
-                     <div className="flex gap-4">
-                       <div className="text-center"><p className="text-[10px] font-black text-emerald-600 uppercase">Present</p><p className="text-2xl font-black text-emerald-700">{currentReport.presentCount}</p></div>
-                       <div className="text-center"><p className="text-[10px] font-black text-red-600 uppercase">Absent</p><p className="text-2xl font-black text-red-700">{currentReport.absentCount}</p></div>
+                     <div className="bg-red-50 px-4 py-2 rounded-xl border border-red-100">
+                        <p className="text-[10px] font-black text-red-600 uppercase">Total Absentees</p>
+                        <p className="text-2xl font-black text-red-700 text-center">{absenteeList.length}</p>
                      </div>
                    </div>
                    
-                   <h4 className="font-black text-red-600 mb-4 border-b border-red-100 pb-2">Absentee List</h4>
-                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {members.filter(m => currentReport.records[m.id] === 'Absent').map(absentee => (
-                      <div key={absentee.id} className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm flex justify-between items-center hover:shadow-md transition-all">
+                   <div className="grid grid-cols-1 gap-4">
+                    {absenteeList.map(({ member, absentCount }) => (
+                      <div key={member.id} className="p-4 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:justify-between md:items-center hover:shadow-md transition-all gap-4">
                         <div>
-                          <p className="font-black text-gray-900">{absentee.name}</p>
-                          <p className="text-xs font-bold text-gray-400 mt-0.5">{absentee.phone}</p>
+                          <div className="flex items-center gap-3">
+                            <p className="font-black text-gray-900 text-lg">{member.name}</p>
+                            <span className="bg-red-100 text-red-700 text-xs font-black px-2 py-0.5 rounded-md">Missed {absentCount} time(s)</span>
+                          </div>
+                          <p className="text-xs font-bold text-gray-400 mt-1">{member.phone} • {member.localAssembly}</p>
                         </div>
-                        {/* THE UPGRADED WHATSAPP & CALL BUTTONS */}
+                        
                         <div className="flex gap-2">
+                          {/* WhatsApp */}
                           <a 
-                            href={`https://wa.me/${absentee.phone?.startsWith('0') ? '233' + absentee.phone.substring(1) : absentee.phone}?text=${encodeURIComponent(`Calvary greetings ${absentee.name.split(' ')[0]}! We missed you at ${currentReport.serviceType} today. We pray all is well with you and your family. Please let us know if there is anything we can pray with you about. God bless you! - Ketiejili District`)}`}
+                            href={`https://wa.me/${member.phone?.startsWith('0') ? '233' + member.phone.substring(1) : member.phone}?text=${encodeURIComponent(`Calvary greetings ${member.name.split(' ')[0]}! We missed you at church recently. We pray all is well. God bless you! - Ketiejili District`)}`}
                             target="_blank" 
                             rel="noopener noreferrer"
                             className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" 
-                            title="Send WhatsApp Follow-up"
+                            title="WhatsApp Follow-up"
+                          >
+                            <MessageCircle size={18} />
+                          </a>
+                          
+                          {/* API DIRECT SMS */}
+                          <button 
+                            onClick={() => handleSendDirectSMS(member, reportService)}
+                            className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" 
+                            title="Send Official API SMS"
                           >
                             <MessageSquare size={18} />
-                          </a>
+                          </button>
+
+                          {/* Direct Call */}
                           <a 
-                            href={`tel:${absentee.phone}`} 
-                            className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm" 
+                            href={`tel:${member.phone}`} 
+                            className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-800 hover:text-white transition-all shadow-sm" 
                             title="Call Member"
                           >
                             <PhoneCall size={18} />
@@ -351,8 +419,8 @@ export default function Attendance() {
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center p-12">
                   <Search size={48} className="text-gray-200 mb-4" />
-                  <h3 className="text-xl font-black text-gray-400">No Log Found</h3>
-                  <p className="font-bold text-gray-400 mt-2">There is no attendance record matching these filters.</p>
+                  <h3 className="text-xl font-black text-gray-400">No Logs Found</h3>
+                  <p className="font-bold text-gray-400 mt-2">There are no attendance records within this exact date range.</p>
                 </div>
               )}
             </div>
@@ -362,7 +430,6 @@ export default function Attendance() {
         {/* ================= TAB 3: MEMBER ANALYTICS ================= */}
         {activeTab === 'analytics' && (
           <div className="bg-white p-6 md:p-8 rounded-[24px] shadow-sm border border-gray-100 animate-fade-in space-y-8">
-             
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <h2 className="text-xl font-black text-gray-900 flex items-center gap-2"><BarChart3 className="text-purple-600" /> District Health Overview</h2>
               <div className="flex gap-2">
@@ -393,12 +460,9 @@ export default function Attendance() {
               </div>
             </div>
 
-            {/* MEMBER FAITHFULNESS TRACKER */}
             <div className="mt-10 pt-6 border-t border-gray-100">
               <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                 <h3 className="text-lg font-black text-purple-900 flex items-center gap-2"><BarChart3 size={18} /> Member Faithfulness Tracker</h3>
-                
-                {/* NEW: Filter Faithfulness by Service Type */}
                 <select value={analyticsServiceType} onChange={e => setAnalyticsServiceType(e.target.value)} className="p-2.5 bg-purple-50 text-purple-900 border border-purple-100 rounded-xl font-bold text-sm outline-none">
                   <option value="All Services">All Services</option>
                   {serviceTypesList.filter(s => s !== '++ Add Custom ++').map(s => <option key={s} value={s}>{s}</option>)}
@@ -445,10 +509,8 @@ export default function Attendance() {
                 </div>
               </div>
             </div>
-
           </div>
         )}
-
       </div>
     </DashboardLayout>
   );
