@@ -10,7 +10,7 @@ export async function POST(request) {
     
     // IMPORTANT: Your Sender ID MUST be registered and approved in your BMS dashboard
     // It must be exactly 11 characters or less.
-    const senderId = 'mNotify'; 
+    const senderId = 'Ketiejili'; 
 
     if (!apiKey) {
       throw new Error('SERVER FAULT: SMS API Key is missing from Vercel environment variables.');

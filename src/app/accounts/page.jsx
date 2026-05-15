@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { UserPlus, UserCog, Trash2, CheckCircle2, AlertCircle, Loader2, Lock, Smartphone } from 'lucide-react';
+import { UserPlus, UserCog, Trash2, CheckCircle2, AlertCircle, Loader2, Lock, Smartphone, MessageSquare } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -142,6 +142,16 @@ export default function UserAccounts() {
     }
   };
 
+  // --- WHATSAPP HANDOVER GENERATOR ---
+  const getWhatsAppLink = (user) => {
+    if (!user.phone) return '#';
+    let formattedPhone = user.phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+    
+    const msg = `Praise the Lord ${user.name.split(' ')[0]}! \n\nYou have been granted official access to the Ketiejili Command Centre. \n\n*Your Setup Code is:* ${user.setupCode}\n\nPlease go to https://tinyurl.com/kddapp to secure your account and set your private PIN. God bless you!`;
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
+  };
+
   const inputStyle = "w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all text-sm text-gray-700 shadow-sm font-bold";
   const labelStyle = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1";
 
@@ -244,9 +254,21 @@ export default function UserAccounts() {
                     </td>
                     <td className="p-5">
                       {user.setupCode ? (
-                        <div className="bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg inline-block">
-                          <span className="text-[10px] font-black text-orange-600 uppercase block">Pending Setup</span>
-                          <span className="text-sm font-black font-mono tracking-widest text-orange-800">{user.setupCode}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="bg-orange-50 border border-orange-200 px-3 py-1.5 rounded-lg inline-block">
+                            <span className="text-[10px] font-black text-orange-600 uppercase block">Pending Setup</span>
+                            <span className="text-sm font-black font-mono tracking-widest text-orange-800">{user.setupCode}</span>
+                          </div>
+                          {/* THE MAGICAL WHATSAPP HANDOVER BUTTON */}
+                          <a 
+                            href={getWhatsAppLink(user)} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="p-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-colors shadow-sm flex items-center justify-center" 
+                            title="Send Setup Code via WhatsApp"
+                          >
+                            <MessageSquare size={16} />
+                          </a>
                         </div>
                       ) : (
                         <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-lg inline-flex text-emerald-700">
