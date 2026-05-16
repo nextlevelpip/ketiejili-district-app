@@ -1,22 +1,40 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Settings, Save, Image as ImageIcon, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Loader2, UploadCloud, Building2, Edit2, Check, X  } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Loader2, UploadCloud, Building2, Edit2, Check, X, Layers, Filter } from 'lucide-react';
 import { db } from '../firebase';
-import { doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 
 export default function SystemSettings() {
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  // --- SETTINGS STATES ---
+  // --- BRANDING STATES ---
   const [districtName, setDistrictName] = useState('KETIEJILI');
   const [districtSlogan, setDistrictSlogan] = useState('District Command');
   const [logoPreview, setLogoPreview] = useState('/logo.jpg');
 
+  // --- MASTER DATA STATES ---
+  const [members, setMembers] = useState([]); // Used to dynamically derive living groups
+  const [assemblies, setAssemblies] = useState([]);
+  
+  // --- ASSEMBLIES UI STATES ---
+  const [newAssembly, setNewAssembly] = useState('');
+  const [editingAssemblyId, setEditingAssemblyId] = useState(null);
+  const [editingAssemblyName, setEditingAssemblyName] = useState('');
+
+  // --- GROUPS UI STATES ---
+  const [editingGroupKey, setEditingGroupKey] = useState(null); // format: "assemblyName|||groupName"
+  const [editingGroupName, setEditingGroupName] = useState('');
+  const [groupCardFilter, setGroupCardFilter] = useState('All Assemblies');
+
   // --- FIREBASE CONNECTION ---
   useEffect(() => {
+    const userStr = localStorage.getItem('ketiejili_user');
+    if (userStr) setCurrentUser(JSON.parse(userStr));
+
     const fetchSettings = async () => {
       try {
         const settingsDoc = await getDoc(doc(db, 'system_settings', 'general'));
@@ -33,116 +51,211 @@ export default function SystemSettings() {
       }
     };
     fetchSettings();
+
+    // Live sync for assemblies
+    const qAssem = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
+    const unsubAssem = onSnapshot(qAssem, (snapshot) => {
+      setAssemblies(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+    });
+
+    // Live sync for members (To power the Self-Organizing Groups radar)
+    const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
+      setMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => { unsubAssem(); unsubMembers(); };
   }, []);
+
+  const isTier1 = currentUser?.tierLevel === 1 || currentUser?.tierLevel === "1";
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
   };
-// --- ASSEMBLIES MANAGEMENT STATES & LOGIC ---
-  const [assemblies, setAssemblies] = useState([]);
-  const [newAssembly, setNewAssembly] = useState('');
 
-  // Live wire to Firebase for assemblies
-  useEffect(() => {
-    const q = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setAssemblies(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
-    });
-    return () => unsubscribe();
-  }, []);
+  // ==========================================
+  // DYNAMIC GROUP RADAR (SELF-ORGANIZING)
+  // Extracts active groups directly from member profiles
+  // ==========================================
+  const derivedGroupsMap = new Map();
+  members.forEach(m => {
+    // Ignore default classes or blanks to keep the list clean
+    if (m.group && m.group !== 'New Convert Class' && m.group !== 'Add Custom Group' && m.group !== 'General Group') {
+      const key = `${m.localAssembly}|||${m.group}`;
+      if (!derivedGroupsMap.has(key)) {
+        derivedGroupsMap.set(key, { key, assemblyName: m.localAssembly, name: m.group });
+      }
+    }
+  });
+  
+  const allLivingGroups = Array.from(derivedGroupsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const displayedGroups = allLivingGroups.filter(g => groupCardFilter === 'All Assemblies' || g.assemblyName === groupCardFilter);
 
+
+  // ==========================================
+  // LOCAL ASSEMBLIES LOGIC
+  // ==========================================
   const handleAddAssembly = async (e) => {
     e.preventDefault();
     if (!newAssembly.trim()) return;
-    setIsLoading(true);
     try {
       await addDoc(collection(db, 'assemblies'), { name: newAssembly.trim() });
       setNewAssembly('');
-      showNotification('success', 'Local Assembly added successfully!');
+      showNotification('success', 'Local Assembly added to district network!');
     } catch (error) {
-      showNotification('error', 'Failed to add assembly.');
+      showNotification('error', 'Failed to register assembly.');
     }
-    setIsLoading(false);
   };
 
-  const [editingAssembly, setEditingAssembly] = useState(null);
+  const handleUpdateAssembly = async (id, oldName) => {
+    const newName = editingAssemblyName.trim();
+    if (!newName || newName === oldName) {
+      setEditingAssemblyId(null);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    showNotification('success', 'Synchronizing assembly identity across all members...');
 
-  const handleUpdateAssembly = async (id) => {
-    if (!editingAssembly.name.trim()) return;
     try {
-      await updateDoc(doc(db, 'assemblies', id), { name: editingAssembly.name.trim() });
-      setEditingAssembly(null);
-      showNotification('success', 'Assembly updated!');
-    } catch (error) {
-      showNotification('error', 'Failed to update assembly.');
-    }
-  };
-
-  const handleDeleteAssembly = async (id, name) => {
-    if (window.confirm(`Remove ${name} from the District list?`)) {
-      try {
-        await deleteDoc(doc(db, 'assemblies', id));
-        showNotification('success', 'Assembly removed.');
-      } catch (error) {
-        showNotification('error', 'Failed to remove assembly.');
+      // 1. Update the master assembly document
+      await updateDoc(doc(db, 'assemblies', id), { name: newName });
+      
+      // 2. Cascade rename the assembly for all assigned members
+      const memberQuery = query(collection(db, 'members'), where('localAssembly', '==', oldName));
+      const memberSnapshot = await getDocs(memberQuery);
+      for (const memberDoc of memberSnapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { localAssembly: newName });
       }
+
+      if (groupCardFilter === oldName) setGroupCardFilter(newName);
+      
+      setEditingAssemblyId(null);
+      showNotification('success', 'Assembly renamed successfully.');
+    } catch (error) {
+      showNotification('error', 'Cascade sync failure occurred.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // --- IMAGE UPLOAD HANDLER ---
+  const handleDeleteAssembly = async (id, assemName) => {
+    if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
+    if (!window.confirm(`PERMANENTLY remove ${assemName}? All records will fall back to General Assembly.`)) return;
+
+    setIsSubmitting(true);
+    try {
+      showNotification('success', 'Migrating active members to safety container...');
+      const q = query(collection(db, 'members'), where('localAssembly', '==', assemName));
+      const snapshot = await getDocs(q);
+      
+      for (const memberDoc of snapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { localAssembly: 'General Assembly' });
+      }
+
+      await deleteDoc(doc(db, 'assemblies', id));
+      showNotification('success', 'Assembly purged. Souls protected inside General Assembly.');
+    } catch (error) {
+      showNotification('error', 'Purge migration failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ==========================================
+  // DISCIPLESHIP GROUPS LOGIC
+  // ==========================================
+  const handleUpdateGroup = async (oldName, assemblyName) => {
+    const newName = editingGroupName.trim();
+    if (!newName || newName === oldName) {
+      setEditingGroupKey(null);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    showNotification('success', 'Updating group identity for all assigned members...');
+    try {
+      const q = query(collection(db, 'members'), where('group', '==', oldName), where('localAssembly', '==', assemblyName));
+      const snapshot = await getDocs(q);
+      
+      for (const memberDoc of snapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { group: newName });
+      }
+
+      setEditingGroupKey(null);
+      showNotification('success', 'Discipleship Group renamed successfully.');
+    } catch (error) {
+      showNotification('error', 'Failed to rename group records.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteGroup = async (groupName, assemName) => {
+    if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
+    if (!window.confirm(`Delete "${groupName}" from ${assemName}? Members will fall back to General Group.`)) return;
+
+    setIsSubmitting(true);
+    try {
+      showNotification('success', 'Disbanding group and securing members...');
+      const q = query(collection(db, 'members'), where('group', '==', groupName), where('localAssembly', '==', assemName));
+      const snapshot = await getDocs(q);
+
+      for (const memberDoc of snapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { group: 'General Group' });
+      }
+
+      showNotification('success', 'Group dissolved smoothly.');
+    } catch (error) {
+      showNotification('error', 'Cascade execution failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ==========================================
+  // BRANDING LOGIC
+  // ==========================================
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1048576) { // 1MB limit for optimal database storage
-        showNotification('error', 'Image is too large. Please upload a logo smaller than 1MB.');
+      if (file.size > 1048576) { 
+        showNotification('error', 'Logo size exceeds 1MB threshold limit.');
         return;
       }
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result); // Converts image to a Base64 string
-      };
+      reader.onloadend = () => setLogoPreview(reader.result);
       reader.readAsDataURL(file);
     }
   };
 
-  // --- SAVE SETTINGS ---
   const handleSaveSettings = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    setNotification({ type: '', message: '' });
-
     try {
-      // Save directly to a master settings document
       await setDoc(doc(db, 'system_settings', 'general'), {
         districtName,
         districtSlogan,
         logoBase64: logoPreview,
         lastUpdated: new Date().toISOString()
       }, { merge: true });
-      
-      showNotification('success', 'System configurations successfully updated! Refresh to see changes globally.');
+      showNotification('success', 'Branding configurations locked in globally.');
     } catch (error) {
-      console.error(error);
-      showNotification('error', 'Failed to save settings. Check your connection.');
+      showNotification('error', 'Configuration save script failed.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const inputStyle = "w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:border-slate-800 focus:ring-4 focus:ring-slate-100 outline-none transition-all text-sm text-gray-900 shadow-sm font-bold";
+  const labelStyle = "block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2 ml-1";
 
-
-
-  if (isLoading) return (
-    <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-slate-400" /></div></DashboardLayout>
-  );
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-slate-400" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in max-w-4xl mx-auto relative pb-10">
+      <div className="space-y-6 animate-fade-in max-w-7xl mx-auto relative pb-20">
         
-        {/* NOTIFICATION BANNER */}
         {notification.message && (
           <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
             {notification.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
@@ -150,119 +263,201 @@ export default function SystemSettings() {
           </div>
         )}
 
-        <div className="flex items-center gap-4 mb-8 border-b border-gray-200 pb-6">
+        <div className="flex items-center gap-4 border-b border-gray-200 pb-6 mb-4">
           <div className="bg-slate-800 p-4 rounded-2xl text-slate-100 shadow-lg"><Settings size={32} /></div>
           <div>
             <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">System Settings</h1>
-            <p className="font-bold text-gray-500">Configure global application branding and parameters.</p>
+            <p className="font-bold text-gray-500">Configure core network parameters and global branding assets.</p>
           </div>
         </div>
-        
-         {/* SIDE-BY-SIDE GRID WRAPPER */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start mt-6">
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
           
-          {/* 1. ASSEMBLIES MANAGEMENT CARD */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-            <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
-              <MapPin className="text-emerald-500" size={24} />
-              <h2 className="text-xl font-black text-gray-900">Local Assemblies</h2>
+          {/* ========================================== */}
+          {/* LEFT COLUMN: LOCAL ASSEMBLIES CARD         */}
+          {/* ========================================== */}
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[490px]">
+            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-50">
+              <MapPin className="text-blue-600" size={20} />
+              <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Local Assemblies</h2>
             </div>
 
-            <form onSubmit={handleAddAssembly} className="flex gap-2 mb-6">
+            <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
               <input 
-                type="text" 
-                value={newAssembly}
-                onChange={(e) => setNewAssembly(e.target.value)}
-                placeholder="e.g. New Town Assembly"
-                className="flex-1 px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-medium text-sm text-gray-800"
+                type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
+                placeholder="Type Local Name (e.g. Central Assembly)"
+                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-sm focus:outline-none focus:bg-white"
                 required
               />
-              <button 
-                type="submit" 
-                disabled={isLoading}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
-              >
-                <Plus size={18} /> Add
+              <button type="submit" disabled={isSubmitting} className="px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-40">
+                <Plus size={16} /> Add
               </button>
             </form>
 
-            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-              {assemblies.length === 0 ? (
-                <p className="text-center text-sm font-bold text-gray-400 py-4">No assemblies found.</p>
-              ) : (
-                assemblies.map((assembly) => (
-                  <div key={assembly.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
-                    <span className="font-bold text-gray-700">{assembly.name}</span>
-                    <button 
-                      type="button"
-                      onClick={() => handleDeleteAssembly(assembly.id, assembly.name)}
-                      className="p-2 text-gray-400 hover:bg-red-100 hover:text-red-600 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))
-              )}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+              {assemblies.map((assem) => (
+                <div key={assem.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                  {editingAssemblyId === assem.id ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <input 
+                        type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)}
+                        className="flex-1 px-3 py-1.5 bg-white border border-blue-500 rounded-lg text-sm font-bold text-gray-800"
+                        autoFocus
+                      />
+                      <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-600 text-white rounded-lg disabled:opacity-40"><Check size={14}/></button>
+                      <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-gray-200 text-gray-600 rounded-lg"><X size={14}/></button>
+                    </div>
+                  ) : (
+                    <>
+                      <span className="font-black text-gray-800 text-sm">{assem.name}</span>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }}
+                          className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        {isTier1 && (
+                          <button 
+                            onClick={() => handleDeleteAssembly(assem.id, assem.name)}
+                            className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {assemblies.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No locals found in registry storage.</p>}
             </div>
           </div>
 
-          {/* 2. SYSTEM SETTINGS FORM */}
-          <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col h-full">
-            
-            {/* Note: I changed grid-cols-3 to flex-col because it is now sharing half the screen! */}
-            <div className="p-6 flex flex-col gap-8 flex-1">
+          {/* ========================================== */}
+          {/* RIGHT COLUMN: RADAR GROUPS CARD (NO ADD FORM) */}
+          {/* ========================================== */}
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[490px]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <Layers className="text-emerald-600" size={20} />
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Active Groups Radar</h2>
+              </div>
               
-              {/* LOGO UPLOAD SECTION */}
-              <div className="flex flex-col items-center justify-center border-b border-gray-100 pb-6">
-                <h3 className="font-black text-gray-800 mb-6 w-full text-left flex items-center gap-2"><ImageIcon size={18} className="text-slate-500" /> Official Logo</h3>
-                
-                <div className="w-40 h-40 rounded-full border-4 border-slate-100 shadow-md flex items-center justify-center bg-gray-50 overflow-hidden relative group mb-4">
-                  <img src={logoPreview} alt="District Logo" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-slate-900/50 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <UploadCloud size={28} className="text-white mb-2" />
-                    <span className="text-xs font-bold text-white">Change Logo</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  </div>
-                </div>
-                <p className="text-xs font-bold text-gray-400 text-center px-4">Click the logo above to upload a new PNG or JPG (Max 1MB).</p>
-              </div>
-
-              {/* DISTRICT IDENTITY SECTION */}
-              <div className="space-y-6">
-                <h3 className="font-black text-gray-800 mb-2 w-full flex items-center gap-2"><Building2 size={18} className="text-slate-500" /> District Identity</h3>
-                
-                <div>
-                  <label className="block text-sm font-black text-gray-500 mb-2 uppercase tracking-wider">District Name</label>
-                  <input 
-                    type="text" required value={districtName} 
-                    onChange={(e) => setDistrictName(e.target.value.toUpperCase())} 
-                    className={`${inputStyle} text-lg tracking-wide`} 
-                    placeholder="e.g. KETIEJILI"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-black text-gray-500 mb-2 uppercase tracking-wider">System Slogan / Subtitle</label>
-                  <input 
-                    type="text" required value={districtSlogan} 
-                    onChange={(e) => setDistrictSlogan(e.target.value)} 
-                    className={inputStyle} 
-                    placeholder="e.g. District Command"
-                  />
-                </div>
+              <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+                <Filter size={12} className="text-gray-400 shrink-0" />
+                <select 
+                  value={groupCardFilter} 
+                  onChange={e => setGroupCardFilter(e.target.value)}
+                  className="bg-transparent font-black text-[11px] uppercase tracking-wider text-gray-600 focus:outline-none cursor-pointer"
+                >
+                  <option value="All Assemblies">All Assemblies Filter</option>
+                  {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                </select>
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex justify-end mt-auto">
-              <button type="submit" disabled={isSubmitting} className={`px-6 py-3 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-3 text-white w-full sm:w-auto ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-slate-800'}`}>
-                {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Saving...</> : <><Save size={20} /> Save Settings</>}
-              </button>
+            <div className="bg-emerald-50 text-emerald-800 text-[10px] font-black uppercase tracking-widest p-3 rounded-xl mb-4 border border-emerald-100 flex items-center gap-2">
+              <AlertCircle size={14} /> Groups auto-populate here when assigned in the Directory.
             </div>
 
-          </form>
-
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+              {displayedGroups.map((grp) => (
+                <div key={grp.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                  {editingGroupKey === grp.key ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <input 
+                        type="text" value={editingGroupName} onChange={e => setEditingGroupName(e.target.value)}
+                        className="flex-1 px-3 py-1.5 bg-white border border-blue-500 rounded-md text-sm font-bold text-gray-800"
+                        autoFocus
+                      />
+                      <div className="flex gap-1">
+                        <button onClick={() => handleUpdateGroup(grp.name, grp.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-600 text-white rounded-md disabled:opacity-40"><Check size={14}/></button>
+                        <button onClick={() => setEditingGroupKey(null)} className="p-1.5 bg-gray-200 text-gray-600 rounded-md"><X size={14}/></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-800 text-sm">{grp.name}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase mt-0.5 tracking-wider">{grp.assemblyName}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button 
+                          onClick={() => { setEditingGroupKey(grp.key); setEditingGroupName(grp.name); }}
+                          className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        {isTier1 && (
+                          <button 
+                            onClick={() => handleDeleteGroup(grp.name, grp.assemblyName)}
+                            className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {displayedGroups.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No fellowship groups detected in this assembly.</p>}
+            </div>
+          </div>
         </div>
-         
+
+        {/* ========================================== */}
+        {/* ROW 2: GLOBAL SYSTEM BRANDING TRINITY      */}
+        {/* ========================================== */}
+        <form onSubmit={handleSaveSettings} className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm space-y-6">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-50">
+            <Building2 className="text-slate-700" size={20} />
+            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Global System Branding</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+            <div className="flex flex-col items-center justify-center bg-gray-50/50 border border-gray-100 p-4 rounded-2xl">
+              <label className={labelStyle}>Official Logo Icon</label>
+              <div className="w-28 h-28 rounded-full border-4 border-white shadow-md flex items-center justify-center bg-white overflow-hidden relative group mb-2">
+                <img src={logoPreview} alt="District Branding Asset" className="w-full h-full object-cover" />
+                <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  <UploadCloud size={20} className="text-white mb-1" />
+                  <span className="text-[10px] font-black text-white uppercase">Upload</span>
+                  <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                </div>
+              </div>
+              <p className="text-[9px] font-black text-gray-400 text-center uppercase tracking-wider">PNG or JPG up to 1MB max</p>
+            </div>
+
+            <div>
+              <label className={labelStyle}>District Identity Name</label>
+              <input 
+                type="text" required value={districtName} 
+                onChange={(e) => setDistrictName(e.target.value.toUpperCase())} 
+                className={`${inputStyle} text-base tracking-wide`} 
+                placeholder="e.g. KETIEJILI"
+              />
+            </div>
+
+            <div>
+              <label className={labelStyle}>System Slogan / Subtitle Text</label>
+              <input 
+                type="text" required value={districtSlogan} 
+                onChange={(e) => setDistrictSlogan(e.target.value)} 
+                className={inputStyle} 
+                placeholder="e.g. District Command Center"
+              />
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-50 flex justify-end">
+            <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-3 text-white text-xs uppercase tracking-widest w-full sm:w-auto ${isSubmitting ? 'bg-slate-400 cursor-not-allowed' : 'bg-slate-900 hover:bg-black'}`}>
+              {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Committing...</> : <><Save size={16} /> Save Branding</>}
+            </button>
+          </div>
+        </form>
+
       </div>
     </DashboardLayout>
   );

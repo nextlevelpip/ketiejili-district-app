@@ -72,6 +72,17 @@ export default function Directory() {
 
   const isTier1 = currentUser?.tierLevel === 1 || currentUser?.tierLevel === "1";
 
+  // ==========================================
+  // NEW: DYNAMIC GROUPS LOGIC
+  // Scan all members in the currently selected assembly,
+  // extract their group names, and remove duplicates/blanks.
+  // ==========================================
+  const dynamicGroups = [...new Set(
+    members
+      .filter(m => m.localAssembly === localAssembly && m.group && m.group !== 'New Convert Class')
+      .map(m => m.group)
+  )].sort();
+
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
@@ -302,10 +313,15 @@ export default function Directory() {
                   </select>
                 </div>
                 
+                {/* DYNAMIC GROUPS DROPDOWN */}
                 <div>
                   <label className={labelStyle}>Discipleship Group</label>
                   <select value={group} onChange={e => setGroup(e.target.value)} className={inputStyle}>
                     <option value="New Convert Class">New Convert Class</option>
+                    {/* Inject dynamically found groups based on localAssembly */}
+                    {dynamicGroups.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
                     <option value="Add Custom Group">+ Add Custom Group</option>
                   </select>
                   {group === 'Add Custom Group' && (
