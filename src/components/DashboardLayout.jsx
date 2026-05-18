@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
   Settings, LogOut, Menu, Cloud, Lock,
-  Heart, Mail, HeartHandshake 
+  Heart, Mail, HeartHandshake, Coins 
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -149,6 +149,7 @@ export default function DashboardLayout({ children }) {
     { name: 'Discipleship Tracker', href: '/discipleship', icon: Target },
     { name: 'Evangelism & Souls', href: '/evangelism', icon: Flame },
     { name: 'Welfare & Social', href: '/welfare', icon: HeartHandshake },
+    { name: 'District Treasury', href: '/treasury', icon: Coins },
     { name: 'Leaders Council', href: '/presbytery', icon: Shield },
     { name: 'Bulk SMS Contacts', href: '/sms', icon: MessageSquare },
     { name: 'District Heritage', href: '/heritage', icon: BookOpen },

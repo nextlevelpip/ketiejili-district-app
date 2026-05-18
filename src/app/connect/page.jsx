@@ -9,7 +9,6 @@ export default function ConnectKiosk() {
   const [success, setSuccess] = useState(false);
   
   // --- DYNAMIC ASSEMBLIES STATE ---
-  // We start with a default so the app doesn't break if the database is empty
   const [assemblies, setAssemblies] = useState(['Central']); 
 
   // Form States
@@ -25,14 +24,12 @@ export default function ConnectKiosk() {
 
   // --- FETCH ASSEMBLIES FROM FIREBASE ---
   useEffect(() => {
-    // This looks for a collection called 'assemblies' and gets their names
     const q = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (!snapshot.empty) {
         const assemblyList = snapshot.docs.map(doc => doc.data().name);
         setAssemblies(assemblyList);
         
-        // Automatically set the default dropdown to the first assembly in the list
         if (assemblyList.length > 0 && formData.localAssembly === 'Central') {
           setFormData(prev => ({ ...prev, localAssembly: assemblyList[0] }));
         }
@@ -41,24 +38,16 @@ export default function ConnectKiosk() {
     return () => unsubscribe();
   }, []);
 
- const handleChange = (e) => {
+  const handleChange = (e) => {
     if (e.target.name === 'phone') {
-      // 1. Strip out anything that is not a number
       let onlyNums = e.target.value.replace(/[^0-9]/g, '');
-      
-      // 2. If they type a number that doesn't start with 0, force a 0 at the front!
       if (onlyNums.length > 0 && onlyNums[0] !== '0') {
         onlyNums = '0' + onlyNums;
       }
-      
-      // 3. Act like a brick wall at exactly 10 digits
       onlyNums = onlyNums.substring(0, 10);
-      
       setFormData({ ...formData, phone: onlyNums });
       return;
     }
-    
-    // For all other fields (name, gender, etc.)
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
@@ -94,139 +83,152 @@ export default function ConnectKiosk() {
     setLoading(false);
   };
 
-  // --- SUCCESS SCREEN ---
+  const glassInputStyle = "w-full pl-12 pr-4 py-3.5 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-blue-400/50 focus:border-white/30 focus:bg-white/10 outline-none font-medium text-white transition-all placeholder:text-white/40 backdrop-blur-sm shadow-inner";
+  const iconStyle = "text-white/50";
+  const selectOptionStyle = "text-slate-900 bg-white font-medium";
+
+  // --- SUCCESS SCREEN (GLASSMORPHISM) ---
   if (success) {
     return (
-      <div className="min-h-screen bg-[#1e2749] flex items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md text-center">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600">
-            <CheckCircle2 size={40} />
+      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Glowing Orbs */}
+        <div className="absolute top-[20%] left-[20%] w-96 h-96 bg-emerald-600/30 rounded-full blur-[100px] pointer-events-none animate-pulse"></div>
+        <div className="absolute bottom-[20%] right-[20%] w-96 h-96 bg-blue-600/30 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div className="bg-white/10 backdrop-blur-2xl border border-white/20 p-10 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.3)] w-full max-w-md text-center relative z-10">
+          <div className="w-24 h-24 bg-white/10 border border-white/20 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-400 shadow-lg">
+            <CheckCircle2 size={48} />
           </div>
-          <h2 className="text-2xl font-black text-[#1e2749] mb-2">Connection Received!</h2>
-          <p className="text-gray-600 font-medium">Thank you for connecting with Ketiejili District. God richly bless you.</p>
+          <h2 className="text-3xl font-black text-white mb-2">Connection Received!</h2>
+          <p className="text-white/70 font-medium">Thank you for connecting with Ketiejili District. God richly bless you.</p>
         </div>
       </div>
     );
   }
 
-  // --- CLASSIC ENTRY SCREEN ---
+  // --- CLASSIC ENTRY SCREEN (GLASSMORPHISM) ---
   return (
-    <div className="min-h-screen bg-[#1e2749] flex flex-col items-center pt-10 px-4">
+    <div className="min-h-screen bg-[#0f172a] flex flex-col items-center pt-10 px-4 relative overflow-hidden">
       
-      <div className="flex flex-col items-center mb-8">
+      {/* --- DECORATIVE GLOWING ORBS FOR BACKDROP BLUR CONTRAST --- */}
+      <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/30 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-purple-600/30 rounded-full blur-[120px] pointer-events-none"></div>
+      <div className="absolute top-[40%] left-[60%] w-72 h-72 bg-emerald-500/20 rounded-full blur-[80px] pointer-events-none"></div>
+
+      {/* HEADER SECTION */}
+      <div className="flex flex-col items-center mb-8 relative z-10">
         <img 
           src="/logo.jpg" 
           alt="Church of Pentecost" 
-          className="w-20 h-20 rounded-full mb-4 border-2 border-white shadow-lg object-cover"
+          className="w-24 h-24 rounded-full mb-4 border-2 border-white/20 shadow-2xl object-cover p-1 bg-white/5 backdrop-blur-sm"
           onError={(e) => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=COP&background=fff&color=1e2749'; }}
         />
-        <h1 className="text-2xl font-black text-white tracking-wider uppercase">Ketiejili District</h1>
-        <p className="text-sm font-bold text-blue-300">Digital Connect Card</p>
+        <h1 className="text-3xl font-black text-white tracking-widest uppercase text-shadow-sm drop-shadow-md">Ketiejili District</h1>
+        <p className="text-sm font-bold text-blue-300 tracking-widest uppercase mt-1">Digital Connect Card</p>
       </div>
 
-      <div className="w-full max-w-md bg-white rounded-t-3xl rounded-b-xl shadow-2xl overflow-hidden mb-10 relative">
+      {/* GLASSMORPHISM FORM CARD */}
+      <div className="w-full max-w-md bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] overflow-hidden mb-10 relative z-10">
         <div className="h-1.5 w-full bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500"></div>
 
-        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-5">
           
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <User size={18} className="text-gray-400" />
+              <User size={18} className={iconStyle} />
             </div>
             <input 
               type="text" name="fullName" value={formData.fullName} onChange={handleChange} required
               placeholder="Your Full Name"
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all placeholder:text-gray-400"
+              className={glassInputStyle}
             />
           </div>
 
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Phone size={18} className="text-gray-400" />
+              <Phone size={18} className={iconStyle} />
             </div>
             <input 
-            type="tel" name="phone" value={formData.phone} onChange={handleChange} required
-              pattern="^0[0-9]{9}$"
-              maxLength="10"
-              title="Phone number must be exactly 10 digits and start with 0"
+              type="tel" name="phone" value={formData.phone} onChange={handleChange} required
+              pattern="^0[0-9]{9}$" maxLength="10" title="Phone number must be exactly 10 digits and start with 0"
               placeholder="Phone Number (e.g. 024...)"
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all placeholder:text-gray-400"
+              className={`${glassInputStyle} tracking-widest`}
             />
           </div>
 
           {/* DYNAMIC LOCAL ASSEMBLY DROPDOWN */}
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <MapPin size={18} className="text-gray-400" />
+              <MapPin size={18} className={iconStyle} />
             </div>
             <select 
               name="localAssembly" value={formData.localAssembly} onChange={handleChange} required
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800 transition-all appearance-none"
+              className={`${glassInputStyle} appearance-none [&>option]:text-slate-900`}
             >
               {assemblies.map((assemblyName, index) => (
-                <option key={index} value={assemblyName}>
+                <option key={index} value={assemblyName} className={selectOptionStyle}>
                   {assemblyName}
                 </option>
               ))}
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div className="relative">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Users size={16} className="text-gray-400" />
+                <Users size={16} className={iconStyle} />
               </div>
               <select 
                 name="gender" value={formData.gender} onChange={handleChange} required
-                className="w-full pl-10 pr-2 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all appearance-none text-sm"
+                className={`${glassInputStyle} pl-10 pr-2 appearance-none text-sm [&>option]:text-slate-900`}
               >
-                <option value="" disabled>Gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
+                <option value="" disabled className={selectOptionStyle}>Gender</option>
+                <option value="Male" className={selectOptionStyle}>Male</option>
+                <option value="Female" className={selectOptionStyle}>Female</option>
               </select>
             </div>
 
-            <div className="relative">
+            <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Calendar size={16} className="text-gray-400" />
+                <Calendar size={16} className={iconStyle} />
               </div>
               <input 
                 type="date" name="dob" value={formData.dob} onChange={handleChange} required
-                className="w-full pl-10 pr-2 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-medium text-gray-700 transition-all text-sm"
+                className={`${glassInputStyle} pl-10 pr-2 text-sm [color-scheme:dark]`}
               />
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Heart size={18} className="text-gray-400" />
+              <Heart size={18} className={iconStyle} />
             </div>
             <select 
               name="connectionType" value={formData.connectionType} onChange={handleChange} required
-              className="w-full pl-12 pr-4 py-3.5 bg-gray-50/50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800 transition-all appearance-none"
+              className={`${glassInputStyle} appearance-none [&>option]:text-slate-900`}
             >
-              <option value="" disabled>- Why are you connecting today? -</option>
-              <option value="I am a First-Time Visitor">I am a First-Time Visitor</option>
-              <option value="I recently gave my life to Christ">I recently gave my life to Christ</option>
-              <option value="I am a member updating my info">I am a member updating my info</option>
-              <option value="I need Pastoral Prayer">I need Pastoral Prayer</option>
+              <option value="" disabled className={selectOptionStyle}>- Why are you connecting today? -</option>
+              <option value="I am a First-Time Visitor" className={selectOptionStyle}>I am a First-Time Visitor</option>
+              <option value="I recently gave my life to Christ" className={selectOptionStyle}>I recently gave my life to Christ</option>
+              <option value="I am a member updating my info" className={selectOptionStyle}>I am a member updating my info</option>
+              <option value="I need Pastoral Prayer" className={selectOptionStyle}>I need Pastoral Prayer</option>
             </select>
           </div>
 
-          <div className="pt-2">
+          <div className="pt-1">
             <textarea 
               name="message" value={formData.message} onChange={handleChange} rows="3"
               placeholder="Any prayer requests or messages for the Pastor? (Optional)"
-              className="w-full p-4 bg-gray-100/70 border border-transparent rounded-xl focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none font-medium text-sm text-gray-700 transition-all resize-none placeholder:text-gray-400"
+              className="w-full p-4 bg-white/5 border border-white/10 rounded-xl focus:ring-2 focus:ring-blue-400/50 focus:border-white/30 focus:bg-white/10 outline-none font-medium text-sm text-white transition-all resize-none placeholder:text-white/40 backdrop-blur-sm shadow-inner"
             ></textarea>
           </div>
 
           <div className="pt-4">
             <button 
               type="submit" disabled={loading} 
-              className="w-full bg-[#1e40af] hover:bg-[#1e3a8a] text-white font-bold tracking-wide py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md"
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 border border-white/20 text-white font-black tracking-widest uppercase py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-[0_0_20px_rgba(59,130,246,0.5)] disabled:opacity-50 hover:shadow-[0_0_30px_rgba(168,85,247,0.6)]"
             >
-              {loading ? 'SENDING...' : 'SUBMIT CONNECTION'} 
+              {loading ? 'TRANSMITTING...' : 'SUBMIT CONNECTION'} 
               {!loading && <Send size={18} />}
             </button>
           </div>
