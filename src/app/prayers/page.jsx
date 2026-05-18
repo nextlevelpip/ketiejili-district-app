@@ -120,7 +120,7 @@ export default function PrayerArchives() {
 
   // --- BIRTHDAY SMS METHOD ---
   const handleSendBirthdaySMS = async (member) => {
-    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! Happy birthday in advance from the Ketiejili District. As you turn ${member.ageTurning}, we pray that the Lord strengthens your faith and opens new doors of grace for you. God bless you!`;
+    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! Happy birthday in advance from the COP Ketiejili District. As you turn ${member.ageTurning}, we pray that the Lord strengthens your faith and opens new doors of grace for you. God bless you!`;
     const message = window.prompt(`[TIER 1 OVERRIDE] Send Birthday Blessing SMS to ${member.name}:`, defaultMsg);
     
     if (!message) return;

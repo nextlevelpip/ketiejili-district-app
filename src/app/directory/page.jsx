@@ -213,7 +213,7 @@ export default function Directory() {
       showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
       return;
     }
-    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! We pray this message finds you well. God bless you! - Ketiejili District`;
+    const defaultMsg = `Praise the Lord ${member.name.split(' ')[0]}! We pray this message finds you well. God bless you! - COP Ketiejili District`;
     const message = window.prompt(`[TIER 1] Send Official SMS to ${member.name}:`, defaultMsg);
     if (!message) return;
 
