@@ -110,25 +110,30 @@ export default function Home() {
   };
   const leaderboard = getLeaderboard();
 
+  // THE REPAIRED 4-TIER DEMOGRAPHICS ENGINE
   const getDemographics = () => {
-    let children = 0; let youth = 0; let adults = 0;
+    let children = 0; let teens = 0; let youth = 0; let adults = 0;
     const currentYear = new Date().getFullYear();
     members.forEach(m => {
       if (m.dob) {
         const birthYear = parseInt(m.dob.split('-')[0]);
         const age = currentYear - birthYear;
-        if (age < 13) children++; else if (age <= 35) youth++; else adults++;
+        if (age <= 12) children++; 
+        else if (age <= 19) teens++; 
+        else if (age <= 35) youth++; 
+        else adults++;
       }
     });
     return [
-      { name: 'Children (0-12)', value: children || 1, color: '#3b82f6' }, 
-      { name: 'Youth (13-35)', value: youth || 1, color: '#10b981' },    
-      { name: 'Adults (36+)', value: adults || 1, color: '#f59e0b' },   
+      { name: 'Children (0-12)', value: children || 1, color: '#f59e0b' }, // Amber
+      { name: 'Teens (13-19)', value: teens || 1, color: '#10b981' }, // Emerald
+      { name: 'Youth (20-35)', value: youth || 1, color: '#3b82f6' }, // Blue
+      { name: 'Adults (36+)', value: adults || 1, color: '#8b5cf6' }, // Purple
     ];
   };
   const demoData = getDemographics();
 
- const getAttendanceTrend = () => {
+  const getAttendanceTrend = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const trendMap = {};
 
@@ -256,7 +261,7 @@ export default function Home() {
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
+                <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-auto pt-4 border-t border-gray-50">
                   {demoData.map(demo => (
                     <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>
@@ -310,7 +315,7 @@ export default function Home() {
                   </PieChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center gap-4 mt-auto pt-4 border-t border-gray-50">
+              <div className="flex flex-wrap justify-center gap-x-4 gap-y-2 mt-auto pt-4 border-t border-gray-50">
                 {demoData.map(demo => (
                   <div key={demo.name} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: demo.color }}></div>

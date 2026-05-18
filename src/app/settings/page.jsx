@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Settings, Save, Image as ImageIcon, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Loader2, UploadCloud, Building2, Edit2, Check, X, Layers, Filter } from 'lucide-react';
+import { Settings, Save, Image as ImageIcon, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Loader2, UploadCloud, Building2, Edit2, Check, X, Layers, Filter, BookOpen, Home } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 
@@ -17,7 +17,7 @@ export default function SystemSettings() {
   const [logoPreview, setLogoPreview] = useState('/logo.jpg');
 
   // --- MASTER DATA STATES ---
-  const [members, setMembers] = useState([]); // Used to dynamically derive living groups
+  const [members, setMembers] = useState([]); 
   const [assemblies, setAssemblies] = useState([]);
   
   // --- ASSEMBLIES UI STATES ---
@@ -26,8 +26,12 @@ export default function SystemSettings() {
   const [editingAssemblyName, setEditingAssemblyName] = useState('');
 
   // --- GROUPS UI STATES ---
-  const [editingGroupKey, setEditingGroupKey] = useState(null); // format: "assemblyName|||groupName"
-  const [editingGroupName, setEditingGroupName] = useState('');
+  const [editingCellKey, setEditingCellKey] = useState(null); 
+  const [editingCellName, setEditingCellName] = useState('');
+  
+  const [editingStudyKey, setEditingStudyKey] = useState(null); 
+  const [editingStudyName, setEditingStudyName] = useState('');
+
   const [groupCardFilter, setGroupCardFilter] = useState('All Assemblies');
 
   // --- FIREBASE CONNECTION ---
@@ -52,13 +56,11 @@ export default function SystemSettings() {
     };
     fetchSettings();
 
-    // Live sync for assemblies
     const qAssem = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubAssem = onSnapshot(qAssem, (snapshot) => {
       setAssemblies(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
     });
 
-    // Live sync for members (To power the Self-Organizing Groups radar)
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       setMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -74,23 +76,33 @@ export default function SystemSettings() {
   };
 
   // ==========================================
-  // DYNAMIC GROUP RADAR (SELF-ORGANIZING)
-  // Extracts active groups directly from member profiles
+  // DUAL RADAR (HOME CELLS & BIBLE STUDIES)
   // ==========================================
-  const derivedGroupsMap = new Map();
+  const cellsMap = new Map();
+  const studiesMap = new Map();
+
   members.forEach(m => {
-    // Ignore default classes or blanks to keep the list clean
-    if (m.group && m.group !== 'New Convert Class' && m.group !== 'Add Custom Group' && m.group !== 'General Group') {
-      const key = `${m.localAssembly}|||${m.group}`;
-      if (!derivedGroupsMap.has(key)) {
-        derivedGroupsMap.set(key, { key, assemblyName: m.localAssembly, name: m.group });
+    // Extract Home Cells
+    if (m.homeCell && m.homeCell !== 'None') {
+      const cellKey = `${m.localAssembly}|||${m.homeCell}`;
+      if (!cellsMap.has(cellKey)) {
+        cellsMap.set(cellKey, { key: cellKey, assemblyName: m.localAssembly, name: m.homeCell });
+      }
+    }
+    // Extract Bible Studies
+    if (m.bibleStudy && m.bibleStudy !== 'None') {
+      const studyKey = `${m.localAssembly}|||${m.bibleStudy}`;
+      if (!studiesMap.has(studyKey)) {
+        studiesMap.set(studyKey, { key: studyKey, assemblyName: m.localAssembly, name: m.bibleStudy });
       }
     }
   });
   
-  const allLivingGroups = Array.from(derivedGroupsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
-  const displayedGroups = allLivingGroups.filter(g => groupCardFilter === 'All Assemblies' || g.assemblyName === groupCardFilter);
+  const allCells = Array.from(cellsMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const displayedCells = allCells.filter(c => groupCardFilter === 'All Assemblies' || c.assemblyName === groupCardFilter);
 
+  const allStudies = Array.from(studiesMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  const displayedStudies = allStudies.filter(s => groupCardFilter === 'All Assemblies' || s.assemblyName === groupCardFilter);
 
   // ==========================================
   // LOCAL ASSEMBLIES LOGIC
@@ -118,10 +130,8 @@ export default function SystemSettings() {
     showNotification('success', 'Synchronizing assembly identity across all members...');
 
     try {
-      // 1. Update the master assembly document
       await updateDoc(doc(db, 'assemblies', id), { name: newName });
       
-      // 2. Cascade rename the assembly for all assigned members
       const memberQuery = query(collection(db, 'members'), where('localAssembly', '==', oldName));
       const memberSnapshot = await getDocs(memberQuery);
       for (const memberDoc of memberSnapshot.docs) {
@@ -163,49 +173,92 @@ export default function SystemSettings() {
   };
 
   // ==========================================
-  // DISCIPLESHIP GROUPS LOGIC
+  // SPLIT DISCIPLESHIP GROUP LOGIC (HOME CELLS)
   // ==========================================
-  const handleUpdateGroup = async (oldName, assemblyName) => {
-    const newName = editingGroupName.trim();
+  const handleUpdateCell = async (oldName, assemblyName) => {
+    const newName = editingCellName.trim();
     if (!newName || newName === oldName) {
-      setEditingGroupKey(null);
+      setEditingCellKey(null);
       return;
     }
     
     setIsSubmitting(true);
-    showNotification('success', 'Updating group identity for all assigned members...');
+    showNotification('success', 'Updating Home Cell identity for all assigned members...');
     try {
-      const q = query(collection(db, 'members'), where('group', '==', oldName), where('localAssembly', '==', assemblyName));
+      const q = query(collection(db, 'members'), where('homeCell', '==', oldName), where('localAssembly', '==', assemblyName));
       const snapshot = await getDocs(q);
-      
       for (const memberDoc of snapshot.docs) {
-        await updateDoc(doc(db, 'members', memberDoc.id), { group: newName });
+        await updateDoc(doc(db, 'members', memberDoc.id), { homeCell: newName });
       }
-
-      setEditingGroupKey(null);
-      showNotification('success', 'Discipleship Group renamed successfully.');
+      setEditingCellKey(null);
+      showNotification('success', 'Home Cell renamed successfully.');
     } catch (error) {
-      showNotification('error', 'Failed to rename group records.');
+      showNotification('error', 'Failed to rename Home Cell records.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDeleteGroup = async (groupName, assemName) => {
+  const handleDeleteCell = async (cellName, assemName) => {
     if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
-    if (!window.confirm(`Delete "${groupName}" from ${assemName}? Members will fall back to General Group.`)) return;
+    if (!window.confirm(`Delete Home Cell "${cellName}" from ${assemName}? Members will be marked as 'None'.`)) return;
 
     setIsSubmitting(true);
     try {
-      showNotification('success', 'Disbanding group and securing members...');
-      const q = query(collection(db, 'members'), where('group', '==', groupName), where('localAssembly', '==', assemName));
+      showNotification('success', 'Disbanding Home Cell...');
+      const q = query(collection(db, 'members'), where('homeCell', '==', cellName), where('localAssembly', '==', assemName));
       const snapshot = await getDocs(q);
-
       for (const memberDoc of snapshot.docs) {
-        await updateDoc(doc(db, 'members', memberDoc.id), { group: 'General Group' });
+        await updateDoc(doc(db, 'members', memberDoc.id), { homeCell: 'None' });
       }
+      showNotification('success', 'Home Cell dissolved smoothly.');
+    } catch (error) {
+      showNotification('error', 'Cascade execution failed.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
-      showNotification('success', 'Group dissolved smoothly.');
+  // ==========================================
+  // SPLIT DISCIPLESHIP GROUP LOGIC (BIBLE STUDY)
+  // ==========================================
+  const handleUpdateStudy = async (oldName, assemblyName) => {
+    const newName = editingStudyName.trim();
+    if (!newName || newName === oldName) {
+      setEditingStudyKey(null);
+      return;
+    }
+    
+    setIsSubmitting(true);
+    showNotification('success', 'Updating Bible Study identity for all assigned members...');
+    try {
+      const q = query(collection(db, 'members'), where('bibleStudy', '==', oldName), where('localAssembly', '==', assemblyName));
+      const snapshot = await getDocs(q);
+      for (const memberDoc of snapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { bibleStudy: newName });
+      }
+      setEditingStudyKey(null);
+      showNotification('success', 'Bible Study Group renamed successfully.');
+    } catch (error) {
+      showNotification('error', 'Failed to rename Bible Study records.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteStudy = async (studyName, assemName) => {
+    if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
+    if (!window.confirm(`Delete Bible Study Group "${studyName}" from ${assemName}? Members will be marked as 'None'.`)) return;
+
+    setIsSubmitting(true);
+    try {
+      showNotification('success', 'Disbanding Bible Study Group...');
+      const q = query(collection(db, 'members'), where('bibleStudy', '==', studyName), where('localAssembly', '==', assemName));
+      const snapshot = await getDocs(q);
+      for (const memberDoc of snapshot.docs) {
+        await updateDoc(doc(db, 'members', memberDoc.id), { bibleStudy: 'None' });
+      }
+      showNotification('success', 'Bible Study Group dissolved smoothly.');
     } catch (error) {
       showNotification('error', 'Cascade execution failed.');
     } finally {
@@ -254,7 +307,7 @@ export default function SystemSettings() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in max-w-7xl mx-auto relative pb-20">
+      <div className="space-y-6 animate-fade-in max-w-[1400px] mx-auto relative pb-20">
         
         {notification.message && (
           <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
@@ -271,12 +324,12 @@ export default function SystemSettings() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
           
           {/* ========================================== */}
-          {/* LEFT COLUMN: LOCAL ASSEMBLIES CARD         */}
+          {/* COLUMN 1: LOCAL ASSEMBLIES CARD            */}
           {/* ========================================== */}
-          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[490px]">
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[520px]">
             <div className="flex items-center gap-2 mb-4 pb-2 border-b border-gray-50">
               <MapPin className="text-blue-600" size={20} />
               <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Local Assemblies</h2>
@@ -285,12 +338,12 @@ export default function SystemSettings() {
             <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
               <input 
                 type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
-                placeholder="Type Local Name (e.g. Central Assembly)"
-                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-sm focus:outline-none focus:bg-white"
+                placeholder="Type Local Name (e.g. Central)"
+                className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs focus:outline-none focus:bg-white"
                 required
               />
-              <button type="submit" disabled={isSubmitting} className="px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-40">
-                <Plus size={16} /> Add
+              <button type="submit" disabled={isSubmitting} className="px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-40">
+                <Plus size={16} />
               </button>
             </form>
 
@@ -311,98 +364,110 @@ export default function SystemSettings() {
                     <>
                       <span className="font-black text-gray-800 text-sm">{assem.name}</span>
                       <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }}
-                          className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        {isTier1 && (
-                          <button 
-                            onClick={() => handleDeleteAssembly(assem.id, assem.name)}
-                            className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                        <button onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }} className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"><Edit2 size={14} /></button>
+                        {isTier1 && <button onClick={() => handleDeleteAssembly(assem.id, assem.name)} className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"><Trash2 size={14} /></button>}
                       </div>
                     </>
                   )}
                 </div>
               ))}
-              {assemblies.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No locals found in registry storage.</p>}
+              {assemblies.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No locals found.</p>}
             </div>
           </div>
 
           {/* ========================================== */}
-          {/* RIGHT COLUMN: RADAR GROUPS CARD (NO ADD FORM) */}
+          {/* COLUMN 2: HOME CELLS RADAR                 */}
           {/* ========================================== */}
-          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[490px]">
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[520px]">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-gray-50">
               <div className="flex items-center gap-2">
-                <Layers className="text-emerald-600" size={20} />
-                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Active Groups Radar</h2>
+                <Home className="text-orange-500" size={20} />
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Home Cells</h2>
               </div>
               
-              <div className="flex items-center gap-1.5 bg-gray-50 px-3 py-2 rounded-xl border border-gray-200 shadow-sm">
+              <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1.5 rounded-xl border border-gray-200 shadow-sm">
                 <Filter size={12} className="text-gray-400 shrink-0" />
-                <select 
-                  value={groupCardFilter} 
-                  onChange={e => setGroupCardFilter(e.target.value)}
-                  className="bg-transparent font-black text-[11px] uppercase tracking-wider text-gray-600 focus:outline-none cursor-pointer"
-                >
-                  <option value="All Assemblies">All Assemblies Filter</option>
+                <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[10px] uppercase tracking-wider text-gray-600 focus:outline-none cursor-pointer">
+                  <option value="All Assemblies">All Assemblies</option>
                   {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
                 </select>
               </div>
             </div>
 
-            <div className="bg-emerald-50 text-emerald-800 text-[10px] font-black uppercase tracking-widest p-3 rounded-xl mb-4 border border-emerald-100 flex items-center gap-2">
-              <AlertCircle size={14} /> Groups auto-populate here when assigned in the Directory.
-            </div>
-
             <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-              {displayedGroups.map((grp) => (
-                <div key={grp.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
-                  {editingGroupKey === grp.key ? (
+              {displayedCells.map((cell) => (
+                <div key={cell.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                  {editingCellKey === cell.key ? (
                     <div className="flex items-center gap-2 w-full">
-                      <input 
-                        type="text" value={editingGroupName} onChange={e => setEditingGroupName(e.target.value)}
-                        className="flex-1 px-3 py-1.5 bg-white border border-blue-500 rounded-md text-sm font-bold text-gray-800"
-                        autoFocus
-                      />
+                      <input type="text" value={editingCellName} onChange={e => setEditingCellName(e.target.value)} className="flex-1 px-3 py-1.5 bg-white border border-orange-500 rounded-md text-sm font-bold text-gray-800" autoFocus />
                       <div className="flex gap-1">
-                        <button onClick={() => handleUpdateGroup(grp.name, grp.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-600 text-white rounded-md disabled:opacity-40"><Check size={14}/></button>
-                        <button onClick={() => setEditingGroupKey(null)} className="p-1.5 bg-gray-200 text-gray-600 rounded-md"><X size={14}/></button>
+                        <button onClick={() => handleUpdateCell(cell.name, cell.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-600 text-white rounded-md disabled:opacity-40"><Check size={14}/></button>
+                        <button onClick={() => setEditingCellKey(null)} className="p-1.5 bg-gray-200 text-gray-600 rounded-md"><X size={14}/></button>
                       </div>
                     </div>
                   ) : (
                     <>
                       <div className="flex flex-col">
-                        <span className="font-black text-gray-800 text-sm">{grp.name}</span>
-                        <span className="text-[10px] font-black text-gray-400 uppercase mt-0.5 tracking-wider">{grp.assemblyName}</span>
+                        <span className="font-black text-gray-800 text-sm">{cell.name}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase mt-0.5 tracking-wider">{cell.assemblyName}</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <button 
-                          onClick={() => { setEditingGroupKey(grp.key); setEditingGroupName(grp.name); }}
-                          className="p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 rounded-md transition-colors"
-                        >
-                          <Edit2 size={14} />
-                        </button>
-                        {isTier1 && (
-                          <button 
-                            onClick={() => handleDeleteGroup(grp.name, grp.assemblyName)}
-                            className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
+                        <button onClick={() => { setEditingCellKey(cell.key); setEditingCellName(cell.name); }} className="p-1.5 text-gray-400 hover:bg-orange-50 hover:text-orange-600 rounded-md transition-colors"><Edit2 size={14} /></button>
+                        {isTier1 && <button onClick={() => handleDeleteCell(cell.name, cell.assemblyName)} className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"><Trash2 size={14} /></button>}
                       </div>
                     </>
                   )}
                 </div>
               ))}
-              {displayedGroups.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No fellowship groups detected in this assembly.</p>}
+              {displayedCells.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No Home Cells detected.</p>}
+            </div>
+          </div>
+
+          {/* ========================================== */}
+          {/* COLUMN 3: BIBLE STUDY GROUPS RADAR         */}
+          {/* ========================================== */}
+          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[520px]">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-gray-50">
+              <div className="flex items-center gap-2">
+                <BookOpen className="text-purple-600" size={20} />
+                <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight">Bible Studies</h2>
+              </div>
+              
+              <div className="flex items-center gap-1.5 bg-gray-50 px-2 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                <Filter size={12} className="text-gray-400 shrink-0" />
+                <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[10px] uppercase tracking-wider text-gray-600 focus:outline-none cursor-pointer">
+                  <option value="All Assemblies">All Assemblies</option>
+                  {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+              {displayedStudies.map((study) => (
+                <div key={study.key} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group">
+                  {editingStudyKey === study.key ? (
+                    <div className="flex items-center gap-2 w-full">
+                      <input type="text" value={editingStudyName} onChange={e => setEditingStudyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-white border border-purple-500 rounded-md text-sm font-bold text-gray-800" autoFocus />
+                      <div className="flex gap-1">
+                        <button onClick={() => handleUpdateStudy(study.name, study.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-600 text-white rounded-md disabled:opacity-40"><Check size={14}/></button>
+                        <button onClick={() => setEditingStudyKey(null)} className="p-1.5 bg-gray-200 text-gray-600 rounded-md"><X size={14}/></button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex flex-col">
+                        <span className="font-black text-gray-800 text-sm">{study.name}</span>
+                        <span className="text-[10px] font-black text-gray-400 uppercase mt-0.5 tracking-wider">{study.assemblyName}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => { setEditingStudyKey(study.key); setEditingStudyName(study.name); }} className="p-1.5 text-gray-400 hover:bg-purple-50 hover:text-purple-600 rounded-md transition-colors"><Edit2 size={14} /></button>
+                        {isTier1 && <button onClick={() => handleDeleteStudy(study.name, study.assemblyName)} className="p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 rounded-md transition-colors"><Trash2 size={14} /></button>}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {displayedStudies.length === 0 && <p className="text-center text-xs font-bold text-gray-400 pt-10 italic">No Bible Study groups detected.</p>}
             </div>
           </div>
         </div>
