@@ -1,14 +1,14 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Coins, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Save, Filter, Landmark, CalendarDays, ArrowDownToLine, ArrowUpFromLine, FileText, TrendingUp, Building2, Plus, Trash, WalletCards, Receipt, Scale } from 'lucide-react';
+import { Coins, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Save, Filter, Landmark, CalendarDays, ArrowDownToLine, ArrowUpFromLine, FileText, TrendingUp, Building2, Plus, Trash, WalletCards, Receipt, Scale, ShieldCheck, Users } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 
 export default function DistrictTreasury() {
   const [logs, setLogs] = useState([]);
   const [assemblies, setAssemblies] = useState(['Central']);
-  const [activeTab, setActiveTab] = useState('income'); // 'income', 'expense', or 'history'
+  const [activeTab, setActiveTab] = useState('income'); 
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -18,7 +18,7 @@ export default function DistrictTreasury() {
   const [globalData, setGlobalData] = useState({
     localAssembly: 'Central',
     date: new Date().toISOString().split('T')[0],
-    entity: 'General Congregation', // Acts as 'Contributor' for income, 'Payee/Recipient' for expenses
+    entity: 'General Congregation', 
     notes: ''
   });
 
@@ -28,7 +28,7 @@ export default function DistrictTreasury() {
 
   // --- FILTER STATES ---
   const [searchTerm, setSearchTerm] = useState('');
-  const [fType, setFType] = useState('All Transactions'); // Income vs Expense
+  const [fType, setFType] = useState('All Transactions');
   const [fCategory, setFCategory] = useState('All Categories');
   const [fAssembly, setFAssembly] = useState('All Assemblies');
   const [dateFrom, setDateFrom] = useState('');
@@ -42,17 +42,17 @@ export default function DistrictTreasury() {
     "Pentecost Men Ministry Offerings", "Other / Add Custom..." 
   ];
 
+  // UPGRADED EXPENSE CATEGORIES FOR EXACT FUND ACCOUNTING
   const expenseCategories = [
-    "Pastoral & Ministry Allowance", "Welfare & Relief", "Church Building & Projects",
-    "Utilities & District Admin", "Evangelism & Crusades", "Equipment & Maintenance",
-    "Headquarters / Area Remittance", "Other / Add Custom..."
+    "Headquarters / Area Remittance", "Pastoral Allowance", "District Admin & Utilities", 
+    "Church Building & Projects", "Welfare & Relief", "Children Ministry Expense", 
+    "Youth Ministry Expense", "Evangelism Ministry Expense", "Women Ministry Expense", 
+    "PEMEM Expense", "Other / Add Custom..."
   ];
 
   const paymentMethods = ["Cash", "Mobile Money (MoMo)", "Bank Transfer", "Cheque"];
-
   const activeCategoryList = activeTab === 'income' ? incomeCategories : expenseCategories;
 
-  // Extract all categories from logs for the filter dropdown
   const dynamicCategories = [...new Set([
     ...incomeCategories.filter(c => c !== "Other / Add Custom..."),
     ...expenseCategories.filter(c => c !== "Other / Add Custom..."),
@@ -94,7 +94,6 @@ export default function DistrictTreasury() {
     setGlobalData(prev => ({ ...prev, entity: tab === 'income' ? 'General Congregation' : '', notes: '' }));
   };
 
-  // --- BATCH ENTRY CONTROLS ---
   const handleAddEntry = () => setEntries([...entries, { id: Date.now(), category: '', customCategory: '', amount: '', paymentMethod: 'Cash' }]);
   const handleRemoveEntry = (idToRemove) => { if (entries.length > 1) setEntries(entries.filter(e => e.id !== idToRemove)); };
   
@@ -140,7 +139,7 @@ export default function DistrictTreasury() {
           amount: parseFloat(entry.amount),
           category: finalCategory,
           paymentMethod: entry.paymentMethod,
-          contributor: globalData.entity.trim() || 'Not Specified', // Maps to Payee for expenses
+          contributor: globalData.entity.trim() || 'Not Specified',
           date: globalData.date,
           notes: globalData.notes.trim(),
           recordedAt: new Date().toISOString(),
@@ -170,11 +169,9 @@ export default function DistrictTreasury() {
     }
   };
 
-  // --- FILTERS & KPI MATH ---
+  // --- FILTERS ---
   const filteredLogs = logs.filter(log => {
-    // Treat legacy logs without transactionType as 'Income'
     const logType = log.transactionType || 'Income';
-    
     const matchesSearch = (log.notes || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (log.contributor || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = fType === 'All Transactions' || logType === fType;
@@ -189,9 +186,29 @@ export default function DistrictTreasury() {
     return matchesSearch && matchesType && matchesCategory && matchesAssembly && matchesDate;
   });
 
+  // --- FUND ACCOUNTING ENGINE ---
+  const calcFund = (incCats, expCats) => {
+    const inc = filteredLogs.filter(l => (l.transactionType || 'Income') === 'Income' && incCats.includes(l.category)).reduce((sum, l) => sum + (l.amount || 0), 0);
+    const exp = filteredLogs.filter(l => l.transactionType === 'Expense' && expCats.includes(l.category)).reduce((sum, l) => sum + (l.amount || 0), 0);
+    return inc - exp;
+  };
+
+  const youthBal = calcFund(["Youth ministry offering"], ["Youth Ministry Expense"]);
+  const womenBal = calcFund(["Women ministry offering"], ["Women Ministry Expense"]);
+  const pememBal = calcFund(["Pentecost Men Ministry Offerings"], ["PEMEM Expense"]);
+  const childBal = calcFund(["Children ministry offering"], ["Children Ministry Expense"]);
+  const evangBal = calcFund(["Evangelism ministry offering"], ["Evangelism Ministry Expense"]);
+  
+  const pendingRemittances = calcFund(
+    ["Tithes", "Mission Offering (M.O.)", "Area Week Offering", "Missions Week Offering", "Area Prayers"], 
+    ["Headquarters / Area Remittance"]
+  );
+
   const totalIncome = filteredLogs.filter(l => (l.transactionType || 'Income') === 'Income').reduce((sum, l) => sum + (l.amount || 0), 0);
   const totalExpense = filteredLogs.filter(l => l.transactionType === 'Expense').reduce((sum, l) => sum + (l.amount || 0), 0);
-  const netBalance = totalIncome - totalExpense;
+  const totalNetBalance = totalIncome - totalExpense;
+
+  const districtMainAccount = totalNetBalance - (youthBal + womenBal + pememBal + childBal + evangBal + pendingRemittances);
 
   const inputStyle = "w-full p-3.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 rounded-xl font-bold text-slate-800 outline-none transition-all text-sm placeholder:text-slate-400";
   const labelStyle = "text-[10px] font-black text-slate-400 uppercase ml-1 mb-2 block tracking-widest";
@@ -213,7 +230,7 @@ export default function DistrictTreasury() {
           <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-lg shadow-slate-900/20"><Landmark size={32} /></div>
           <div>
             <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">District Treasury</h1>
-            <p className="font-bold text-slate-500">Track all district Income, Remittances, and Local Expenses.</p>
+            <p className="font-bold text-slate-500">Fund Accounting: Track segregated balances for Ministries, Remittances, and District Admin.</p>
           </div>
         </div>
 
@@ -320,32 +337,61 @@ export default function DistrictTreasury() {
         )}
 
         {/* ================================================== */}
-        {/* TAB 3: MASTER FINANCIAL LEDGER                     */}
+        {/* TAB 3: FUND ACCOUNTING MASTER LEDGER               */}
         {/* ================================================== */}
         {activeTab === 'history' && (
           <div className="space-y-6 animate-fade-in">
             
-            {/* TRI-STATE KPI METRIC CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-emerald-50 border border-emerald-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm relative overflow-hidden">
-                <div className="bg-emerald-500 text-white p-3 rounded-xl relative z-10"><ArrowDownToLine size={24}/></div>
-                <div className="relative z-10">
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Income</p>
-                  <h3 className="text-2xl font-black text-emerald-900">₵ {totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
-                </div>
-              </div>
-              <div className="bg-rose-50 border border-rose-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm relative overflow-hidden">
-                <div className="bg-rose-500 text-white p-3 rounded-xl relative z-10"><ArrowUpFromLine size={24}/></div>
-                <div className="relative z-10">
-                  <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Total Expenses</p>
-                  <h3 className="text-2xl font-black text-rose-900">₵ {totalExpense.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
-                </div>
-              </div>
-              <div className={`p-5 rounded-2xl flex items-center gap-4 shadow-sm border ${netBalance >= 0 ? 'bg-slate-900 border-slate-800' : 'bg-red-900 border-red-800'}`}>
-                <div className="bg-white/10 text-white p-3 rounded-xl"><Scale size={24}/></div>
+            {/* FUND BALANCES DASHBOARD */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              
+              {/* Main District Account */}
+              <div className={`p-6 rounded-[2rem] shadow-xl border flex flex-col justify-between ${districtMainAccount >= 0 ? 'bg-slate-900 border-slate-800' : 'bg-red-900 border-red-800'}`}>
                 <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Net Balance</p>
-                  <h3 className="text-2xl font-black text-white">₵ {netBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="bg-white/10 p-2 rounded-xl text-white"><Building2 size={20}/></div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main District Fund</p>
+                  </div>
+                  <p className="text-sm font-bold text-slate-400 mb-4 line-clamp-2">Available funds after reserving Headquarters Remittances and all Ministry balances.</p>
+                </div>
+                <h3 className="text-4xl font-black text-white">₵ {districtMainAccount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
+              </div>
+
+              {/* Pending Remittances Vault */}
+              <div className="p-6 rounded-[2rem] shadow-sm border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="bg-blue-600 p-2 rounded-xl text-white"><ShieldCheck size={20}/></div>
+                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Pending HQ Remittances</p>
+                  </div>
+                  <p className="text-sm font-bold text-blue-700/70 mb-4 line-clamp-2">Unremitted Tithes, M.O., and Area Offerings waiting to be dispatched.</p>
+                </div>
+                <h3 className="text-4xl font-black text-blue-900">₵ {pendingRemittances.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
+              </div>
+
+              {/* Ministries Sub-Ledgers */}
+              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col gap-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2"><Users size={14}/> Ministry Vaults</p>
+                
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-600">Youth Ministry</span>
+                  <span className={`text-sm font-black ${youthBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {youthBal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-600">Women's Ministry</span>
+                  <span className={`text-sm font-black ${womenBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {womenBal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-600">PEMEM (Men)</span>
+                  <span className={`text-sm font-black ${pememBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {pememBal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-600">Children's Ministry</span>
+                  <span className={`text-sm font-black ${childBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {childBal.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                  <span className="text-xs font-bold text-slate-600">Evangelism Ministry</span>
+                  <span className={`text-sm font-black ${evangBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {evangBal.toLocaleString()}</span>
                 </div>
               </div>
             </div>

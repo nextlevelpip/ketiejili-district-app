@@ -170,8 +170,8 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <MassiveKpiCard title="Total Members" value={totalMembers} icon={Users} bgColor="bg-blue-900" textColor="text-blue-100" />
           <MassiveKpiCard title="Total Souls Won" value={totalSouls} icon={Flame} bgColor="bg-emerald-600" textColor="text-emerald-100" />
-          <MassiveKpiCard title="Water Baptisms" value={waterBaptized} icon={Droplet} bgColor="bg-amber-500" textColor="text-amber-100" />
-          <MassiveKpiCard title="Holy Spirit Baptisms" value={spiritBaptized} icon={Wind} bgColor="bg-purple-600" textColor="text-purple-100" />
+          <MassiveKpiCard title="Water Baptism" value={waterBaptized} icon={Droplet} bgColor="bg-amber-500" textColor="text-amber-100" />
+          <MassiveKpiCard title="Holy Spirit Baptism" value={spiritBaptized} icon={Wind} bgColor="bg-purple-600" textColor="text-purple-100" />
         </div>
 
         {/* ROW 2: STRUCTURAL & MINISTRY FOCUS */}

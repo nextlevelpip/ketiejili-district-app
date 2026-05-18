@@ -168,7 +168,7 @@ const handleSendSMS = async (e) => {
     "District Minister", 
     "District Minister's Wife", 
     "Presiding Elder", 
-     "Presiding Deacon",
+    "Presiding Deacon",
     "Presiding Brother" // Added Presiding Brother as requested
   ];
 
