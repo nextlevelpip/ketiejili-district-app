@@ -15,7 +15,7 @@ export default function EvangelismAndSouls() {
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- FORM STATES (PENTCHMS ALIGNED) ---
+  // --- FORM STATES ---
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [localAssembly, setLocalAssembly] = useState('Central');
   const [location, setLocation] = useState('');
@@ -23,7 +23,6 @@ export default function EvangelismAndSouls() {
   const [targetDemographic, setTargetDemographic] = useState('');
   const [testimonies, setTestimonies] = useState('');
   
-  // Specific PentChMS Soul Categories
   const [adultSoulsCop, setAdultSoulsCop] = useState('');
   const [otherSoulsNonCop, setOtherSoulsNonCop] = useState('');
   const [gospelSundaySouls, setGospelSundaySouls] = useState('');
@@ -34,7 +33,7 @@ export default function EvangelismAndSouls() {
   const [fAssembly, setFAssembly] = useState('All Assemblies');
   const [fDemographic, setFDemographic] = useState('All Categories');
 
-   const outreachTypes = [
+  const outreachTypes = [
     "House to House", "Mass Rally / Crusade", "Street Evangelism", "Dawn Broadcast", 
     "Hospital / Healing Ministry", "Prison Ministry", "Digital / Media Outreach", 
     "Schools / Campus Outreach", "Tract Distribution", "Personal Evangelism"
@@ -133,7 +132,6 @@ export default function EvangelismAndSouls() {
     }
   };
 
-  // --- FILTERS & PENTCHMS AGGREGATIONS ---
   const filteredLogs = logs.filter(log => {
     const matchesSearch = (log.location || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesAssembly = fAssembly === 'All Assemblies' || log.localAssembly === fAssembly;
@@ -147,316 +145,162 @@ export default function EvangelismAndSouls() {
     return matchesSearch && matchesAssembly;
   });
 
-  // KPI Calculations for the PentChMS Auto-Report
   const totalPrograms = filteredLogs.length;
   const totalAdultCop = filteredLogs.reduce((sum, log) => sum + (log.adultSoulsCop || 0), 0);
   const totalOtherNonCop = filteredLogs.reduce((sum, log) => sum + (log.otherSoulsNonCop || 0), 0);
   const totalGospelSunday = filteredLogs.reduce((sum, log) => sum + (log.gospelSundaySouls || 0), 0);
   const totalChildren = filteredLogs.reduce((sum, log) => sum + (log.childrenWon || 0), 0);
-  const masterTotalSouls = totalAdultCop + totalOtherNonCop + totalGospelSunday + totalChildren;
 
-  const inputStyle = "w-full p-3.5 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 focus:ring-4 focus:ring-orange-500/10 rounded-xl font-bold text-slate-800 outline-none transition-all text-sm placeholder:text-slate-400";
-  const labelStyle = "text-[10px] font-black text-slate-400 uppercase ml-1 mb-2 block tracking-widest";
+  const inputStyle = "w-full p-3.5 bg-black/20 border border-white/10 focus:bg-black/30 focus:border-orange-400 focus:ring-4 focus:ring-orange-500/20 rounded-xl font-bold text-white outline-none transition-all text-sm placeholder:text-orange-200/50";
+  const labelStyle = "text-[10px] font-black text-orange-200 uppercase ml-1 mb-2 block tracking-widest";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-slate-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-orange-400" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-20 relative">
+      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#c2410c] via-[#991b1b] to-[#450a0a] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
         
-        {notification.message && (
-          <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-bounce ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-            {notification.type === 'success' ? <CheckCircle2 size={24}/> : <AlertCircle size={24}/>}
-            {notification.message}
-          </div>
-        )}
+        {/* Ambient background decorative elements */}
+        <div className="absolute top-0 right-0 w-96 h-96 bg-orange-500/20 blur-[120px] rounded-full pointer-events-none"></div>
 
-        <div className="flex items-center gap-4 mb-8 border-b border-gray-100 pb-6">
-          <div className="bg-orange-600 p-4 rounded-2xl text-white shadow-lg shadow-orange-600/20"><Flame size={32} /></div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">Evangelism & Souls</h1>
-            <p className="font-bold text-slate-500">Track outreach efforts perfectly aligned with reporting.</p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap justify-center items-center gap-3 mb-8">
-          <button onClick={() => setActiveTab('log')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'log' ? 'bg-orange-600 text-white shadow-md' : 'bg-white text-orange-600 hover:bg-slate-50 border border-slate-200'}`}>
-            <Megaphone size={16}/> Log Outreach
-          </button>
-          <button onClick={() => setActiveTab('history')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'history' ? 'bg-orange-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'}`}>
-            <FileSpreadsheet size={16}/> Reports ({logs.length})
-          </button>
-          <button onClick={() => setActiveTab('souls')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'souls' ? 'bg-orange-600 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'}`}>
-            <Users size={16}/> Harvested Souls ({converts.length})
-          </button>
-        </div>
-
-        {/* ================================================== */}
-        {/* TAB 1: LOG OUTREACH (PENTCHMS FIELDS)              */}
-        {/* ================================================== */}
-        {activeTab === 'log' && (
-          <div className="bg-white p-8 md:p-10 rounded-[2rem] shadow-xl border border-slate-100 max-w-4xl mx-auto animate-fade-in relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-orange-400 to-red-500"></div>
-            
-            <div className="mb-6 border-b border-slate-100 pb-4">
-              <h2 className="text-xl font-black uppercase tracking-widest text-orange-700">Record Evangelism Event</h2>
-              <p className="text-sm font-bold text-slate-500">Inputs are strictly aligned with the Headquarters portal.</p>
+        <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
+          
+          {notification.message && (
+            <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-bounce ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+              {notification.type === 'success' ? <CheckCircle2 size={24}/> : <AlertCircle size={24}/>}
+              {notification.message}
             </div>
+          )}
 
-            <form onSubmit={handleSave} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className={labelStyle}>Date of Outreach *</label>
-                  <input required type="date" value={date} onChange={e => setDate(e.target.value)} className={inputStyle} />
-                </div>
-                <div>
-                  <label className={labelStyle}>Executing Assembly *</label>
-                  <select required value={localAssembly} onChange={e => setLocalAssembly(e.target.value)} className={inputStyle}>
-                    {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelStyle}>Strategy / Type of Evangelism *</label>
-                  <select required value={outreachType} onChange={e => setOutreachType(e.target.value)} className={inputStyle}>
-                    <option value="">- Select Type -</option>
-                    {outreachTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelStyle}>Target Demographic *</label>
-                  <select required value={targetDemographic} onChange={e => setTargetDemographic(e.target.value)} className={`${inputStyle} text-orange-700`}>
-                    <option value="">- Select Focus Area -</option>
-                    {pentChmsDemographics.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div>
-                <label className={labelStyle}>Specific Location / Community *</label>
-                <input required type="text" placeholder="e.g. Katanga Market Square or Nsawam Prisons" value={location} onChange={e => setLocation(e.target.value)} className={inputStyle} />
-              </div>
-
-              {/* PENTCHMS SOULS BREAKDOWN SECTION */}
-              <div className="bg-orange-50/50 p-6 rounded-2xl border border-orange-100">
-                <h3 className="text-sm font-black uppercase tracking-widest text-orange-800 mb-4 flex items-center gap-2"><Target size={16}/> Souls Won Breakdown</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className={labelStyle}>Adult Souls Won (COP)</label>
-                    <input type="number" min="0" placeholder="0" value={adultSoulsCop} onChange={e => setAdultSoulsCop(e.target.value)} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>Other Souls Won (Non-COP)</label>
-                    <input type="number" min="0" placeholder="0" value={otherSoulsNonCop} onChange={e => setOtherSoulsNonCop(e.target.value)} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>Gospel Sunday Souls</label>
-                    <input type="number" min="0" placeholder="0" value={gospelSundaySouls} onChange={e => setGospelSundaySouls(e.target.value)} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>Children Won And Retained</label>
-                    <input type="number" min="0" placeholder="0" value={childrenWon} onChange={e => setChildrenWon(e.target.value)} className={inputStyle} />
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className={labelStyle}>Testimonies & Notes</label>
-                <textarea rows="3" placeholder="Any notable miracles, resistance, or general observations?" value={testimonies} onChange={e => setTestimonies(e.target.value)} className={inputStyle} />
-              </div>
-
-              <div className="pt-4 border-t border-slate-100 flex justify-end">
-                <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-4 bg-orange-600 hover:bg-orange-700 text-white text-sm font-black uppercase tracking-widest rounded-xl shadow-lg shadow-orange-600/30 transition-all flex justify-center items-center gap-3 disabled:opacity-50">
-                  {isSubmitting ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Save Outreach Log</>}
-                </button>
-              </div>
-            </form>
+          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
+            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><Flame size={32} /></div>
+            <div>
+              <h1 className="text-3xl font-black text-white uppercase tracking-tight">Evangelism & Souls</h1>
+              <p className="font-bold text-orange-200">Track outreach efforts perfectly aligned with reporting.</p>
+            </div>
           </div>
-        )}
 
-        {/* ================================================== */}
-        {/* TAB 2: PENTCHMS AUTO-REPORT HISTORY                */}
-        {/* ================================================== */}
-        {activeTab === 'history' && (
-          <div className="space-y-6 animate-fade-in">
-            
-            {/* PENTCHMS REPORT GENERATOR CARD */}
-            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-200 overflow-hidden relative">
-              <div className="bg-slate-50 border-b border-slate-200 p-6">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600 text-white p-2 rounded-lg"><FileSpreadsheet size={20}/></div>
-                  <div>
-                    <h2 className="text-lg font-black text-slate-900 tracking-tight">Auto-Generated Report</h2>
-                    <p className="text-xs font-bold text-slate-500">Totals below automatically adjust based on your search filters.</p>
-                  </div>
-                </div>
-              </div>
+          <div className="flex flex-wrap justify-center items-center gap-3 mb-8">
+            <button onClick={() => setActiveTab('log')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'log' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-orange-200 border-white/10 hover:bg-white/10'}`}>
+              <Megaphone size={16}/> Log Outreach
+            </button>
+            <button onClick={() => setActiveTab('history')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'history' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-orange-200 border-white/10 hover:bg-white/10'}`}>
+              <FileSpreadsheet size={16}/> Reports ({logs.length})
+            </button>
+            <button onClick={() => setActiveTab('souls')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'souls' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-orange-200 border-white/10 hover:bg-white/10'}`}>
+              <Users size={16}/> Harvested Souls ({converts.length})
+            </button>
+          </div>
+
+          {activeTab === 'log' && (
+            <div className="bg-white/10 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-xl border border-white/10 max-w-4xl mx-auto relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-orange-400 to-red-400"></div>
               
-              <div className="p-8 max-w-3xl mx-auto space-y-4">
-                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <span className="font-bold text-slate-600">Total Outreach Programs</span>
-                  <span className="bg-white px-6 py-2 rounded-lg border border-slate-200 font-black text-slate-800 shadow-sm w-24 text-center">{totalPrograms}</span>
-                </div>
-                
-                <div className="border border-slate-200 rounded-xl p-6 space-y-4 mt-6">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-600">Adult Souls Won (COP)</span>
-                    <span className="bg-white px-6 py-2 rounded-lg border border-slate-200 font-black text-slate-800 shadow-sm w-24 text-center">{totalAdultCop}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-600">Other Souls Won (Non-COP)</span>
-                    <span className="bg-white px-6 py-2 rounded-lg border border-slate-200 font-black text-slate-800 shadow-sm w-24 text-center">{totalOtherNonCop}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-600">Gospel Sunday Souls</span>
-                    <span className="bg-white px-6 py-2 rounded-lg border border-slate-200 font-black text-slate-800 shadow-sm w-24 text-center">{totalGospelSunday}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-slate-600">Children Won And Retained</span>
-                    <span className="bg-white px-6 py-2 rounded-lg border border-slate-200 font-black text-slate-800 shadow-sm w-24 text-center">{totalChildren}</span>
-                  </div>
-                </div>
+              <div className="mb-6 border-b border-white/10 pb-4">
+                <h2 className="text-xl font-black uppercase tracking-widest text-orange-100">Record Evangelism Event</h2>
+                <p className="text-xs font-bold text-orange-200/70">Inputs are strictly aligned with the Headquarters portal.</p>
               </div>
-            </div>
 
-            {/* FILTERS */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-3.5 text-slate-300" size={18}/>
-                <input placeholder="Search locations..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-orange-500 transition-all" />
-              </div>
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                <Filter size={16} className="text-slate-400 shrink-0" />
-                <select value={fDemographic} onChange={e => setFDemographic(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-slate-700 outline-none cursor-pointer">
-                  <option value="All Categories">All Demographics</option>
-                  {pentChmsDemographics.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                <MapPin size={16} className="text-slate-400 shrink-0" />
-                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-slate-700 outline-none cursor-pointer">
-                  <option value="All Assemblies">All Assemblies</option>
-                  {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            </div>
+              <form onSubmit={handleSave} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div><label className={labelStyle}>Date of Outreach *</label><input required type="date" value={date} onChange={e => setDate(e.target.value)} className={inputStyle} /></div>
+                  <div><label className={labelStyle}>Executing Assembly *</label><select required value={localAssembly} onChange={e => setLocalAssembly(e.target.value)} className={inputStyle}>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select></div>
+                  <div><label className={labelStyle}>Strategy / Type *</label><select required value={outreachType} onChange={e => setOutreachType(e.target.value)} className={inputStyle}><option value="">- Select Type -</option>{outreachTypes.map(t => <option key={t} value={t}>{t}</option>)}</select></div>
+                  <div><label className={labelStyle}>Target Demographic *</label><select required value={targetDemographic} onChange={e => setTargetDemographic(e.target.value)} className={inputStyle}>{pentChmsDemographics.map(d => <option key={d} value={d}>{d}</option>)}</select></div>
+                </div>
 
-            {/* DETAILED LOGS TABLE */}
-            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-              <div className="overflow-x-auto">
+                <div><label className={labelStyle}>Specific Location / Community *</label><input required type="text" placeholder="e.g. Katanga Market Square" value={location} onChange={e => setLocation(e.target.value)} className={inputStyle} /></div>
+
+                <div className="bg-black/20 p-6 rounded-2xl border border-white/5">
+                  <h3 className="text-xs font-black uppercase tracking-widest text-orange-200 mb-4 flex items-center gap-2"><Target size={16}/> Souls Won Breakdown</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div><label className={labelStyle}>Adult Souls Won (COP)</label><input type="number" min="0" placeholder="0" value={adultSoulsCop} onChange={e => setAdultSoulsCop(e.target.value)} className={inputStyle} /></div>
+                    <div><label className={labelStyle}>Other Souls Won (Non-COP)</label><input type="number" min="0" placeholder="0" value={otherSoulsNonCop} onChange={e => setOtherSoulsNonCop(e.target.value)} className={inputStyle} /></div>
+                    <div><label className={labelStyle}>Gospel Sunday Souls</label><input type="number" min="0" placeholder="0" value={gospelSundaySouls} onChange={e => setGospelSundaySouls(e.target.value)} className={inputStyle} /></div>
+                    <div><label className={labelStyle}>Children Won And Retained</label><input type="number" min="0" placeholder="0" value={childrenWon} onChange={e => setChildrenWon(e.target.value)} className={inputStyle} /></div>
+                  </div>
+                </div>
+
+                <div><label className={labelStyle}>Testimonies & Notes</label><textarea rows="3" placeholder="Any notable miracles?" value={testimonies} onChange={e => setTestimonies(e.target.value)} className={inputStyle} /></div>
+
+                <div className="pt-4 border-t border-white/10 flex justify-end">
+                  <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-4 bg-[#f97316] hover:bg-[#ea580c] text-white text-sm font-black uppercase tracking-widest rounded-xl shadow-lg shadow-orange-900/30 transition-all flex justify-center items-center gap-3 disabled:opacity-50">
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Save Outreach Log</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 overflow-hidden">
+                <div className="bg-black/20 border-b border-white/10 p-6">
+                  <h2 className="text-lg font-black text-white tracking-tight">Auto-Generated Report</h2>
+                </div>
+                <div className="p-8 max-w-3xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center"><p className="text-[10px] font-black text-orange-200 uppercase">Programs</p><p className="text-2xl font-black">{totalPrograms}</p></div>
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center"><p className="text-[10px] font-black text-orange-200 uppercase">Adult COP</p><p className="text-2xl font-black">{totalAdultCop}</p></div>
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center"><p className="text-[10px] font-black text-orange-200 uppercase">Gospel</p><p className="text-2xl font-black">{totalGospelSunday}</p></div>
+                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 text-center"><p className="text-[10px] font-black text-orange-200 uppercase">Children</p><p className="text-2xl font-black">{totalChildren}</p></div>
+                </div>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl border border-white/10 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="relative"><Search className="absolute left-4 top-3.5 text-orange-200/50" size={18}/><input placeholder="Search locations..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-sm outline-none text-white transition-all" /></div>
+                <select value={fDemographic} onChange={e => setFDemographic(e.target.value)} className="p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-white focus:outline-none"><option value="All Categories">All Demographics</option>{pentChmsDemographics.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-white focus:outline-none"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
+              </div>
+
+              <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 overflow-hidden">
                 <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-5 w-40">Date</th>
-                      <th className="p-5">Location & Strategy</th>
-                      <th className="p-5">Demographic</th>
-                      <th className="p-5 text-center">Total Souls</th>
-                      {isTier1 && <th className="p-5 text-center w-24">Action</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <thead><tr className="bg-black/20 border-b border-white/10 text-[10px] font-black text-orange-200 uppercase tracking-widest"><th className="p-5">Date</th><th className="p-5">Location & Strategy</th><th className="p-5">Demographic</th><th className="p-5 text-center">Total Souls</th>{isTier1 && <th className="p-5 text-center">Action</th>}</tr></thead>
+                  <tbody className="divide-y divide-white/5">
                     {filteredLogs.map(log => (
-                      <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-5">
-                          <div className="flex items-center gap-2 font-bold text-slate-500">
-                            <CalendarDays size={14} className="text-orange-400" />
-                            {new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
-                        </td>
-                        <td className="p-5">
-                          <div className="font-black text-slate-900 text-sm mb-1">{log.location}</div>
-                          <div className="text-[9px] font-black uppercase px-2 py-0.5 rounded inline-block border bg-slate-100 text-slate-600 border-slate-200">
-                            {log.localAssembly} • {log.outreachType}
-                          </div>
-                        </td>
-                        <td className="p-5 font-bold text-orange-700">{log.targetDemographic}</td>
-                        <td className="p-5 text-center font-black text-lg text-red-600">{log.totalSoulsWon || 0}</td>
-                        {isTier1 && (
-                          <td className="p-5 text-center">
-                            <button onClick={() => handleDeleteLog(log.id, log.location)} className="p-2 text-slate-300 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
-                              <Trash2 size={16}/>
-                            </button>
-                          </td>
-                        )}
+                      <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-5 font-bold text-white"><CalendarDays size={14} className="inline mr-2 text-orange-400" />{new Date(log.date).toLocaleDateString()}</td>
+                        <td className="p-5 font-black text-white">{log.location}<br/><span className="text-[10px] font-bold text-orange-200/60 uppercase">{log.outreachType}</span></td>
+                        <td className="p-5 font-bold text-orange-300">{log.targetDemographic}</td>
+                        <td className="p-5 text-center font-black text-lg text-red-300">{log.totalSoulsWon || 0}</td>
+                        {isTier1 && <td className="p-5 text-center"><button onClick={() => handleDeleteLog(log.id, log.location)} className="p-2 text-white/40 hover:text-red-400"><Trash2 size={16}/></button></td>}
                       </tr>
                     ))}
-                    {filteredLogs.length === 0 && <tr><td colSpan={isTier1 ? "5" : "4"} className="p-12 text-center text-slate-400 font-bold italic">No outreach records match your criteria.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* ================================================== */}
-        {/* TAB 3: HARVESTED SOULS                             */}
-        {/* ================================================== */}
-        {activeTab === 'souls' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl flex items-center gap-4 shadow-sm">
-              <div className="bg-blue-500 text-white p-3 rounded-xl"><Target size={24}/></div>
-              <div>
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Discipleship Radar</p>
-                <h3 className="text-lg font-bold text-blue-900">Tracking all members registered as "New Converts"</h3>
+          {activeTab === 'souls' && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl flex items-center gap-4 border border-white/10">
+                <div className="bg-blue-500/20 text-blue-200 p-3 rounded-xl border border-blue-400/20"><Target size={24}/></div>
+                <div><p className="text-[10px] font-black text-blue-200 uppercase tracking-widest">Discipleship Radar</p><h3 className="text-lg font-bold text-white">Tracking all members registered as "New Converts"</h3></div>
               </div>
-            </div>
 
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <Search className="absolute left-4 top-3.5 text-slate-300" size={18}/>
-                <input placeholder="Search convert names..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-orange-500 transition-all" />
+              <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl border border-white/10 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative"><Search className="absolute left-4 top-3.5 text-orange-200/50" size={18}/><input placeholder="Search convert names..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-sm outline-none text-white transition-all" /></div>
+                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-xs text-white focus:outline-none"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
               </div>
-              <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                <MapPin size={16} className="text-slate-400 shrink-0" />
-                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-slate-700 outline-none cursor-pointer">
-                  <option value="All Assemblies">All Assemblies</option>
-                  {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
-                </select>
-              </div>
-            </div>
 
-            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-              <div className="overflow-x-auto">
+              <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 overflow-hidden">
                 <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-5">Convert Name</th>
-                      <th className="p-5">Assembly</th>
-                      <th className="p-5">HQ Category</th>
-                      <th className="p-5 text-center">Discipleship Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <thead><tr className="bg-black/20 border-b border-white/10 text-[10px] font-black text-orange-200 uppercase tracking-widest"><th className="p-5">Convert Name</th><th className="p-5">Assembly</th><th className="p-5">HQ Category</th><th className="p-5 text-center">Status</th></tr></thead>
+                  <tbody className="divide-y divide-white/5">
                     {filteredConverts.map(convert => (
-                      <tr key={convert.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="p-5">
-                          <div className="font-black text-slate-900 text-base">{convert.name}</div>
-                          <div className="text-xs font-bold text-slate-500 mt-0.5">{convert.phone || 'No Phone'}</div>
-                        </td>
-                        <td className="p-5 font-bold text-emerald-700">{convert.localAssembly}</td>
-                        <td className="p-5">
-                          <span className="text-[10px] font-black uppercase px-3 py-1 rounded-lg border bg-orange-50 text-orange-700 border-orange-200">
-                            {convert.soulWinner || 'General Event'}
-                          </span>
-                        </td>
-                        <td className="p-5">
-                          <div className="flex justify-center gap-3">
-                            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${convert.waterBaptized === 'Yes' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                              <Droplet size={12} className={convert.waterBaptized === 'Yes' ? 'fill-current' : ''}/> Water
-                            </div>
-                            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-[10px] font-black uppercase tracking-wider ${convert.spiritBaptism === 'Yes' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-slate-50 text-slate-400 border-slate-200'}`}>
-                              <Wind size={12} className={convert.spiritBaptism === 'Yes' ? 'fill-current' : ''}/> Spirit
-                            </div>
-                          </div>
-                        </td>
+                      <tr key={convert.id} className="hover:bg-white/5">
+                        <td className="p-5 font-black text-white">{convert.name}</td>
+                        <td className="p-5 font-bold text-emerald-300">{convert.localAssembly}</td>
+                        <td className="p-5"><span className="text-[10px] font-black uppercase px-3 py-1 rounded-lg border bg-orange-500/20 text-orange-200 border-orange-400/20">{convert.soulWinner || 'General'}</span></td>
+                        <td className="p-5"><div className="flex justify-center gap-3"><span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${convert.waterBaptized === 'Yes' ? 'bg-blue-500/20 text-blue-200 border-blue-400/20' : 'bg-white/5 text-white/30 border-white/5'}`}>Water</span><span className={`px-2 py-0.5 rounded-full border text-[10px] font-black ${convert.spiritBaptism === 'Yes' ? 'bg-purple-500/20 text-purple-200 border-purple-400/20' : 'bg-white/5 text-white/30 border-white/5'}`}>Spirit</span></div></td>
                       </tr>
                     ))}
-                    {filteredConverts.length === 0 && <tr><td colSpan="4" className="p-12 text-center text-slate-400 font-bold italic">No converts found in the Directory.</td></tr>}
                   </tbody>
                 </table>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );

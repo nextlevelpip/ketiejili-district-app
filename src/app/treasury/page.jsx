@@ -210,289 +210,299 @@ export default function DistrictTreasury() {
 
   const districtMainAccount = totalNetBalance - (youthBal + womenBal + pememBal + childBal + evangBal + pendingRemittances);
 
-  const inputStyle = "w-full p-3.5 bg-slate-50 border border-slate-200 focus:bg-white focus:ring-4 rounded-xl font-bold text-slate-800 outline-none transition-all text-sm placeholder:text-slate-400";
-  const labelStyle = "text-[10px] font-black text-slate-400 uppercase ml-1 mb-2 block tracking-widest";
+  // PREMIUM GLASS INPUT STYLE
+  const inputStyle = "w-full p-3.5 bg-black/20 border border-white/10 focus:bg-black/30 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/20 rounded-xl font-bold text-white outline-none transition-all text-sm placeholder:text-emerald-200/50 [&>option]:text-gray-900";
+  const labelStyle = "text-[10px] font-black text-emerald-200 uppercase ml-1 mb-2 block tracking-widest";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-slate-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-emerald-400" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="max-w-7xl mx-auto space-y-6 animate-fade-in pb-20 relative">
+      {/* FINANCIAL GRADIENT WRAPPER */}
+      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#064e3b] via-[#0f766e] to-[#022c22] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
         
-        {notification.message && (
-          <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-bounce ${notification.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
-            {notification.type === 'success' ? <CheckCircle2 size={24}/> : <AlertCircle size={24}/>}
-            {notification.message}
-          </div>
-        )}
+        {/* Decorative ambient glowing orbs */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-emerald-400/20 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-500/20 blur-[120px] rounded-full pointer-events-none"></div>
 
-        <div className="flex items-center gap-4 mb-8 border-b border-gray-100 pb-6">
-          <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-lg shadow-slate-900/20"><Landmark size={32} /></div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 uppercase tracking-tight">District Treasury</h1>
-            <p className="font-bold text-slate-500">Fund Accounting: Track segregated balances for Ministries, Remittances, and District Admin.</p>
-          </div>
-        </div>
-
-        {/* MASTER TABS */}
-        <div className="flex flex-wrap justify-center items-center gap-3 mb-8">
-          <button onClick={() => handleTabSwitch('income')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'income' ? 'bg-emerald-600 text-white shadow-md' : 'bg-white text-emerald-600 hover:bg-slate-50 border border-slate-200'}`}>
-            <ArrowDownToLine size={16}/> Receive Funds
-          </button>
-          <button onClick={() => handleTabSwitch('expense')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'expense' ? 'bg-rose-600 text-white shadow-md' : 'bg-white text-rose-600 hover:bg-slate-50 border border-slate-200'}`}>
-            <ArrowUpFromLine size={16}/> Dispatch Expenses
-          </button>
-          <button onClick={() => handleTabSwitch('history')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm ${activeTab === 'history' ? 'bg-slate-900 text-white shadow-md' : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200'}`}>
-            <FileText size={16}/> Master Ledger ({logs.length})
-          </button>
-        </div>
-
-        {/* ================================================== */}
-        {/* TAB 1 & 2: DYNAMIC BATCH FORM (INCOME OR EXPENSE)  */}
-        {/* ================================================== */}
-        {(activeTab === 'income' || activeTab === 'expense') && (
-          <div className="bg-white p-8 md:p-10 rounded-[2rem] shadow-xl border border-slate-100 max-w-5xl mx-auto animate-fade-in relative overflow-hidden">
-            <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${activeTab === 'income' ? 'from-emerald-400 to-teal-500' : 'from-rose-500 to-orange-500'}`}></div>
-            
-            <div className="mb-8 border-b border-slate-100 pb-4">
-              <h2 className={`text-xl font-black uppercase tracking-widest ${activeTab === 'income' ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {activeTab === 'income' ? 'Log Incoming Funds' : 'Log Dispatched Expenses'}
-              </h2>
+        <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
+          
+          {notification.message && (
+            <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
+              {notification.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
+              <span className="font-extrabold">{notification.message}</span>
             </div>
+          )}
 
-            <form onSubmit={handleSaveBatch} className="space-y-6">
-              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <label className={labelStyle}>Date of {activeTab === 'income' ? 'Income' : 'Dispatch'} *</label>
-                  <input required type="date" value={globalData.date} onChange={e => setGlobalData({...globalData, date: e.target.value})} className={`${inputStyle} focus:border-slate-400 focus:ring-slate-500/10`} />
-                </div>
-                <div>
-                  <label className={labelStyle}>Allocated Assembly *</label>
-                  <select required value={globalData.localAssembly} onChange={e => setGlobalData({...globalData, localAssembly: e.target.value})} className={`${inputStyle} focus:border-slate-400 focus:ring-slate-500/10`}>
-                    {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className={labelStyle}>{activeTab === 'income' ? 'Specific Contributor / Source' : 'Payee / Recipient'}</label>
-                  <input type="text" placeholder={activeTab === 'income' ? "e.g. General Congregation" : "e.g. ECG Ghana or Bro. Builder"} value={globalData.entity} onChange={e => setGlobalData({...globalData, entity: e.target.value})} className={`${inputStyle} focus:border-slate-400 focus:ring-slate-500/10`} />
-                </div>
-                <div>
-                  <label className={labelStyle}>Batch Reference / Notes</label>
-                  <input type="text" placeholder={activeTab === 'income' ? "e.g. Sunday Service" : "e.g. June Utilities & Salary"} value={globalData.notes} onChange={e => setGlobalData({...globalData, notes: e.target.value})} className={`${inputStyle} focus:border-slate-400 focus:ring-slate-500/10`} />
-                </div>
+          {/* HEADER */}
+          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
+            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><Landmark size={32} /></div>
+            <div>
+              <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">District Treasury</h1>
+              <p className="font-bold text-emerald-100">Fund Accounting: Track segregated balances for Ministries and Admin.</p>
+            </div>
+          </div>
+
+          {/* MASTER TABS */}
+          <div className="flex flex-wrap justify-center items-center gap-3 mb-8">
+            <button onClick={() => handleTabSwitch('income')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'income' ? 'bg-emerald-600/80 text-white border-emerald-400/50 shadow-lg' : 'bg-white/5 text-emerald-200 border-white/10 hover:bg-white/10'}`}>
+              <ArrowDownToLine size={16}/> Receive Funds
+            </button>
+            <button onClick={() => handleTabSwitch('expense')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'expense' ? 'bg-rose-600/80 text-white border-rose-400/50 shadow-lg' : 'bg-white/5 text-emerald-200 border-white/10 hover:bg-white/10'}`}>
+              <ArrowUpFromLine size={16}/> Dispatch Expenses
+            </button>
+            <button onClick={() => handleTabSwitch('history')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'history' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-emerald-200 border-white/10 hover:bg-white/10'}`}>
+              <FileText size={16}/> Master Ledger ({logs.length})
+            </button>
+          </div>
+
+          {/* ================================================== */}
+          {/* TAB 1 & 2: DYNAMIC BATCH FORM (INCOME OR EXPENSE)  */}
+          {/* ================================================== */}
+          {(activeTab === 'income' || activeTab === 'expense') && (
+            <div className="bg-white/10 backdrop-blur-xl p-8 md:p-10 rounded-[2rem] shadow-xl border border-white/10 max-w-5xl mx-auto animate-fade-in relative overflow-hidden">
+              <div className={`absolute top-0 left-0 w-full h-1.5 ${activeTab === 'income' ? 'bg-gradient-to-r from-emerald-400 to-teal-400' : 'bg-gradient-to-r from-rose-400 to-orange-400'}`}></div>
+              
+              <div className="mb-8 border-b border-white/10 pb-4 mt-2">
+                <h2 className={`text-xl font-black uppercase tracking-widest ${activeTab === 'income' ? 'text-emerald-300' : 'text-rose-300'}`}>
+                  {activeTab === 'income' ? 'Log Incoming Funds' : 'Log Dispatched Expenses'}
+                </h2>
               </div>
 
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-black text-slate-800">{activeTab === 'income' ? 'Income Breakdown' : 'Expense Breakdown'}</h3>
-                  <button type="button" onClick={handleAddEntry} className={`text-sm font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg border transition-colors ${activeTab === 'income' ? 'text-emerald-600 hover:text-emerald-700 bg-emerald-50 border-emerald-100' : 'text-rose-600 hover:text-rose-700 bg-rose-50 border-rose-100'}`}>
-                    <Plus size={14} /> Add Line Item
-                  </button>
+              <form onSubmit={handleSaveBatch} className="space-y-6">
+                <div className="bg-black/20 p-6 rounded-2xl border border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6 mb-8 backdrop-blur-md">
+                  <div>
+                    <label className={labelStyle}>Date of {activeTab === 'income' ? 'Income' : 'Dispatch'} *</label>
+                    <input required type="date" value={globalData.date} onChange={e => setGlobalData({...globalData, date: e.target.value})} className={inputStyle} />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Allocated Assembly *</label>
+                    <select required value={globalData.localAssembly} onChange={e => setGlobalData({...globalData, localAssembly: e.target.value})} className={inputStyle}>
+                      {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelStyle}>{activeTab === 'income' ? 'Specific Contributor / Source' : 'Payee / Recipient'}</label>
+                    <input type="text" placeholder={activeTab === 'income' ? "e.g. General Congregation" : "e.g. ECG Ghana or Bro. Builder"} value={globalData.entity} onChange={e => setGlobalData({...globalData, entity: e.target.value})} className={inputStyle} />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Batch Reference / Notes</label>
+                    <input type="text" placeholder={activeTab === 'income' ? "e.g. Sunday Service" : "e.g. June Utilities & Salary"} value={globalData.notes} onChange={e => setGlobalData({...globalData, notes: e.target.value})} className={inputStyle} />
+                  </div>
                 </div>
 
-                {entries.map((entry, index) => (
-                  <div key={entry.id} className="p-4 rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center">
-                    <div className="w-full md:flex-1">
-                      <select required value={entry.category} onChange={e => handleEntryChange(entry.id, 'category', e.target.value)} className={`${inputStyle} ${activeTab === 'income' ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-rose-500 focus:ring-rose-500/10'}`}>
-                        <option value="">- Select Category -</option>
-                        {activeCategoryList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                      </select>
-                      {entry.category === "Other / Add Custom..." && (
-                        <input required type="text" placeholder="Specify Custom Category..." value={entry.customCategory} onChange={e => handleEntryChange(entry.id, 'customCategory', e.target.value)} className={`${inputStyle} mt-2 ${activeTab === 'income' ? 'bg-emerald-50/30' : 'bg-rose-50/30'}`} autoFocus />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-black text-white">{activeTab === 'income' ? 'Income Breakdown' : 'Expense Breakdown'}</h3>
+                    <button type="button" onClick={handleAddEntry} className={`text-sm font-bold flex items-center gap-1 px-3 py-1.5 rounded-lg border transition-colors ${activeTab === 'income' ? 'text-emerald-200 hover:text-white bg-emerald-500/20 border-emerald-400/30' : 'text-rose-200 hover:text-white bg-rose-500/20 border-rose-400/30'}`}>
+                      <Plus size={14} /> Add Line Item
+                    </button>
+                  </div>
+
+                  {entries.map((entry, index) => (
+                    <div key={entry.id} className="p-4 rounded-xl border border-white/10 bg-white/5 shadow-sm flex flex-col md:flex-row gap-4 items-start md:items-center hover:bg-white/10 transition-colors">
+                      <div className="w-full md:flex-1">
+                        <select required value={entry.category} onChange={e => handleEntryChange(entry.id, 'category', e.target.value)} className={inputStyle}>
+                          <option value="">- Select Category -</option>
+                          {activeCategoryList.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
+                        {entry.category === "Other / Add Custom..." && (
+                          <input required type="text" placeholder="Specify Custom Category..." value={entry.customCategory} onChange={e => handleEntryChange(entry.id, 'customCategory', e.target.value)} className={`${inputStyle} mt-2 ${activeTab === 'income' ? 'bg-emerald-900/40 border-emerald-400/30' : 'bg-rose-900/40 border-rose-400/30'}`} autoFocus />
+                        )}
+                      </div>
+
+                      <div className="w-full md:w-56">
+                        <select required value={entry.paymentMethod} onChange={e => handleEntryChange(entry.id, 'paymentMethod', e.target.value)} className={inputStyle}>
+                          {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+                        </select>
+                      </div>
+
+                      <div className="w-full md:w-48 relative">
+                        <span className={`absolute left-4 top-3.5 font-black ${activeTab === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>₵</span>
+                        <input required type="number" step="0.01" min="0" placeholder="0.00" value={entry.amount} onChange={e => handleEntryChange(entry.id, 'amount', e.target.value)} className={`${inputStyle} pl-10 ${activeTab === 'income' ? 'text-emerald-300' : 'text-rose-300'}`} />
+                      </div>
+
+                      {entries.length > 1 && (
+                        <button type="button" onClick={() => handleRemoveEntry(entry.id)} className="p-3.5 text-white/40 hover:text-red-400 hover:bg-red-500/20 rounded-xl transition-colors shrink-0">
+                          <Trash size={18} />
+                        </button>
                       )}
                     </div>
-
-                    <div className="w-full md:w-56">
-                      <select required value={entry.paymentMethod} onChange={e => handleEntryChange(entry.id, 'paymentMethod', e.target.value)} className={`${inputStyle} text-slate-600 ${activeTab === 'income' ? 'focus:border-emerald-500 focus:ring-emerald-500/10' : 'focus:border-rose-500 focus:ring-rose-500/10'}`}>
-                        {paymentMethods.map(pm => <option key={pm} value={pm}>{pm}</option>)}
-                      </select>
-                    </div>
-
-                    <div className="w-full md:w-48 relative">
-                      <span className="absolute left-4 top-3.5 font-black text-slate-400">₵</span>
-                      <input required type="number" step="0.01" min="0" placeholder="0.00" value={entry.amount} onChange={e => handleEntryChange(entry.id, 'amount', e.target.value)} className={`${inputStyle} pl-10 ${activeTab === 'income' ? 'text-emerald-700 focus:border-emerald-500 focus:ring-emerald-500/10' : 'text-rose-700 focus:border-rose-500 focus:ring-rose-500/10'}`} />
-                    </div>
-
-                    {entries.length > 1 && (
-                      <button type="button" onClick={() => handleRemoveEntry(entry.id)} className="p-3.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-colors shrink-0">
-                        <Trash size={18} />
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-6 mt-6 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className={`px-6 py-3 rounded-2xl flex items-center gap-4 w-full md:w-auto border ${activeTab === 'income' ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
-                  <div className={`text-[10px] font-black uppercase tracking-widest text-right ${activeTab === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>Batch<br/>Total</div>
-                  <div className={`text-3xl font-black ${activeTab === 'income' ? 'text-emerald-800' : 'text-rose-800'}`}>₵ {batchTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  ))}
                 </div>
 
-                <button type="submit" disabled={isSubmitting || batchTotal === 0} className={`w-full md:w-auto px-10 py-4 text-white text-sm font-black uppercase tracking-widest rounded-xl shadow-lg transition-all flex justify-center items-center gap-3 disabled:opacity-50 ${activeTab === 'income' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/30' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-600/30'}`}>
-                  {isSubmitting ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Process {activeTab === 'income' ? 'Income' : 'Expense'} to Ledger</>}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+                <div className="pt-6 mt-6 border-t border-white/10 flex flex-col md:flex-row items-center justify-between gap-6">
+                  <div className={`px-6 py-3 rounded-2xl flex items-center gap-4 w-full md:w-auto border ${activeTab === 'income' ? 'bg-emerald-900/50 border-emerald-400/30' : 'bg-rose-900/50 border-rose-400/30'}`}>
+                    <div className={`text-[10px] font-black uppercase tracking-widest text-right ${activeTab === 'income' ? 'text-emerald-300' : 'text-rose-300'}`}>Batch<br/>Total</div>
+                    <div className="text-3xl font-black text-white">₵ {batchTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  </div>
 
-        {/* ================================================== */}
-        {/* TAB 3: FUND ACCOUNTING MASTER LEDGER               */}
-        {/* ================================================== */}
-        {activeTab === 'history' && (
-          <div className="space-y-6 animate-fade-in">
-            
-            {/* FUND BALANCES DASHBOARD */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                  <button type="submit" disabled={isSubmitting || batchTotal === 0} className={`w-full md:w-auto px-10 py-4 text-white text-sm font-black uppercase tracking-widest rounded-xl shadow-lg transition-all flex justify-center items-center gap-3 border border-white/20 disabled:opacity-50 disabled:cursor-not-allowed ${activeTab === 'income' ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/30' : 'bg-rose-600 hover:bg-rose-500 shadow-rose-500/30'}`}>
+                    {isSubmitting ? <Loader2 className="animate-spin" /> : <><Save size={18}/> Process {activeTab === 'income' ? 'Income' : 'Expense'} to Ledger</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* TAB 3: FUND ACCOUNTING MASTER LEDGER               */}
+          {/* ================================================== */}
+          {activeTab === 'history' && (
+            <div className="space-y-6 animate-fade-in">
               
-              {/* Main District Account */}
-              <div className={`p-6 rounded-[2rem] shadow-xl border flex flex-col justify-between ${districtMainAccount >= 0 ? 'bg-slate-900 border-slate-800' : 'bg-red-900 border-red-800'}`}>
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-white/10 p-2 rounded-xl text-white"><Building2 size={20}/></div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Main District Fund</p>
-                  </div>
-                  <p className="text-sm font-bold text-slate-400 mb-4 line-clamp-2">Available funds after reserving Headquarters Remittances and all Ministry balances.</p>
-                </div>
-                <h3 className="text-4xl font-black text-white">₵ {districtMainAccount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
-              </div>
-
-              {/* Pending Remittances Vault */}
-              <div className="p-6 rounded-[2rem] shadow-sm border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="bg-blue-600 p-2 rounded-xl text-white"><ShieldCheck size={20}/></div>
-                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Pending HQ Remittances</p>
-                  </div>
-                  <p className="text-sm font-bold text-blue-700/70 mb-4 line-clamp-2">Unremitted Tithes, M.O., and Area Offerings waiting to be dispatched.</p>
-                </div>
-                <h3 className="text-4xl font-black text-blue-900">₵ {pendingRemittances.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
-              </div>
-
-              {/* Ministries Sub-Ledgers */}
-              <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col gap-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2"><Users size={14}/> Ministry Vaults</p>
+              {/* FUND BALANCES DASHBOARD */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 
-                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">Youth Ministry</span>
-                  <span className={`text-sm font-black ${youthBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {youthBal.toLocaleString()}</span>
+                {/* Main District Account */}
+                <div className={`p-6 rounded-[2rem] shadow-xl border flex flex-col justify-between backdrop-blur-xl ${districtMainAccount >= 0 ? 'bg-black/30 border-white/20' : 'bg-red-900/60 border-red-500/30'}`}>
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="bg-white/10 p-2 rounded-xl text-white"><Building2 size={20}/></div>
+                      <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">Main District Fund</p>
+                    </div>
+                    <p className="text-sm font-bold text-emerald-100/60 mb-4 line-clamp-2">Available funds after reserving Headquarters Remittances and all Ministry balances.</p>
+                  </div>
+                  <h3 className="text-4xl font-black text-white">₵ {districtMainAccount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
                 </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">Women's Ministry</span>
-                  <span className={`text-sm font-black ${womenBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {womenBal.toLocaleString()}</span>
+
+                {/* Pending Remittances Vault */}
+                <div className="p-6 rounded-[2rem] shadow-xl border border-blue-400/30 bg-blue-900/40 backdrop-blur-xl flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-2">
+                      <div className="bg-blue-500/30 p-2 rounded-xl text-blue-200"><ShieldCheck size={20}/></div>
+                      <p className="text-[10px] font-black text-blue-300 uppercase tracking-widest">Pending HQ Remittances</p>
+                    </div>
+                    <p className="text-sm font-bold text-blue-200/70 mb-4 line-clamp-2">Unremitted Tithes, M.O., and Area Offerings waiting to be dispatched.</p>
+                  </div>
+                  <h3 className="text-4xl font-black text-white">₵ {pendingRemittances.toLocaleString('en-US', { minimumFractionDigits: 2 })}</h3>
                 </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">PEMEM (Men)</span>
-                  <span className={`text-sm font-black ${pememBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {pememBal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">Children's Ministry</span>
-                  <span className={`text-sm font-black ${childBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {childBal.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                  <span className="text-xs font-bold text-slate-600">Evangelism Ministry</span>
-                  <span className={`text-sm font-black ${evangBal >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>₵ {evangBal.toLocaleString()}</span>
+
+                {/* Ministries Sub-Ledgers */}
+                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-[2rem] shadow-xl border border-white/10 flex flex-col gap-3">
+                  <p className="text-[10px] font-black text-emerald-200 uppercase tracking-widest mb-1 flex items-center gap-2"><Users size={14}/> Ministry Vaults</p>
+                  
+                  <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-xs font-bold text-white">Youth Ministry</span>
+                    <span className={`text-sm font-black ${youthBal >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>₵ {youthBal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-xs font-bold text-white">Women's Ministry</span>
+                    <span className={`text-sm font-black ${womenBal >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>₵ {womenBal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-xs font-bold text-white">PEMEM (Men)</span>
+                    <span className={`text-sm font-black ${pememBal >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>₵ {pememBal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-xs font-bold text-white">Children's Ministry</span>
+                    <span className={`text-sm font-black ${childBal >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>₵ {childBal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-white/5 p-2.5 rounded-xl border border-white/10">
+                    <span className="text-xs font-bold text-white">Evangelism Ministry</span>
+                    <span className={`text-sm font-black ${evangBal >= 0 ? 'text-emerald-300' : 'text-rose-400'}`}>₵ {evangBal.toLocaleString()}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* LEDGER FILTERS ENGINE */}
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 flex flex-col gap-4">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="relative md:col-span-2">
-                  <Search className="absolute left-4 top-3.5 text-slate-300" size={18}/>
-                  <input placeholder="Search entities, notes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-slate-50 border border-slate-200 rounded-xl font-bold text-sm outline-none focus:border-slate-500" />
+              {/* LEDGER FILTERS ENGINE */}
+              <div className="bg-white/10 backdrop-blur-xl p-5 rounded-2xl shadow-xl border border-white/10 flex flex-col gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="relative md:col-span-2">
+                    <Search className="absolute left-4 top-3.5 text-emerald-200/50" size={18}/>
+                    <input placeholder="Search entities, notes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-11 p-3 bg-black/20 border border-white/10 rounded-xl font-bold text-sm outline-none focus:border-emerald-400 text-white placeholder:text-emerald-200/50 transition-all" />
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/20 px-3 py-1 rounded-xl border border-white/10">
+                    <Receipt size={16} className="text-emerald-300 shrink-0" />
+                    <select value={fType} onChange={e => setFType(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-white outline-none cursor-pointer [&>option]:text-gray-900">
+                      <option value="All Transactions">All Transactions</option>
+                      <option value="Income">Income Only</option>
+                      <option value="Expense">Expenses Only</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/20 px-3 py-1 rounded-xl border border-white/10">
+                    <Filter size={16} className="text-emerald-300 shrink-0" />
+                    <select value={fCategory} onChange={e => setFCategory(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-white outline-none cursor-pointer [&>option]:text-gray-900">
+                      <option value="All Categories">All Categories</option>
+                      {dynamicCategories.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                  <Receipt size={16} className="text-slate-400 shrink-0" />
-                  <select value={fType} onChange={e => setFType(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-slate-700 outline-none cursor-pointer">
-                    <option value="All Transactions">All Transactions</option>
-                    <option value="Income">Income Only</option>
-                    <option value="Expense">Expenses Only</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 bg-slate-50 px-3 py-1 rounded-xl border border-slate-200">
-                  <Filter size={16} className="text-slate-400 shrink-0" />
-                  <select value={fCategory} onChange={e => setFCategory(e.target.value)} className="w-full bg-transparent font-bold text-xs uppercase tracking-wider text-slate-700 outline-none cursor-pointer">
-                    <option value="All Categories">All Categories</option>
-                    {dynamicCategories.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-white/10 pt-4">
+                  <div className="flex items-center gap-3">
+                    <label className="text-[10px] font-black text-emerald-200 uppercase tracking-widest w-12">From:</label>
+                    <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full p-2 bg-black/20 border border-white/10 rounded-lg font-bold text-sm outline-none text-white transition-all" />
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <label className="text-[10px] font-black text-emerald-200 uppercase tracking-widest w-12">To:</label>
+                    <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full p-2 bg-black/20 border border-white/10 rounded-lg font-bold text-sm outline-none text-white transition-all" />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-100 pt-4">
-                <div className="flex items-center gap-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">From:</label>
-                  <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none text-slate-600" />
-                </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest w-12">To:</label>
-                  <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-sm outline-none text-slate-600" />
-                </div>
-              </div>
-            </div>
-
-            {/* MASTER LEDGER TABLE */}
-            <div className="bg-white rounded-[2rem] shadow-xl border border-slate-100 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                      <th className="p-5 w-40">Date</th>
-                      <th className="p-5">Transaction Details</th>
-                      <th className="p-5">Reference / Notes</th>
-                      <th className="p-5 text-right">Amount (₵)</th>
-                      {isTier1 && <th className="p-5 text-center w-24">Action</th>}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredLogs.map(log => {
-                      const isExpense = log.transactionType === 'Expense';
-                      return (
-                        <tr key={log.id} className="hover:bg-slate-50 transition-colors">
-                          <td className="p-5">
-                            <div className="flex items-center gap-2 font-bold text-slate-500">
-                              <CalendarDays size={14} className={isExpense ? "text-rose-400" : "text-emerald-400"} />
-                              {new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                            </div>
-                          </td>
-                          <td className="p-5">
-                            <div className="font-black text-slate-900 text-sm mb-1">{log.localAssembly} <span className="text-slate-300 mx-1">→</span> <span className={isExpense ? "text-rose-700" : "text-emerald-700"}>{log.contributor}</span></div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded inline-block border ${isExpense ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                                {isExpense ? 'EXP' : 'INC'} • {log.category}
-                              </span>
-                              <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
-                                <WalletCards size={10} /> {log.paymentMethod || 'Cash'}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="p-5">
-                            <p className="text-xs font-bold text-slate-500 line-clamp-2">{log.notes || <span className="italic text-slate-300">No notes</span>}</p>
-                          </td>
-                          <td className="p-5 text-right">
-                            <span className={`font-black text-lg flex items-center justify-end gap-1 ${isExpense ? 'text-rose-600' : 'text-emerald-600'}`}>
-                              {isExpense ? '-' : '+'} {(log.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </span>
-                          </td>
-                          {isTier1 && (
-                            <td className="p-5 text-center">
-                              <button onClick={() => handleDelete(log.id, log.category, log.amount, log.transactionType || 'Income')} className="p-2 text-slate-300 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors">
-                                <Trash2 size={16}/>
-                              </button>
+              {/* MASTER LEDGER TABLE */}
+              <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr className="bg-black/20 border-b border-white/10 text-[10px] font-black text-emerald-200 uppercase tracking-widest">
+                        <th className="p-5 w-40">Date</th>
+                        <th className="p-5">Transaction Details</th>
+                        <th className="p-5">Reference / Notes</th>
+                        <th className="p-5 text-right">Amount (₵)</th>
+                        {isTier1 && <th className="p-5 text-center w-24">Action</th>}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {filteredLogs.map(log => {
+                        const isExpense = log.transactionType === 'Expense';
+                        return (
+                          <tr key={log.id} className="hover:bg-white/5 transition-colors">
+                            <td className="p-5">
+                              <div className="flex items-center gap-2 font-bold text-white">
+                                <CalendarDays size={14} className={isExpense ? "text-rose-400" : "text-emerald-400"} />
+                                {new Date(log.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
                             </td>
-                          )}
-                        </tr>
-                      );
-                    })}
-                    {filteredLogs.length === 0 && <tr><td colSpan={isTier1 ? "5" : "4"} className="p-12 text-center text-slate-400 font-bold italic">No transactions found.</td></tr>}
-                  </tbody>
-                </table>
+                            <td className="p-5">
+                              <div className="font-black text-white text-sm mb-1">{log.localAssembly} <span className="text-white/30 mx-1">→</span> <span className={isExpense ? "text-rose-300" : "text-emerald-300"}>{log.contributor}</span></div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded inline-block border ${isExpense ? 'bg-rose-500/20 text-rose-200 border-rose-400/30' : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/30'}`}>
+                                  {isExpense ? 'EXP' : 'INC'} • {log.category}
+                                </span>
+                                <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-white/70 bg-white/5 px-2 py-0.5 rounded border border-white/10">
+                                  <WalletCards size={10} /> {log.paymentMethod || 'Cash'}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="p-5">
+                              <p className="text-xs font-bold text-emerald-100/70 line-clamp-2">{log.notes || <span className="italic text-white/30">No notes</span>}</p>
+                            </td>
+                            <td className="p-5 text-right">
+                              <span className={`font-black text-lg flex items-center justify-end gap-1 ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                {isExpense ? '-' : '+'} {(log.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                              </span>
+                            </td>
+                            {isTier1 && (
+                              <td className="p-5 text-center">
+                                <button onClick={() => handleDelete(log.id, log.category, log.amount, log.transactionType || 'Income')} className="p-2 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors">
+                                  <Trash2 size={16}/>
+                                </button>
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
+                      {filteredLogs.length === 0 && <tr><td colSpan={isTier1 ? "5" : "4"} className="p-12 text-center text-emerald-200/50 font-bold italic">No transactions found.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+              
             </div>
-            
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </DashboardLayout>
   );
