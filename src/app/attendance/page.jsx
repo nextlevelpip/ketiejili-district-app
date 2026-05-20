@@ -1,17 +1,20 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle, WalletCards } from 'lucide-react';
+import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle, MapPin, Home } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 
 export default function Attendance() {
   const [members, setMembers] = useState([]);
   const [attendanceLogs, setAttendanceLogs] = useState([]);
-  const [activeTab, setActiveTab] = useState('reports'); 
+  const [activeTab, setActiveTab] = useState('mark'); 
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ type: '', message: '' });
+
+  // --- MASTER TOGGLE (NEW LOGIC) ---
+  const [meetingFormat, setMeetingFormat] = useState('Church House'); // 'Church House' | 'Home Cell'
 
   // --- MARK REGISTER STATES ---
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -23,12 +26,14 @@ export default function Attendance() {
   const [activeSubGroup, setActiveSubGroup] = useState('');
 
   // --- REPORT STATES (RANGE FILTER) ---
+  const [reportMeetingFormat, setReportMeetingFormat] = useState('Church House');
   const [reportStartDate, setReportStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0]); 
   const [reportEndDate, setReportEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [reportService, setReportService] = useState('All Services');
   const [reportAssembly, setReportAssembly] = useState('Central');
 
   // --- ANALYTICS STATES ---
+  const [analyticsMeetingFormat, setAnalyticsMeetingFormat] = useState('Church House');
   const [analyticsAssembly, setAnalyticsAssembly] = useState('All Assemblies');
   const [analyticsServiceType, setAnalyticsServiceType] = useState('All Services');
 
@@ -52,40 +57,57 @@ export default function Attendance() {
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
   };
 
+  // --- DYNAMIC LIST GENERATORS BASED ON MEETING FORMAT ---
+  const getServiceTypesList = (format) => {
+    if (format === 'Home Cell') {
+      return ["Monday Cell Meeting", "Cell Prayers", "Home Cell (Other)", "++ Add Custom ++"];
+    }
+    return [
+      "Sunday Service", "Bible Study", "Children Ministry Meeting", 
+      "Evangelism Ministry Meeting", "Friday Service", "PEMEM Meeting", 
+      "Wednesday Service", "Women Ministry Meeting", "Youth Ministry Meeting", "++ Add Custom ++"
+    ];
+  };
+
+  // Auto-reset service type when format changes
+  useEffect(() => {
+    const defaultService = meetingFormat === 'Home Cell' ? 'Monday Cell Meeting' : 'Sunday Service';
+    setServiceType(defaultService);
+    setGroup('All Groups (Whole Assembly)');
+  }, [meetingFormat]);
+
   const assemblyMembers = members.filter(m => m.localAssembly === assembly);
 
-  // --- DYNAMIC GROUP EXTRACTION ---
   const getDynamicGroups = () => {
-    if (serviceType === 'Bible Study') {
-      return [...new Set(assemblyMembers.map(m => m.bibleStudy).filter(Boolean))].sort();
-    } else if (serviceType === 'Home Cell' || serviceType === 'Monday Cell Meeting' || serviceType === 'Cell Prayers') {
-      return [...new Set(assemblyMembers.map(m => m.homeCell).filter(Boolean))].sort();
+    let rawGroups = [];
+    if (meetingFormat === 'Home Cell') {
+      rawGroups = assemblyMembers.map(m => m.homeCell);
     } else {
-      return [...new Set(assemblyMembers.map(m => m.group || 'Unassigned'))].sort();
+      rawGroups = assemblyMembers.map(m => m.bibleStudy);
     }
+    const validGroups = rawGroups.filter(g => g && g.trim() !== '' && g !== 'New Convert');
+    if (validGroups.length === 0) return ['Unassigned'];
+    return [...new Set(validGroups)].sort();
   };
 
   const availableGroups = getDynamicGroups();
 
   useEffect(() => {
     setActiveSubGroup(availableGroups[0] || '');
-  }, [assembly, serviceType, members]); 
+  }, [assembly, meetingFormat, members]);
 
-  // --- DYNAMIC MEMBER FILTERING ---
+  // --- DYNAMIC MEMBER FILTERING FOR MARKING ---
   const targetMembers = assemblyMembers.filter(m => {
     if (group !== 'All Groups (Whole Assembly)') {
-        if (serviceType === 'Bible Study') return m.bibleStudy === group;
-        if (serviceType === 'Home Cell' || serviceType === 'Monday Cell Meeting' || serviceType === 'Cell Prayers') return m.homeCell === group;
-        return m.group === group;
+        if (meetingFormat === 'Home Cell') return m.homeCell === group;
+        return m.bibleStudy === group;
     }
     return true;
   });
 
   const displayedMembers = group === 'All Groups (Whole Assembly)' 
     ? assemblyMembers.filter(m => {
-        let relevantField = m.group;
-        if (serviceType === 'Bible Study') relevantField = m.bibleStudy;
-        if (serviceType === 'Home Cell' || serviceType === 'Monday Cell Meeting' || serviceType === 'Cell Prayers') relevantField = m.homeCell;
+        let relevantField = meetingFormat === 'Home Cell' ? m.homeCell : m.bibleStudy;
         return (relevantField || 'Unassigned') === activeSubGroup;
       })
     : targetMembers;
@@ -117,9 +139,16 @@ export default function Attendance() {
     const absentCount = targetMembers.filter(m => attendanceRecords[m.id] === 'Absent').length;
 
     const payload = {
-      date, serviceType: finalService, assembly, group,
-      totalMembers: targetMembers.length, presentCount, absentCount,
-      records: attendanceRecords, timestamp: new Date().toISOString()
+      date, 
+      meetingFormat, 
+      serviceType: finalService, 
+      assembly, 
+      group,
+      totalMembers: targetMembers.length, 
+      presentCount, 
+      absentCount,
+      records: attendanceRecords, 
+      timestamp: new Date().toISOString()
     };
 
     try {
@@ -133,20 +162,15 @@ export default function Attendance() {
     }
   };
 
-  // ==========================================
-  // DIRECT IN-APP SMS FUNCTION
-  // ==========================================
   const handleSendDirectSMS = async (member, serviceType) => {
     const defaultMsg = `Praise the Lord ${member.name.split(' ')[0]}! We missed you at ${serviceType === 'All Services' ? 'church' : serviceType} recently. We pray all is well with you. God bless you! - Ketiejili District`;
-    
     const message = window.prompt(`Send Official District SMS to ${member.name}:`, defaultMsg);
     
     if (!message) return;
 
     let formattedPhone = member.phone?.replace(/\D/g, '');
     if (!formattedPhone) {
-      showNotification('error', 'Member does not have a valid phone number.');
-      return;
+      showNotification('error', 'Member does not have a valid phone number.'); return;
     }
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
 
@@ -155,15 +179,10 @@ export default function Attendance() {
       const response = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: message,
-          recipients: [formattedPhone]
-        })
+        body: JSON.stringify({ message: message, recipients: [formattedPhone] })
       });
-
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'API Connection Failed');
-
       showNotification('success', `Official SMS delivered to ${member.name}!`);
     } catch (err) {
       showNotification('error', `Transmission Failed: ${err.message}`);
@@ -171,31 +190,8 @@ export default function Attendance() {
   };
 
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
-  
-  // --- DYNAMIC SERVICE TYPES (MARK REGISTER) ---
-  const getServiceTypesList = () => {
-    let list = [
-      "Sunday Service", "Bible Study", "Home Cell", "Children Ministry Meeting", 
-      "Evangelism Ministry Meeting", "Friday Service", "PEMEM Meeting", 
-      "Wednesday Service", "Women Ministry Meeting", "Youth Ministry Meeting", "++ Add Custom ++"
-    ];
-    if (serviceType === 'Home Cell' || serviceType === 'Monday Cell Meeting' || serviceType === 'Cell Prayers') {
-      return ["Monday Cell Meeting", "Cell Prayers", "Home Cell (Other)", ...list.filter(s => s !== "Home Cell")];
-    }
-    return list;
-  };
-  const serviceTypesList = getServiceTypesList();
 
-  // --- COMPREHENSIVE SERVICE TYPES (REPORTS & ANALYTICS) ---
-  const loggedServiceTypes = [...new Set(attendanceLogs.map(log => log.serviceType))];
-  const allFilterServiceTypes = [...new Set([
-    "Sunday Service", "Bible Study", "Monday Cell Meeting", "Cell Prayers", "Home Cell (Other)",
-    "Children Ministry Meeting", "Evangelism Ministry Meeting", "Friday Service", 
-    "PEMEM Meeting", "Wednesday Service", "Women Ministry Meeting", "Youth Ministry Meeting",
-    ...loggedServiceTypes
-  ])].filter(s => s && s !== '++ Add Custom ++' && s !== 'Home Cell').sort();
-
-  // --- AGGREGATE ABSENTEE LOGIC ---
+  // --- REPORT ANALYTICS COMPUTATIONS ---
   const matchingLogs = attendanceLogs.filter(log => {
     return log.date >= reportStartDate && 
            log.date <= reportEndDate && 
@@ -205,19 +201,12 @@ export default function Attendance() {
 
   const absenteeStats = {};
   matchingLogs.forEach(log => {
-    // Only iterate through records explicitly present in the log to ensure perfect aggregation
-    Object.entries(log.records || {}).forEach(([memberId, status]) => {
-      if (status === 'Absent') {
-        const member = members.find(m => m.id === memberId);
-        if (member) {
-          if (reportAssembly !== 'All Assemblies' && member.localAssembly !== reportAssembly) return;
-          
-          if (!absenteeStats[memberId]) {
-            absenteeStats[memberId] = { member, absentCount: 0, datesMissed: [] };
-          }
-          absenteeStats[memberId].absentCount += 1;
-          absenteeStats[memberId].datesMissed.push(log.date);
-        }
+    members.forEach(m => {
+      if (reportAssembly !== 'All Assemblies' && m.localAssembly !== reportAssembly) return;
+      if (log.records && log.records[m.id] === 'Absent') {
+        if (!absenteeStats[m.id]) { absenteeStats[m.id] = { member: m, absentCount: 0, datesMissed: [] }; }
+        absenteeStats[m.id].absentCount += 1;
+        absenteeStats[m.id].datesMissed.push(log.date);
       }
     });
   });
@@ -281,6 +270,27 @@ export default function Attendance() {
           {/* ================= TAB 1: MARK REGISTER ================= */}
           {activeTab === 'mark' && (
             <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[2rem] shadow-xl border border-white/10">
+              
+              {/* MEETING FORMAT TOGGLE (THE MASTER SWITCH) */}
+              <div className="mb-8 flex justify-center">
+                <div className="flex gap-2 p-1.5 bg-black/20 rounded-2xl border border-white/10 shadow-inner">
+                  <button 
+                    type="button" 
+                    onClick={() => setMeetingFormat('Church House')} 
+                    className={`px-6 py-3 rounded-xl text-sm font-black transition-all flex items-center gap-2 ${meetingFormat === 'Church House' ? 'bg-cyan-600 text-white shadow-md' : 'text-cyan-200/50 hover:text-cyan-100'}`}
+                  >
+                    <MapPin size={16}/> Church House (Bible Study Groups)
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => setMeetingFormat('Home Cell')} 
+                    className={`px-6 py-3 rounded-xl text-sm font-black transition-all flex items-center gap-2 ${meetingFormat === 'Home Cell' ? 'bg-cyan-600 text-white shadow-md' : 'text-cyan-200/50 hover:text-cyan-100'}`}
+                  >
+                    <Home size={16}/> Outside (Home Cell Groups)
+                  </button>
+                </div>
+              </div>
+
               <form onSubmit={handleSave} className="space-y-8">
                 <div className="bg-black/20 p-6 rounded-2xl border border-white/5 grid grid-cols-1 md:grid-cols-4 gap-6 backdrop-blur-md">
                   <div>
@@ -290,8 +300,7 @@ export default function Attendance() {
                   <div>
                     <label className={labelStyle}>Service Type</label>
                     <select value={serviceType} onChange={e => setServiceType(e.target.value)} className={inputStyle}>
-                      <option value="">- Select -</option>
-                      {serviceTypesList.map(s => <option key={s} value={s}>{s}</option>)}
+                      {getServiceTypesList(meetingFormat).map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     {serviceType === '++ Add Custom ++' && <input placeholder="Type Custom Service" required autoFocus value={customService} onChange={e => setCustomService(e.target.value)} className={`mt-2 ${inputStyle} border-cyan-400 bg-black/40`} />}
                   </div>
@@ -321,9 +330,7 @@ export default function Attendance() {
                     <div className="flex gap-2 overflow-x-auto mb-6 pb-2 border-b border-white/10">
                       {availableGroups.map(g => {
                         const groupCount = assemblyMembers.filter(m => {
-                          let relevantField = m.group;
-                          if (serviceType === 'Bible Study') relevantField = m.bibleStudy;
-                          if (serviceType === 'Home Cell' || serviceType === 'Monday Cell Meeting' || serviceType === 'Cell Prayers') relevantField = m.homeCell;
+                          let relevantField = meetingFormat === 'Home Cell' ? m.homeCell : m.bibleStudy;
                           return (relevantField || 'Unassigned') === g;
                         }).length;
                         return (
@@ -378,6 +385,8 @@ export default function Attendance() {
           {/* ================= TAB 2: ABSENTEE REPORT ================= */}
           {activeTab === 'reports' && (
             <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[2rem] shadow-xl border border-white/10 animate-fade-in space-y-8">
+              
+              {/* Optional: Add Meeting Format Filter here too if needed, but simple Service Type is usually enough for reports */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-black/20 p-6 rounded-2xl border border-white/5">
                 <div>
                   <label className={labelStyle}>Start Date</label>
@@ -398,7 +407,15 @@ export default function Attendance() {
                   <label className={labelStyle}>Service Type</label>
                   <select value={reportService} onChange={e => setReportService(e.target.value)} className={inputStyle}>
                     <option value="All Services">All Services</option>
-                    {allFilterServiceTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                    <optgroup label="Church House">
+                       <option value="Sunday Service">Sunday Service</option>
+                       <option value="Bible Study">Bible Study</option>
+                       <option value="Friday Service">Friday Service</option>
+                    </optgroup>
+                    <optgroup label="Outside (Home Cell)">
+                       <option value="Monday Cell Meeting">Monday Cell Meeting</option>
+                       <option value="Cell Prayers">Cell Prayers</option>
+                    </optgroup>
                   </select>
                 </div>
               </div>
@@ -507,7 +524,14 @@ export default function Attendance() {
                   <h3 className="text-lg font-black text-white flex items-center gap-2 drop-shadow-md"><BarChart3 size={18} className="text-cyan-300" /> Member Faithfulness Tracker</h3>
                   <select value={analyticsServiceType} onChange={e => setAnalyticsServiceType(e.target.value)} className="p-3 bg-black/30 border border-white/20 rounded-xl font-bold text-sm outline-none text-white shadow-sm [&>option]:text-gray-900">
                     <option value="All Services">All Services</option>
-                    {allFilterServiceTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                    <optgroup label="Church House">
+                       <option value="Sunday Service">Sunday Service</option>
+                       <option value="Bible Study">Bible Study</option>
+                    </optgroup>
+                    <optgroup label="Outside (Home Cell)">
+                       <option value="Monday Cell Meeting">Monday Cell Meeting</option>
+                       <option value="Cell Prayers">Cell Prayers</option>
+                    </optgroup>
                   </select>
                 </div>
 
