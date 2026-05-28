@@ -31,13 +31,13 @@ export default function DistrictHeritage() {
   useEffect(() => {
     const unsubTimeline = onSnapshot(collection(db, 'heritage_timeline'), (snapshot) => {
       const fetchedEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedEvents.sort((a, b) => parseInt(a.year) - parseInt(b.year));
+      fetchedEvents.sort((a, b) => parseInt(b.year) - parseInt(a.year)); // Sorted newest to oldest
       setTimeline(fetchedEvents);
     });
 
     const unsubRoll = onSnapshot(collection(db, 'heritage_roll'), (snapshot) => {
       const fetchedMinisters = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetchedMinisters.sort((a, b) => parseInt(a.startYear) - parseInt(b.startYear));
+      fetchedMinisters.sort((a, b) => parseInt(b.startYear) - parseInt(a.startYear)); // Sorted newest to oldest
       setRollOfHonor(fetchedMinisters);
       setIsLoading(false);
     });
@@ -93,7 +93,7 @@ export default function DistrictHeritage() {
     }
   };
 
-  const inputStyle = "w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:bg-black/30 focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 outline-none transition-all text-sm text-white placeholder:text-amber-200/40 shadow-sm font-bold";
+  const inputStyle = "w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:bg-black/30 focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 outline-none transition-all text-sm text-white placeholder:text-amber-200/40 shadow-sm font-bold [&>option]:text-gray-900";
   const labelStyle = "block text-[10px] font-black text-amber-200 uppercase tracking-widest mb-2 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-amber-400" /></div></DashboardLayout>;
@@ -105,6 +105,7 @@ export default function DistrictHeritage() {
         
         {/* Ambient background glow */}
         <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/20 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none"></div>
         
         <div className="relative z-10 space-y-8 animate-fade-in max-w-7xl mx-auto">
           
@@ -181,15 +182,15 @@ export default function DistrictHeritage() {
                     <div className="relative border-l-4 border-amber-500/30 ml-4 md:ml-6 space-y-8 pb-4">
                       {timeline.map((event) => (
                         <div key={event.id} className="relative pl-8 md:pl-10 group">
-                          <div className="absolute -left-[18px] top-1 w-8 h-8 bg-amber-500 rounded-full border-4 border-[#78350f] shadow-lg"></div>
-                          <div className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:bg-white/10 transition-all">
+                          <div className="absolute -left-[18px] top-1 w-8 h-8 bg-amber-500 rounded-full border-4 border-[#78350f] shadow-[0_0_15px_rgba(245,158,11,0.5)]"></div>
+                          <div className="bg-black/20 border border-white/5 rounded-2xl p-6 hover:bg-white/5 transition-all shadow-inner">
                             <button onClick={() => handleDelete('heritage_timeline', event.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
-                            <span className="inline-block px-3 py-1 bg-amber-500/20 text-amber-200 font-black text-sm rounded-lg mb-2 tracking-wider border border-amber-500/30">
+                            <span className="inline-block px-3 py-1 bg-amber-500/20 text-amber-300 font-black text-sm rounded-lg mb-2 tracking-wider border border-amber-500/30">
                               {event.year}
                             </span>
-                            <h3 className="text-lg font-black text-white">{event.title}</h3>
-                            <span className="text-[10px] font-black text-amber-300 uppercase tracking-wider block mb-2">{event.category}</span>
-                            <p className="text-amber-100/70 font-medium text-sm leading-relaxed">{event.description}</p>
+                            <h3 className="text-xl font-black text-white">{event.title}</h3>
+                            <span className="text-[10px] font-black text-amber-200/70 uppercase tracking-widest block mb-3">{event.category}</span>
+                            <p className="text-amber-50 font-medium text-sm leading-relaxed">{event.description}</p>
                           </div>
                         </div>
                       ))}
@@ -205,7 +206,7 @@ export default function DistrictHeritage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 p-6 shadow-xl h-fit sticky top-6">
                 <h2 className="text-lg font-extrabold text-white flex items-center gap-2 mb-6">
-                  <UserCheck size={20} className="text-blue-300" /> Induct Minister
+                  <UserCheck size={20} className="text-amber-300" /> Induct Minister
                 </h2>
                 <form onSubmit={handleSaveMinister} className="space-y-5">
                   <div>
@@ -226,7 +227,7 @@ export default function DistrictHeritage() {
                     <label className={labelStyle}>Key Legacy / Achievement</label>
                     <textarea rows="3" placeholder="e.g. Pioneered 3 new assemblies..." value={keyAchievement} onChange={e => setKeyAchievement(e.target.value)} className={`${inputStyle} resize-none`}></textarea>
                   </div>
-                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-2 text-white border border-white/20 ${isSubmitting ? 'bg-white/10' : 'bg-[#1e40af] hover:bg-[#1e3a8a]'}`}>
+                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-2 text-white border border-white/20 ${isSubmitting ? 'bg-white/10' : 'bg-[#d97706] hover:bg-[#b45309]'}`}>
                     {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><Award size={18} /> Add to Roll</>}
                   </button>
                 </form>
@@ -235,17 +236,17 @@ export default function DistrictHeritage() {
               <div className="lg:col-span-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {rollOfHonor.map((minister) => (
-                    <div key={minister.id} className="bg-white/10 backdrop-blur-xl rounded-[2rem] p-6 shadow-xl border border-white/10 relative overflow-hidden group hover:bg-white/15 transition-all">
+                    <div key={minister.id} className="bg-black/20 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-white/5 relative overflow-hidden group hover:bg-white/5 transition-all">
                       <button onClick={() => handleDelete('heritage_roll', minister.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 z-10"><Trash2 size={16} /></button>
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-blue-700"></div>
-                      <Award size={80} className="absolute -bottom-4 -right-4 text-white/5 opacity-20 transform rotate-12" />
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)]"></div>
+                      <Award size={100} className="absolute -bottom-4 -right-4 text-amber-500/10 transform rotate-12 group-hover:scale-110 transition-transform" />
                       
                       <div className="relative z-10 pl-2">
-                        <span className="inline-block px-3 py-1 bg-blue-500/20 text-blue-200 font-black text-[10px] uppercase tracking-widest rounded-lg mb-3 border border-blue-400/20">
+                        <span className="inline-block px-3 py-1 bg-amber-500/20 text-amber-200 font-black text-[10px] uppercase tracking-widest rounded-lg mb-3 border border-amber-500/30">
                           {minister.startYear} — {minister.endYear || 'Present'}
                         </span>
                         <h3 className="text-xl font-black text-white mb-2 leading-tight">{minister.name}</h3>
-                        <p className="text-sm text-purple-100/70 font-medium italic border-l-2 border-amber-400 pl-3">
+                        <p className="text-sm text-amber-100/70 font-medium italic border-l-2 border-amber-500/50 pl-3 mt-4">
                           "{minister.achievement || 'Faithfully served the Ketiejili District.'}"
                         </p>
                       </div>

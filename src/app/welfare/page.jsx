@@ -219,7 +219,7 @@ export default function SocialInterventions() {
               <form onSubmit={handleSave} className="space-y-6 mt-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className={labelStyle}>PentChMS Category *</label>
+                    <label className={labelStyle}>Category *</label>
                     <select required value={category} onChange={e => setCategory(e.target.value)} className={inputStyle}>
                       <option value="">- Select Reporting Category -</option>
                       {welfareCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
