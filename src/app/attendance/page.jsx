@@ -191,22 +191,29 @@ export default function Attendance() {
 
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
 
-  // --- REPORT ANALYTICS COMPUTATIONS ---
+  // --- REPORT ANALYTICS COMPUTATIONS (FIXED) ---
   const matchingLogs = attendanceLogs.filter(log => {
     return log.date >= reportStartDate && 
            log.date <= reportEndDate && 
-           (reportAssembly === 'All Assemblies' || log.assembly === reportAssembly) &&
            (reportService === 'All Services' || log.serviceType === reportService);
+           // REMOVED the log.assembly check here so we can capture members regardless of where the log was created.
   });
 
   const absenteeStats = {};
   matchingLogs.forEach(log => {
-    members.forEach(m => {
-      if (reportAssembly !== 'All Assemblies' && m.localAssembly !== reportAssembly) return;
-      if (log.records && log.records[m.id] === 'Absent') {
-        if (!absenteeStats[m.id]) { absenteeStats[m.id] = { member: m, absentCount: 0, datesMissed: [] }; }
-        absenteeStats[m.id].absentCount += 1;
-        absenteeStats[m.id].datesMissed.push(log.date);
+    Object.entries(log.records || {}).forEach(([memberId, status]) => {
+      if (status === 'Absent') {
+        const member = members.find(m => m.id === memberId);
+        if (member) {
+          // STRICT CHECK: We filter by the member's profile localAssembly, ensuring accurate local data.
+          if (reportAssembly !== 'All Assemblies' && member.localAssembly !== reportAssembly) return;
+          
+          if (!absenteeStats[memberId]) { 
+            absenteeStats[memberId] = { member: member, absentCount: 0, datesMissed: [] }; 
+          }
+          absenteeStats[memberId].absentCount += 1;
+          absenteeStats[memberId].datesMissed.push(log.date);
+        }
       }
     });
   });
@@ -300,6 +307,7 @@ export default function Attendance() {
                   <div>
                     <label className={labelStyle}>Service Type</label>
                     <select value={serviceType} onChange={e => setServiceType(e.target.value)} className={inputStyle}>
+                      <option value="">- Select -</option>
                       {getServiceTypesList(meetingFormat).map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                     {serviceType === '++ Add Custom ++' && <input placeholder="Type Custom Service" required autoFocus value={customService} onChange={e => setCustomService(e.target.value)} className={`mt-2 ${inputStyle} border-cyan-400 bg-black/40`} />}
@@ -386,7 +394,6 @@ export default function Attendance() {
           {activeTab === 'reports' && (
             <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[2rem] shadow-xl border border-white/10 animate-fade-in space-y-8">
               
-              {/* Optional: Add Meeting Format Filter here too if needed, but simple Service Type is usually enough for reports */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6 bg-black/20 p-6 rounded-2xl border border-white/5">
                 <div>
                   <label className={labelStyle}>Start Date</label>
