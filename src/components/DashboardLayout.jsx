@@ -10,13 +10,13 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
   Settings, LogOut, Menu, Cloud, Lock,
-  Heart, Mail, HeartHandshake, Coins 
+  Heart, HeartHandshake 
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); // NEW: Dropdown state
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
   const router = useRouter();
   const pathname = usePathname();
 
@@ -58,8 +58,6 @@ export default function DashboardLayout({ children }) {
             });
             setIsAuthorized(true); 
 
-            // NEW: SILENT AUDIT LOGGER
-            // Uses sessionStorage so it only logs once per browser tab session
             if (!sessionStorage.getItem('session_logged')) {
               try {
                 await addDoc(collection(db, 'login_history'), {
@@ -145,7 +143,7 @@ export default function DashboardLayout({ children }) {
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to securely log out?")) {
       try {
-        sessionStorage.removeItem('session_logged'); // Clear session token
+        sessionStorage.removeItem('session_logged'); 
         await signOut(auth);
         router.push('/login');
       } catch (error) {
@@ -157,12 +155,12 @@ export default function DashboardLayout({ children }) {
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
-    { name: 'Directory', href: '/directory', icon: Users },
+    { name: 'Directory & Certificates', href: '/directory', icon: Users }, // UPDATED LABEL
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'Discipleship Tracker', href: '/discipleship', icon: Target },
     { name: 'Evangelism & Souls', href: '/evangelism', icon: Flame },
+    { name: 'Visitation Command', href: '/visitation', icon: HeartHandshake },
     { name: 'Welfare & Social', href: '/welfare', icon: HeartHandshake },
-    { name: 'District Treasury', href: '/treasury', icon: Coins },
     { name: 'Leaders Council', href: '/presbytery', icon: Shield },
     { name: 'Bulk SMS Contacts', href: '/sms', icon: MessageSquare },
     { name: 'District Heritage', href: '/heritage', icon: BookOpen },
@@ -182,7 +180,7 @@ export default function DashboardLayout({ children }) {
       return !restricted.includes(item.name);
     }
     if (currentUser.tierLevel === 3) {
-      const allowed = ['Directory', 'Attendance', 'Discipleship Tracker'];
+      const allowed = ['Directory & Certificates', 'Attendance', 'Discipleship Tracker'];
       return allowed.includes(item.name);
     }
     return false;
@@ -264,29 +262,14 @@ export default function DashboardLayout({ children }) {
         />
       )}
 
+      {/* SIDEBAR NAVIGATION */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-72 bg-black/20 backdrop-blur-2xl border-r border-white/10 flex flex-col transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
         
-        {/* LOGO AREA - NOW CLICKABLE TO DASHBOARD */}
-        <div 
-          className="p-6 border-b border-white/10 flex flex-col gap-5 bg-white/5 cursor-pointer hover:bg-white/10 transition-colors"
-          onClick={() => router.push('/')}
-          title="Go to Analytics Dashboard"
-        >
-          <div className="flex items-center gap-4">
-            <img 
-              src={globalLogo} 
-              alt="Logo" 
-              className="w-12 h-12 rounded-full object-cover border-2 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)]" 
-              onError={(e) => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=COP&background=1e3a8a&color=fff'; }} 
-            />
-            <div className="overflow-hidden">
-              <h1 className="font-black text-white leading-tight tracking-tight text-lg truncate drop-shadow-md">{globalName}</h1>
-              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest truncate">{globalSlogan}</p>
-            </div>
-          </div>
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-2.5 flex items-center justify-center gap-2 shadow-inner">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
-            <span className="text-[10px] font-black text-emerald-200 uppercase tracking-widest">System Active</span>
+        {/* BRANDING AREA - NO LONGER CONTAINS THE LOGO, ONLY SYSTEM STATUS */}
+        <div className="p-6 border-b border-white/10 bg-white/5">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center justify-center gap-2 shadow-inner w-full">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></div>
+            <span className="text-xs font-black text-emerald-200 uppercase tracking-widest">System Active</span>
           </div>
         </div>
 
@@ -338,38 +321,55 @@ export default function DashboardLayout({ children }) {
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
         
-        <header className="h-[72px] bg-white/5 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-4 sm:px-6 lg:px-8 z-20 shrink-0 shadow-sm">
-          <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-blue-200 hover:bg-white/10 hover:text-white rounded-lg md:hidden transition-colors border border-transparent hover:border-white/10">
-              <Menu size={24} />
+        {/* RE-ALIGNED HEADER: COMPLETELY CENTERED BRANDING */}
+        <header className="min-h-[80px] bg-white/5 backdrop-blur-xl border-b border-white/10 px-4 sm:px-6 z-20 shadow-sm relative flex items-center justify-between">
+          
+          {/* Left: Mobile Menu Button */}
+          <div className="flex-1 flex items-center">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 -ml-2 text-blue-200 hover:bg-white/10 hover:text-white rounded-lg md:hidden transition-colors">
+              <Menu size={28} />
             </button>
-            <h2 className="hidden sm:block text-xl font-black text-white tracking-tight drop-shadow-md cursor-pointer hover:opacity-80 transition-opacity" onClick={() => router.push('/')}>
-              COP {globalName}
-            </h2>
           </div>
           
-          <div className="flex items-center gap-5">
-            <div className="hidden sm:flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-500/30 shadow-inner">
+          {/* Center: District Logo and Name (Absolutely Centered) */}
+          <div 
+             className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 cursor-pointer group"
+             onClick={() => router.push('/')}
+             title="Go to Analytics Dashboard"
+          >
+             <img 
+               src={globalLogo} 
+               alt="Logo" 
+               className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover border-2 border-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.3)] group-hover:scale-105 transition-transform" 
+               onError={(e) => { e.target.onerror = null; e.target.src = 'https://ui-avatars.com/api/?name=COP&background=1e3a8a&color=fff'; }} 
+             />
+             <div className="text-center sm:text-left">
+               <h1 className="font-black text-white text-base sm:text-lg leading-tight tracking-tight drop-shadow-md whitespace-nowrap">COP {globalName}</h1>
+               <p className="text-[9px] sm:text-[10px] font-black text-blue-400 uppercase tracking-widest">{globalSlogan}</p>
+             </div>
+          </div>
+          
+          {/* Right: User Profile & Cloud Sync */}
+          <div className="flex-1 flex items-center justify-end gap-3 sm:gap-5">
+            <div className="hidden lg:flex items-center gap-2 bg-emerald-500/20 text-emerald-300 px-3 py-1.5 rounded-full border border-emerald-500/30 shadow-inner">
               <Cloud size={14} className="fill-current" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Cloud Synced</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">Synced</span>
             </div>
             
-            {/* NEW: CLICKABLE PROFILE DROPDOWN */}
             <div className="relative">
               <div 
                 onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-                className="flex items-center gap-3 bg-black/20 pl-1.5 pr-4 py-1.5 rounded-full border border-white/10 shadow-inner cursor-pointer hover:bg-white/10 hover:border-white/20 transition-all"
+                className="flex items-center gap-2 sm:gap-3 bg-black/20 pl-1 sm:pl-1.5 pr-2 sm:pr-4 py-1 sm:py-1.5 rounded-full border border-white/10 shadow-inner cursor-pointer hover:bg-white/10 hover:border-white/20 transition-all"
               >
-                <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-[0_0_10px_rgba(37,99,235,0.5)] border border-blue-400/30">
+                <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-xs shadow-[0_0_10px_rgba(37,99,235,0.5)] border border-blue-400/30">
                   {getInitials(currentUser.fullName)}
                 </div>
                 <div className="hidden md:block text-left">
                   <p className="text-sm font-black text-white leading-none tracking-wide drop-shadow-sm">{currentUser.fullName}</p>
-                  <p className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mt-1 opacity-80">{currentUser.role}</p>
+                  <p className="text-[9px] font-bold text-blue-300 uppercase tracking-widest mt-1 opacity-80">{currentUser.role}</p>
                 </div>
               </div>
               
-              {/* DROPDOWN MENU */}
               {isProfileMenuOpen && (
                 <div className="absolute right-0 mt-3 w-56 bg-[#0f172a]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] py-2 z-50 animate-fade-in overflow-hidden">
                   <button 
@@ -388,7 +388,6 @@ export default function DashboardLayout({ children }) {
                 </div>
               )}
             </div>
-            
           </div>
         </header>
 
