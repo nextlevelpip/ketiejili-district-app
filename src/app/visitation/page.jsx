@@ -157,53 +157,63 @@ export default function VisitationTracker() {
   });
 
   const getPurposeColor = (purpose) => {
-    if (purpose.includes('Sickness')) return 'text-rose-300 bg-rose-500/20 border-rose-500/30';
-    if (purpose.includes('Backsliding')) return 'text-amber-300 bg-amber-500/20 border-amber-500/30';
-    if (purpose.includes('Bereavement')) return 'text-slate-300 bg-slate-500/20 border-slate-500/30';
-    if (purpose.includes('Convert')) return 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30';
-    return 'text-fuchsia-300 bg-fuchsia-500/20 border-fuchsia-500/30'; // Default Routine
+    if (purpose.includes('Sickness')) return 'text-rose-400 bg-rose-500/10 border-rose-500/30';
+    if (purpose.includes('Backsliding')) return 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+    if (purpose.includes('Bereavement')) return 'text-slate-300 bg-slate-500/10 border-slate-500/30';
+    if (purpose.includes('Convert')) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+    return 'text-blue-400 bg-blue-500/10 border-blue-500/30'; 
   };
 
-  const inputStyle = "w-full p-3 bg-black/20 border border-white/10 focus:bg-black/30 focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-500/20 rounded-xl font-bold text-white outline-none transition-all text-xs placeholder:text-fuchsia-200/50 [&>option]:text-gray-900";
-  const labelStyle = "text-[9px] font-black text-fuchsia-200 uppercase ml-1 mb-1.5 block tracking-widest";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
+  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-fuchsia-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#4c1d95] via-[#701a75] to-[#2e1065] p-5 md:p-8 text-white relative overflow-hidden shadow-2xl pb-20">
+      <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
-        {/* Decorative elements */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-fuchsia-400/20 blur-[120px] rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/20 blur-[120px] rounded-full pointer-events-none"></div>
-
-        <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
+        <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
-            <div className={`fixed top-6 right-6 z-50 flex items-center gap-2 px-5 py-3 rounded-xl shadow-2xl animate-fade-in text-sm ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-              {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span className="font-extrabold">{notification.message}</span>
+            <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
+              {notification.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              {notification.message}
             </div>
           )}
 
-          <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-5">
-            <div className="bg-white/10 p-3.5 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><HeartHandshake size={26} /></div>
-            <div>
-              <h1 className="text-2xl font-black text-white uppercase tracking-tight drop-shadow-md">Visitation Command</h1>
-              <p className="text-xs font-bold text-fuchsia-100/80 mt-0.5">Tracking pastoral care, home visits, and spiritual follow-ups.</p>
+          {/* ========================================================= */}
+          {/* STICKY HEADER & TABS (Locks to top when scrolling down) */}
+          {/* ========================================================= */}
+          <div className="sticky top-0 z-30 bg-[#001D3D] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block"><HeartHandshake size={24} /></div>
+              <div>
+                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">Visitation Command</h1>
+                <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">Tracking pastoral care & follow-ups.</p>
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-2.5 mb-6">
-            <button onClick={() => setActiveTab('dashboard')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-wider transition-all text-[10px] border backdrop-blur-md ${activeTab === 'dashboard' ? 'bg-fuchsia-600/80 text-white border-fuchsia-400/50 shadow-lg' : 'bg-white/5 text-fuchsia-200/70 border-white/10 hover:bg-white/10'}`}>
-              <Activity size={14} className="inline mr-1.5"/> Analytics Radar
-            </button>
-            <button onClick={() => setActiveTab('log')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-wider transition-all text-[10px] border backdrop-blur-md ${activeTab === 'log' ? 'bg-purple-600/80 text-white border-purple-400/50 shadow-lg' : 'bg-white/5 text-fuchsia-200/70 border-white/10 hover:bg-white/10'}`}>
-              <Plus size={14} className="inline mr-1.5"/> Log Visit
-            </button>
-            <button onClick={() => setActiveTab('history')} className={`px-5 py-2.5 rounded-xl font-black uppercase tracking-wider transition-all text-[10px] border backdrop-blur-md ${activeTab === 'history' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-fuchsia-200/70 border-white/10 hover:bg-white/10'}`}>
-              <FileText size={14} className="inline mr-1.5"/> Visitation Ledger
-            </button>
+            {/* TAB NAVIGATION */}
+            <div className="flex flex-wrap gap-2">
+              {[
+                { id: 'dashboard', label: 'Analytics Radar', icon: Activity },
+                { id: 'log', label: 'Log Visit', icon: Plus },
+                { id: 'history', label: 'Visitation Ledger', icon: FileText }
+              ].map(tab => {
+                const Icon = tab.icon;
+                return (
+                  <button 
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`px-4 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[9px] border flex items-center gap-1.5 ${activeTab === tab.id ? 'bg-[#FFC300] text-[#000814] shadow-md border-transparent' : 'bg-[#000814] text-white/50 border-[#003566] hover:text-white'}`}
+                  >
+                    <Icon size={12}/> {tab.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* ================================================== */}
@@ -214,31 +224,31 @@ export default function VisitationTracker() {
               
               {/* TOP KPI CARDS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="bg-black/20 backdrop-blur-md p-6 rounded-2xl border border-white/10 shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-fuchsia-300">
-                    <Users size={18}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Flock Coverage</h3>
+                <div className="bg-[#000814] p-6 rounded-2xl border border-[#003566] shadow-inner flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2 text-[#FFC300]">
+                    <Users size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Flock Coverage</h3>
                   </div>
-                  <p className="text-xs font-bold text-fuchsia-100/60 mb-4">Percentage of total district membership visited.</p>
+                  <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Percentage of total membership visited.</p>
                   <div className="flex items-end gap-3">
-                    <span className="text-4xl font-black text-white">{coveragePercentage}%</span>
-                    <span className="text-xs font-bold text-fuchsia-200/50 mb-1">({uniqueMembersVisited} of {totalMembers})</span>
+                    <span className="text-3xl font-black text-white">{coveragePercentage}%</span>
+                    <span className="text-[10px] font-bold text-white/50 mb-1">({uniqueMembersVisited} of {totalMembers})</span>
                   </div>
                 </div>
 
-                <div className="bg-black/20 backdrop-blur-md p-6 rounded-2xl border border-white/10 shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-purple-300">
-                    <ClipboardList size={18}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Total Visits Logged</h3>
+                <div className="bg-[#000814] p-6 rounded-2xl border border-[#003566] shadow-inner flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2 text-blue-400">
+                    <ClipboardList size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Total Visits Logged</h3>
                   </div>
-                  <p className="text-xs font-bold text-purple-100/60 mb-4">Cumulative number of pastoral visitations recorded.</p>
-                  <span className="text-4xl font-black text-white">{visitations.length}</span>
+                  <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Cumulative pastoral visitations recorded.</p>
+                  <span className="text-3xl font-black text-white">{visitations.length}</span>
                 </div>
 
-                <div className="bg-rose-900/30 backdrop-blur-md p-6 rounded-2xl border border-rose-500/30 shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-rose-300">
-                    <ShieldAlert size={18}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Urgent Follow-ups</h3>
+                <div className="bg-[#000814] p-6 rounded-2xl border border-red-500/30 shadow-inner flex flex-col justify-between">
+                  <div className="flex items-center gap-2 mb-2 text-red-400">
+                    <ShieldAlert size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Urgent Follow-ups</h3>
                   </div>
-                  <p className="text-xs font-bold text-rose-200/60 mb-4">Visits marked as requiring immediate continued care.</p>
-                  <span className={`text-4xl font-black ${urgentFollowUps.length > 0 ? 'text-rose-400 animate-pulse' : 'text-white'}`}>
+                  <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Visits requiring immediate continued care.</p>
+                  <span className={`text-3xl font-black ${urgentFollowUps.length > 0 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
                     {urgentFollowUps.length}
                   </span>
                 </div>
@@ -247,21 +257,21 @@ export default function VisitationTracker() {
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* ASSEMBLY COMPARISON */}
-                <div className="lg:col-span-2 bg-white/5 border border-white/10 rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-sm font-black text-white uppercase tracking-widest border-b border-white/10 pb-3 mb-5 flex items-center gap-2">
-                    <Activity size={16} className="text-fuchsia-400"/> Assembly Comparison Matrix
+                <div className="lg:col-span-2 bg-[#000814] border border-[#003566] rounded-2xl p-6 shadow-xl">
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest border-b border-[#003566] pb-3 mb-5 flex items-center gap-2">
+                    <Activity size={14} className="text-[#FFC300]"/> Assembly Comparison Matrix
                   </h3>
                   <div className="space-y-4">
                     {visitsByAssembly.map(item => {
                       const percentage = item.memberCount > 0 ? Math.min((item.count / item.memberCount) * 100, 100) : 0;
                       return (
                         <div key={item.assembly}>
-                          <div className="flex justify-between items-end mb-1 text-xs font-bold">
+                          <div className="flex justify-between items-end mb-1 text-[10px] font-bold uppercase tracking-widest">
                             <span className="text-white">{item.assembly}</span>
-                            <span className="text-fuchsia-300">{item.count} Visits <span className="text-white/30 text-[9px] ml-1">({percentage.toFixed(0)}% of members)</span></span>
+                            <span className="text-[#FFC300]">{item.count} Visits <span className="text-white/30 text-[8px] ml-1">({percentage.toFixed(0)}% of members)</span></span>
                           </div>
-                          <div className="w-full bg-black/40 rounded-full h-2.5 overflow-hidden border border-white/5">
-                            <div className="bg-gradient-to-r from-fuchsia-500 to-purple-400 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                          <div className="w-full bg-[#001D3D] rounded-full h-2 overflow-hidden border border-[#003566]">
+                            <div className="bg-[#FFC300] h-2 rounded-full" style={{ width: `${percentage}%` }}></div>
                           </div>
                         </div>
                       )
@@ -270,20 +280,20 @@ export default function VisitationTracker() {
                 </div>
 
                 {/* URGENT CARE PINS */}
-                <div className="lg:col-span-1 bg-black/30 border border-rose-500/20 rounded-2xl p-6 shadow-inner overflow-y-auto max-h-[400px]">
-                   <h3 className="text-sm font-black text-rose-400 uppercase tracking-widest border-b border-rose-500/20 pb-3 mb-5 flex items-center gap-2">
-                    <Heart size={16}/> Critical Care Radar
+                <div className="lg:col-span-1 bg-[#000814] border border-red-500/30 rounded-2xl p-6 shadow-inner overflow-y-auto max-h-[400px]">
+                   <h3 className="text-xs font-black text-red-400 uppercase tracking-widest border-b border-red-500/30 pb-3 mb-5 flex items-center gap-2">
+                    <Heart size={14}/> Critical Care Radar
                   </h3>
                   <div className="space-y-3">
                     {urgentFollowUps.map(visit => (
-                      <div key={visit.id} className="p-3 bg-white/5 border border-white/10 rounded-xl relative group">
+                      <div key={visit.id} className="p-4 bg-[#001D3D] border border-red-500/20 rounded-xl">
                         <div className="font-black text-white text-xs">{visit.memberName}</div>
-                        <div className="text-[9px] font-bold text-rose-300 uppercase mt-0.5">{visit.purpose} • {visit.assembly}</div>
-                        <p className="text-[10px] text-white/60 mt-2 italic leading-snug">"{visit.notes}"</p>
+                        <div className="text-[9px] font-bold text-red-300 uppercase tracking-widest mt-1">{visit.purpose} • {visit.assembly}</div>
+                        <p className="text-[10px] text-white/60 mt-3 italic leading-relaxed border-l-2 border-red-500/30 pl-2">"{visit.notes}"</p>
                         
                         <button 
                           onClick={() => resolveFollowUp(visit.id, visit.memberName)}
-                          className="mt-3 w-full py-1.5 bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/40 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/30 transition-colors"
+                          className="mt-4 w-full py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/30 transition-colors"
                         >
                           Mark Resolved
                         </button>
@@ -302,17 +312,17 @@ export default function VisitationTracker() {
           {/* TAB 2: LOG VISIT FORM                              */}
           {/* ================================================== */}
           {activeTab === 'log' && (
-            <div className="bg-white/10 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] shadow-xl border border-white/10 max-w-4xl mx-auto animate-fade-in relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-fuchsia-400 to-purple-400"></div>
+            <div className="bg-[#000814] p-6 md:p-10 rounded-[2rem] shadow-xl border border-[#003566] max-w-4xl mx-auto animate-fade-in relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFC300] to-[#FCA311]"></div>
               
-              <div className="mb-6 border-b border-white/10 pb-4 mt-1">
-                <h2 className="text-lg font-black uppercase tracking-widest text-fuchsia-300 flex items-center gap-2">
-                  <UserPlus size={20} /> Record Pastoral Visit
+              <div className="mb-6 border-b border-[#003566] pb-4 mt-1">
+                <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2">
+                  <UserPlus size={16} className="text-[#FFC300]" /> Record Pastoral Visit
                 </h2>
               </div>
 
-              <form onSubmit={handleSaveVisit} className="space-y-5">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <form onSubmit={handleSaveVisit} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label className={labelStyle}>Date of Visit *</label>
                     <input required type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className={inputStyle} />
@@ -324,8 +334,8 @@ export default function VisitationTracker() {
                     </select>
                   </div>
                   
-                  <div className="md:col-span-2 p-4 bg-black/20 border border-white/5 rounded-xl">
-                    <label className={`${labelStyle} text-blue-300`}>Select Member Visited *</label>
+                  <div className="md:col-span-2 p-5 bg-[#001D3D] border border-[#003566] rounded-xl">
+                    <label className={`${labelStyle} text-[#FFC300]`}>Select Member Visited *</label>
                     <select required value={formData.memberId} onChange={handleMemberSelect} className={inputStyle}>
                       <option value="">- Search Directory -</option>
                       {members.filter(m => m.localAssembly === formData.assembly).map(m => (
@@ -333,7 +343,7 @@ export default function VisitationTracker() {
                       ))}
                     </select>
                     {members.filter(m => m.localAssembly === formData.assembly).length === 0 && (
-                      <p className="text-[9px] text-rose-300 mt-2 italic">No members registered in this assembly.</p>
+                      <p className="text-[9px] text-red-400 mt-2 italic font-bold">No members registered in this assembly.</p>
                     )}
                   </div>
 
@@ -358,20 +368,20 @@ export default function VisitationTracker() {
                     <textarea rows="3" placeholder="Condition of the member, scriptures shared, prayer requests..." value={formData.notes} onChange={e => setFormData({...formData, notes: e.target.value})} className={`${inputStyle} resize-none`}></textarea>
                   </div>
 
-                  <div className="md:col-span-2 flex items-center gap-3 p-4 bg-rose-900/10 border border-rose-500/20 rounded-xl cursor-pointer" onClick={() => setFormData({...formData, requiresFollowUp: !formData.requiresFollowUp})}>
-                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.requiresFollowUp ? 'bg-rose-500 border-rose-400 text-white' : 'bg-black/30 border-white/20 text-transparent'}`}>
+                  <div className="md:col-span-2 flex items-center gap-3 p-4 bg-[#001D3D] border border-red-500/30 rounded-xl cursor-pointer hover:bg-[#003566] transition-all" onClick={() => setFormData({...formData, requiresFollowUp: !formData.requiresFollowUp})}>
+                    <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${formData.requiresFollowUp ? 'bg-red-500 border-red-400 text-white' : 'bg-[#000814] border-[#003566] text-transparent'}`}>
                       <CheckCircle2 size={14} />
                     </div>
                     <div>
-                      <span className="font-black text-rose-300 uppercase tracking-widest text-[10px] block">Requires Continued Follow-up</span>
-                      <span className="text-[9px] text-white/50">Pin this member to the Critical Care radar on the dashboard.</span>
+                      <span className="font-black text-red-400 uppercase tracking-widest text-[10px] block">Requires Continued Follow-up</span>
+                      <span className="text-[9px] text-white/50 mt-0.5 block">Pin this member to the Critical Care radar on the dashboard.</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="pt-5 mt-2 flex justify-end">
-                  <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-8 py-3.5 bg-fuchsia-600 hover:bg-fuchsia-500 text-white text-xs font-black uppercase tracking-widest rounded-xl shadow-lg shadow-fuchsia-500/30 transition-all flex justify-center items-center gap-2 border border-white/20">
-                    {isSubmitting ? <Loader2 className="animate-spin" size={16}/> : <><Heart size={16}/> Log Visit</>}
+                  <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-8 py-3.5 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all flex justify-center items-center gap-2 disabled:opacity-50">
+                    {isSubmitting ? <Loader2 className="animate-spin" size={14}/> : <><Heart size={14}/> Log Visit</>}
                   </button>
                 </div>
               </form>
@@ -382,63 +392,63 @@ export default function VisitationTracker() {
           {/* TAB 3: VISITATION LEDGER HISTORY                   */}
           {/* ================================================== */}
           {activeTab === 'history' && (
-            <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden shadow-lg animate-fade-in">
-              <div className="p-4 border-b border-white/5 flex flex-wrap gap-3 items-center bg-black/20">
+            <div className="bg-[#000814] rounded-2xl overflow-hidden shadow-2xl border border-[#003566] animate-fade-in">
+              <div className="p-5 border-b border-[#003566] bg-[#001D3D] flex flex-wrap gap-3 items-center">
                 <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-2.5 text-fuchsia-200/50" size={14}/>
-                  <input placeholder="Search member names, notes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 p-2 rounded-lg bg-white/5 border border-white/10 text-xs outline-none focus:border-fuchsia-500 text-white" />
+                  <Search className="absolute left-3 top-2.5 text-white/30" size={14}/>
+                  <input placeholder="Search member names, notes..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 p-2.5 rounded-xl bg-[#000814] border border-[#003566] text-xs font-bold outline-none focus:border-[#FFC300] text-white placeholder:text-white/30" />
                 </div>
-                <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-lg border border-white/10">
-                  <Filter size={14} className="text-fuchsia-300 shrink-0" />
-                  <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="bg-transparent font-bold text-[10px] uppercase tracking-wider text-white outline-none [&>option]:text-black">
+                <div className="flex items-center gap-2 bg-[#000814] px-3 py-1.5 rounded-xl border border-[#003566]">
+                  <Filter size={12} className="text-[#FFC300] shrink-0" />
+                  <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none [&>option]:text-[#000814]">
                     <option value="All Assemblies">All Assemblies</option>
                     {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
               </div>
 
-              <div className="overflow-x-auto max-h-[600px]">
+              <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
                 <table className="w-full text-left whitespace-nowrap">
-                  <thead className="sticky top-0 bg-black/80 backdrop-blur z-10 text-[9px] font-black tracking-widest text-fuchsia-300 uppercase border-b border-white/10">
+                  <thead className="sticky top-0 bg-[#001D3D] z-10 text-[9px] font-black tracking-widest text-[#FFC300] uppercase border-b border-[#003566]">
                     <tr>
-                      <th className="p-4 w-32">Date</th>
-                      <th className="p-4">Member Visited</th>
-                      <th className="p-4">Purpose & Notes</th>
-                      <th className="p-4">Visiting Team</th>
-                      <th className="p-4 text-center">Status</th>
-                      <th className="p-4 text-center">Action</th>
+                      <th className="p-5 w-32">Date</th>
+                      <th className="p-5">Member Visited</th>
+                      <th className="p-5">Purpose & Notes</th>
+                      <th className="p-5">Visiting Team</th>
+                      <th className="p-5 text-center">Status</th>
+                      <th className="p-5 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/5">
+                  <tbody className="divide-y divide-[#003566]">
                     {filteredVisits.map(visit => (
-                      <tr key={visit.id} className="hover:bg-white/5 transition-colors">
-                        <td className="p-4 font-mono text-[11px] text-white/70">
-                          <div className="flex items-center gap-1.5"><CalendarDays size={12} className="text-fuchsia-400"/> {visit.date}</div>
+                      <tr key={visit.id} className="hover:bg-[#001D3D]/50 transition-colors">
+                        <td className="p-5 font-mono text-[10px] text-white/70">
+                          <div className="flex items-center gap-1.5"><CalendarDays size={12} className="text-[#FFC300]"/> {visit.date}</div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-5">
                           <div className="font-black text-white text-xs">{visit.memberName}</div>
-                          <div className="text-[9px] uppercase tracking-wider text-white/50 mt-0.5">{visit.assembly}</div>
+                          <div className="text-[9px] font-bold uppercase tracking-widest text-white/50 mt-1">{visit.assembly}</div>
                         </td>
-                        <td className="p-4">
-                          <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded border inline-block mb-1 ${getPurposeColor(visit.purpose)}`}>
+                        <td className="p-5">
+                          <span className={`text-[8px] font-black uppercase px-2 py-1 rounded border inline-block mb-1.5 tracking-widest ${getPurposeColor(visit.purpose)}`}>
                             {visit.purpose}
                           </span>
-                          <div className="text-[10px] text-white/60 max-w-xs truncate" title={visit.notes}>{visit.notes || <span className="italic text-white/30">No notes</span>}</div>
+                          <div className="text-[10px] font-bold text-white/60 max-w-xs truncate" title={visit.notes}>{visit.notes || <span className="italic text-white/30">No notes</span>}</div>
                         </td>
-                        <td className="p-4 text-[10px] font-bold text-white/80">{visit.visitingTeam}</td>
-                        <td className="p-4 text-center">
+                        <td className="p-5 text-[10px] font-bold text-white/70 uppercase tracking-widest">{visit.visitingTeam}</td>
+                        <td className="p-5 text-center">
                            {visit.requiresFollowUp ? (
-                             <span className="text-[9px] font-black uppercase text-rose-300 bg-rose-500/20 px-2 py-1 rounded border border-rose-500/30">Action Reqd</span>
+                             <span className="text-[8px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/30">Action Reqd</span>
                            ) : (
-                             <span className="text-[9px] font-black uppercase text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded border border-emerald-500/30">Cleared</span>
+                             <span className="text-[8px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/30">Cleared</span>
                            )}
                         </td>
-                        <td className="p-4 text-center">
-                          <button onClick={() => handleDelete(visit.id)} className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors"><Trash2 size={14}/></button>
+                        <td className="p-5 text-center">
+                          <button onClick={() => handleDelete(visit.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
                         </td>
                       </tr>
                     ))}
-                    {filteredVisits.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-fuchsia-200/50 font-bold italic">No visitation records found.</td></tr>}
+                    {filteredVisits.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-white/50 font-bold italic text-xs">No visitation records found.</td></tr>}
                   </tbody>
                 </table>
               </div>

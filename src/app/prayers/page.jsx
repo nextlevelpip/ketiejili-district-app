@@ -30,7 +30,7 @@ export default function PrayerArchives() {
     // 2. Fetch live members directory for the birthday radar
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      fetched.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      fetched.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
       setMembers(fetched);
       setIsLoading(false);
     });
@@ -111,7 +111,7 @@ export default function PrayerArchives() {
   // --- FILTER CELEBRANTS ---
   const filteredCelebrants = upcomingCelebrantsList.filter(c => {
     const matchesAssembly = birthdayAssemblyFilter === 'All Assemblies' || c.localAssembly === birthdayAssemblyFilter;
-    const matchesSearch = c.name?.toLowerCase().includes(searchCelebrant.toLowerCase()) || c.phone?.includes(searchCelebrant);
+    const matchesSearch = String(c.name || '').toLowerCase().includes(searchCelebrant.toLowerCase()) || String(c.phone || '').includes(searchCelebrant);
     return matchesAssembly && matchesSearch;
   });
 
@@ -119,12 +119,12 @@ export default function PrayerArchives() {
 
   // --- BIRTHDAY SMS METHOD ---
   const handleSendBirthdaySMS = async (member) => {
-    const defaultMsg = `Calvary greetings ${member.name.split(' ')[0]}! Happy birthday in advance from the COP Ketiejili District. As you turn ${member.ageTurning}, we pray that the Lord strengthens your faith and opens new doors of grace for you. God bless you!`;
+    const defaultMsg = `Calvary greetings ${String(member.name).split(' ')[0]}! Happy birthday in advance from the COP Ketiejili District. As you turn ${member.ageTurning}, we pray that the Lord strengthens your faith and opens new doors of grace for you. God bless you!`;
     const message = window.prompt(`[TIER 1 OVERRIDE] Send Birthday Blessing SMS to ${member.name}:`, defaultMsg);
     
     if (!message) return;
 
-    let formattedPhone = member.phone?.replace(/\D/g, '');
+    let formattedPhone = String(member.phone || '').replace(/\D/g, '');
     if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
 
@@ -144,53 +144,57 @@ export default function PrayerArchives() {
     }
   };
 
-  // PREMIUM GLASS INPUT STYLE
-  const inputStyle = "w-full p-3.5 bg-black/20 border border-white/10 rounded-xl font-bold text-sm text-white outline-none focus:border-purple-400 focus:bg-black/30 transition-all shadow-sm placeholder:text-purple-200/40 [&>option]:text-gray-900";
+  // PALETTE 2 (MODERN CYAN & GOLD) INPUT STYLE
+  const inputStyle = "w-full p-3 bg-[#023047] border border-[#209EBB]/30 rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFB701] transition-all shadow-sm placeholder:text-[#8ECAE6]/50 [&>option]:text-[#023047]";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-purple-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFB701]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      {/* PASTORAL CHAMBER AMETHYST GRADIENT WRAPPER */}
-      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#4a044e] via-[#6d28d9] to-[#1e1b4b] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
+      {/* PALETTE 2 BACKGROUND GRADIENT */}
+      <div className="min-h-full bg-gradient-to-br from-[#023047] via-[#209EBB]/20 to-[#023047] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
         {/* Ambient background decorative elements */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/20 blur-[120px] rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-fuchsia-500/20 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute top-0 left-0 w-96 h-96 bg-[#8ECAE6]/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFB701]/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
           {notification.message && (
             <div className="fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in bg-emerald-500 text-white">
-              <CheckCircle2 size={24} /> <span className="font-extrabold">{notification.message}</span>
+              <CheckCircle2 size={20} /> <span className="font-black uppercase tracking-widest text-[10px]">{notification.message}</span>
             </div>
           )}
 
-          {/* SECTION HEADER */}
-          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
-            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20">
-              <Heart size={32} />
+          {/* ========================================================= */}
+          {/* STICKY HEADER & TABS (Locks to top when scrolling down) */}
+          {/* ========================================================= */}
+          <div className="sticky top-0 z-30 bg-[#023047] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#209EBB]/20 mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-[#209EBB]/10 p-3 rounded-xl text-[#FFB701] border border-[#FFB701]/20 hidden md:block">
+                <Heart size={24} />
+              </div>
+              <div>
+                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">Pastoral Chamber</h1>
+                <p className="font-bold text-[#8ECAE6] text-[10px] uppercase tracking-widest mt-1">Secure gateway for intercessory data and birthdays.</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">Pastoral Chamber</h1>
-              <p className="font-bold text-purple-200">Secure gateway for intercessory data and birthday milestones.</p>
-            </div>
-          </div>
 
-          {/* NAVIGATION NAVIGATION TABS */}
-          <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
-            <button 
-              onClick={() => setActiveTab('intercessions')} 
-              className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 whitespace-nowrap text-sm border backdrop-blur-md transition-all ${activeTab === 'intercessions' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10'}`}
-            >
-              <Heart size={18}/> Active Intercessions ({prayers.length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('birthdays')} 
-              className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 whitespace-nowrap text-sm border backdrop-blur-md transition-all ${activeTab === 'birthdays' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-purple-200 border-white/10 hover:bg-white/10'}`}
-            >
-              <Cake size={18}/> 30-Day Birthday Watch ({filteredCelebrants.length})
-            </button>
+            {/* NAVIGATION TABS */}
+            <div className="flex flex-wrap gap-2">
+              <button 
+                onClick={() => setActiveTab('intercessions')} 
+                className={`px-4 py-2.5 rounded-xl font-black flex items-center gap-2 whitespace-nowrap text-[9px] uppercase tracking-widest border transition-all ${activeTab === 'intercessions' ? 'bg-[#FFB701] text-[#023047] border-[#FFB701] shadow-lg' : 'bg-[#023047] text-[#8ECAE6] border-[#209EBB]/30 hover:bg-[#209EBB]/10'}`}
+              >
+                <Heart size={12}/> Active Intercessions ({prayers.length})
+              </button>
+              <button 
+                onClick={() => setActiveTab('birthdays')} 
+                className={`px-4 py-2.5 rounded-xl font-black flex items-center gap-2 whitespace-nowrap text-[9px] uppercase tracking-widest border transition-all ${activeTab === 'birthdays' ? 'bg-[#FFB701] text-[#023047] border-[#FFB701] shadow-lg' : 'bg-[#023047] text-[#8ECAE6] border-[#209EBB]/30 hover:bg-[#209EBB]/10'}`}
+              >
+                <Cake size={12}/> 30-Day Birthday Watch ({filteredCelebrants.length})
+              </button>
+            </div>
           </div>
 
           {/* ========================================== */}
@@ -199,38 +203,38 @@ export default function PrayerArchives() {
           {activeTab === 'intercessions' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl">
               {prayers.length === 0 ? (
-                <div className="col-span-full bg-white/5 backdrop-blur-xl p-12 rounded-[2rem] border border-white/10 flex flex-col items-center justify-center text-center">
-                  <Heart size={64} className="text-purple-300/20 mb-4" />
-                  <h3 className="text-xl font-black text-purple-200/40">No Pending Intercessions</h3>
+                <div className="col-span-full bg-[#023047] border border-[#209EBB]/20 p-12 rounded-2xl flex flex-col items-center justify-center text-center shadow-lg">
+                  <Heart size={48} className="text-[#8ECAE6]/20 mb-4" />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-[#8ECAE6]/40">No Pending Intercessions</h3>
                 </div>
               ) : (
                 prayers.map(prayer => (
-                  <div key={prayer.id} className="bg-white/10 backdrop-blur-xl p-6 rounded-[2rem] shadow-xl border border-white/10 flex flex-col h-full relative overflow-hidden hover:bg-white/15 transition-colors">
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-purple-400"></div>
+                  <div key={prayer.id} className="bg-[#023047] p-5 rounded-2xl shadow-xl border border-[#209EBB]/30 flex flex-col h-full relative overflow-hidden hover:border-[#FFB701]/50 transition-colors">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-[#FC8500]"></div>
                     
-                    <div className="flex justify-between items-start mb-4 pl-2">
+                    <div className="flex justify-between items-start mb-4 pl-3">
                       <div>
-                        <h3 className="text-lg font-black text-white flex items-center gap-2">
+                        <h3 className="text-sm font-black text-white flex items-center gap-2 uppercase tracking-widest">
                           {prayer.name} 
-                          {prayer.isMember && <ShieldCheck size={16} className="text-emerald-400 animate-pulse" title="Registered Member" />}
+                          {prayer.isMember && <ShieldCheck size={14} className="text-emerald-400" title="Registered Member" />}
                         </h3>
-                        <div className="flex flex-wrap gap-4 text-xs font-bold text-purple-200 mt-1">
-                          <span className="flex items-center gap-1"><Phone size={14} className="text-purple-300"/> {prayer.phone}</span>
-                          <span className="flex items-center gap-1"><Calendar size={14} className="text-purple-300/60"/> {new Date(prayer.archivedAt).toLocaleDateString()}</span>
+                        <div className="flex flex-wrap gap-3 text-[10px] font-bold text-[#8ECAE6] mt-1.5 uppercase tracking-widest">
+                          <span className="flex items-center gap-1"><Phone size={12} className="text-[#FFB701]"/> {prayer.phone}</span>
+                          <span className="flex items-center gap-1"><Calendar size={12} className="text-[#FFB701]"/> {new Date(prayer.archivedAt).toLocaleDateString()}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-black/20 border border-white/5 p-4 rounded-xl text-sm font-medium text-purple-100 flex-1 mb-4 pl-3 leading-relaxed shadow-inner">
+                    <div className="bg-[#023047] border border-[#209EBB]/10 p-4 rounded-xl text-xs font-bold text-white flex-1 mb-4 pl-3 leading-relaxed shadow-inner">
                       {prayer.message}
                     </div>
 
-                    <div className="flex justify-end pt-4 border-t border-white/5 pl-2 mt-auto">
+                    <div className="flex justify-end pt-4 border-t border-[#209EBB]/20 pl-2 mt-auto">
                       <button 
                         onClick={() => handleResolve(prayer.id, prayer.name)}
-                        className="px-4 py-2 bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/30 text-purple-200 hover:text-emerald-300 font-bold rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm"
+                        className="px-4 py-2 bg-[#209EBB]/10 hover:bg-emerald-500/20 border border-[#209EBB]/30 hover:border-emerald-500/50 text-[#8ECAE6] hover:text-emerald-300 font-black uppercase tracking-widest rounded-lg transition-all flex items-center gap-1.5 text-[9px] shadow-sm"
                       >
-                        <CheckCircle2 size={16} /> Mark Resolved
+                        <CheckCircle2 size={12} /> Mark Resolved
                       </button>
                     </div>
                   </div>
@@ -246,20 +250,20 @@ export default function PrayerArchives() {
             <div className="space-y-6">
               
               {/* FILTERS PANEL */}
-              <div className="bg-white/5 backdrop-blur-md p-5 rounded-[2rem] border border-white/10 shadow-xl grid grid-cols-1 md:grid-cols-2 gap-4 items-center max-w-5xl">
+              <div className="bg-[#023047] p-5 rounded-2xl border border-[#209EBB]/30 shadow-xl grid grid-cols-1 md:grid-cols-2 gap-4 items-center max-w-5xl">
                 <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-purple-300" size={16} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#8ECAE6]/50" size={14} />
                   <input 
                     type="text" placeholder="Search celebrant name..." value={searchCelebrant}
-                    onChange={e => setSearchCelebrant(e.target.value)} className={`${inputStyle} pl-10`}
+                    onChange={e => setSearchCelebrant(e.target.value)} className={`${inputStyle} pl-9`}
                   />
                 </div>
 
-                <div className="flex items-center gap-2 bg-black/20 px-3 py-2.5 rounded-xl border border-white/10 shadow-inner">
-                  <Filter size={14} className="text-purple-300 shrink-0" />
+                <div className="flex items-center gap-2 bg-[#023047] px-3 py-2 rounded-xl border border-[#209EBB]/30 shadow-inner">
+                  <Filter size={12} className="text-[#FFB701] shrink-0" />
                   <select 
                     value={birthdayAssemblyFilter} onChange={e => setBirthdayAssemblyFilter(e.target.value)}
-                    className="w-full bg-transparent font-black text-xs uppercase tracking-wider text-white focus:outline-none cursor-pointer [&>option]:text-gray-900"
+                    className="w-full bg-transparent font-black text-[9px] uppercase tracking-widest text-white focus:outline-none cursor-pointer [&>option]:text-[#023047]"
                   >
                     <option value="All Assemblies">All Assemblies Filter</option>
                     {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
@@ -268,45 +272,45 @@ export default function PrayerArchives() {
               </div>
 
               {/* CELEBRANTS RADAR CONTAINER */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                 {filteredCelebrants.map((member) => (
-                  <div key={member.id} className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 p-6 shadow-xl hover:bg-white/15 transition-all flex flex-col justify-between relative overflow-hidden group">
+                  <div key={member.id} className="bg-[#023047] rounded-2xl border border-[#209EBB]/30 p-5 shadow-xl hover:border-[#FFB701]/50 transition-all flex flex-col justify-between relative overflow-hidden group">
                     
                     {member.daysLeft <= 7 && (
-                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-pink-500 to-amber-500"></div>
+                      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#FC8500] to-[#FFB701]"></div>
                     )}
 
-                    <div className="mb-6">
+                    <div className="mb-5">
                       <div className="flex justify-between items-start gap-2 mb-3">
                         <div>
-                          <h2 className="text-lg font-black text-white group-hover:text-pink-300 transition-colors line-clamp-1 drop-shadow-sm">{member.name}</h2>
-                          <p className="text-[10px] font-black text-purple-300 uppercase tracking-widest mt-0.5">{member.churchRole} • {member.localAssembly}</p>
+                          <h2 className="text-sm font-black text-white group-hover:text-[#FFB701] transition-colors line-clamp-1 uppercase tracking-widest">{member.name}</h2>
+                          <p className="text-[8px] font-black text-[#8ECAE6] uppercase tracking-widest mt-1">{member.churchRole} • {member.localAssembly}</p>
                         </div>
                         
-                        <div className="bg-white/5 border border-white/10 text-white rounded-2xl p-2 text-center shrink-0 min-w-[70px] backdrop-blur-md shadow-sm">
-                          <span className="text-xs font-black tracking-tight block text-pink-300">{member.formattedMonthDay}</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider block mt-0.5 text-amber-300">Turns {member.ageTurning}</span>
+                        <div className="bg-[#209EBB]/10 border border-[#209EBB]/30 text-white rounded-xl p-2 text-center shrink-0 min-w-[70px] shadow-inner">
+                          <span className="text-[10px] font-black tracking-widest uppercase block text-[#FFB701]">{member.formattedMonthDay}</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest block mt-0.5 text-white/50">Turns {member.ageTurning}</span>
                         </div>
                       </div>
 
-                      <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border font-black text-[10px] uppercase tracking-wider backdrop-blur-sm ${
-                        member.daysLeft === 0 ? 'bg-red-500/20 border-red-500/40 text-red-200 animate-pulse shadow-lg shadow-red-500/10' :
-                        member.daysLeft <= 7 ? 'bg-amber-500/20 border border-amber-500/40 text-amber-200' :
-                        'bg-white/5 border-white/10 text-purple-100'
+                      <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border font-black text-[8px] uppercase tracking-widest ${
+                        member.daysLeft === 0 ? 'bg-[#FC8500]/20 border-[#FC8500]/50 text-[#FFB701] animate-pulse' :
+                        member.daysLeft <= 7 ? 'bg-[#FFB701]/10 border border-[#FFB701]/30 text-[#FFB701]' :
+                        'bg-[#209EBB]/10 border-[#209EBB]/30 text-[#8ECAE6]'
                       }`}>
-                        <Calendar size={12} />
+                        <Calendar size={10} />
                         {member.daysLeft === 0 ? "Celebrating Today! 🎉" : `${member.daysLeft} Days Remaining`}
                       </div>
                     </div>
 
-                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-purple-200/60">{member.phone || 'No Contact'}</span>
+                    <div className="pt-4 border-t border-[#209EBB]/20 flex items-center justify-between">
+                      <span className="font-mono text-[10px] font-bold text-[#8ECAE6]">{member.phone || 'No Contact'}</span>
                       
                       <div className="flex gap-2">
                         <a 
-                          href={`https://wa.me/${member.phone?.startsWith('0') ? '233' + member.phone.substring(1) : member.phone}?text=${encodeURIComponent(`Happy birthday in advance ${member.name.split(' ')[0]}! We thank God for your life and your service in the kingdom. May your new age bring double favor! - Ketiejili District`)}`}
+                          href={`https://wa.me/${member.phone?.startsWith('0') ? '233' + member.phone.substring(1) : member.phone}?text=${encodeURIComponent(`Happy birthday in advance ${String(member.name).split(' ')[0]}! We thank God for your life and your service in the kingdom. May your new age bring double favor! - Ketiejili District`)}`}
                           target="_blank" rel="noopener noreferrer"
-                          className="p-2.5 bg-white/5 border border-white/10 text-emerald-400 rounded-xl hover:bg-emerald-500/20 hover:text-white transition-all shadow-sm"
+                          className="p-2 bg-[#209EBB]/10 border border-[#209EBB]/30 text-emerald-400 rounded-lg hover:bg-emerald-500/20 hover:text-white transition-all shadow-sm"
                           title="Send WhatsApp Blessing"
                         >
                           <MessageCircle size={14} />
@@ -314,7 +318,7 @@ export default function PrayerArchives() {
 
                         <a 
                           href={`tel:${member.phone}`}
-                          className="p-2.5 bg-white/5 border border-white/10 text-purple-200 rounded-xl hover:bg-white/20 hover:text-white transition-all shadow-sm"
+                          className="p-2 bg-[#209EBB]/10 border border-[#209EBB]/30 text-[#8ECAE6] rounded-lg hover:bg-[#209EBB]/30 hover:text-white transition-all shadow-sm"
                           title="Call Member"
                         >
                           <PhoneCall size={14} />
@@ -323,13 +327,11 @@ export default function PrayerArchives() {
                         {isTier1 && (
                           <button 
                             onClick={() => handleSendBirthdaySMS(member)}
-                            className="p-2.5 bg-white/5 border border-white/10 text-blue-400 rounded-xl hover:bg-blue-600/30 hover:text-white transition-all shadow-sm relative"
+                            className="p-2 bg-[#FFB701]/10 border border-[#FFB701]/30 text-[#FFB701] rounded-lg hover:bg-[#FFB701]/30 hover:text-white transition-all shadow-sm relative"
                             title="Send Official District Blessing SMS (Tier 1)"
                           >
                             <MessageSquare size={14} />
-                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-pink-500 rounded-full flex items-center justify-center border-2 border-purple-900 shadow-sm">
-                              <Shield size={6} className="text-white" />
-                            </div>
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-[#FC8500] rounded-full border border-[#023047] shadow-sm"></div>
                           </button>
                         )}
                       </div>
@@ -339,9 +341,9 @@ export default function PrayerArchives() {
                 ))}
 
                 {filteredCelebrants.length === 0 && (
-                  <div className="col-span-full py-20 text-center flex flex-col items-center justify-center text-purple-300/40">
-                    <Cake size={48} className="mb-4 opacity-20 text-pink-400" />
-                    <p className="font-black uppercase tracking-widest text-sm">No birthdays detected in this assembly scope.</p>
+                  <div className="col-span-full py-16 text-center flex flex-col items-center justify-center text-[#8ECAE6]/40 bg-[#023047] rounded-2xl border border-[#209EBB]/20">
+                    <Cake size={36} className="mb-3 opacity-30 text-[#FFB701]" />
+                    <p className="font-black uppercase tracking-widest text-[10px]">No birthdays detected in this assembly scope.</p>
                   </div>
                 )}
               </div>

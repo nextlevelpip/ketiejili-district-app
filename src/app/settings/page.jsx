@@ -298,34 +298,42 @@ export default function SystemSettings() {
     }
   };
 
-  // PREMIUM GLASS INPUT STYLE
-  const inputStyle = "w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:border-purple-400 focus:ring-4 focus:ring-purple-500/20 outline-none transition-all text-sm text-white shadow-sm font-bold placeholder:text-purple-300 [&>option]:text-gray-900";
-  const labelStyle = "block text-[10px] font-black text-purple-200 uppercase tracking-widest mb-2 ml-1";
+  // PALETTE 2 (MODERN CYAN & GOLD) INPUT STYLE
+  const inputStyle = "w-full p-3 bg-[#023047] border border-[#209EBB]/30 rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFB701] transition-all shadow-sm placeholder:text-[#8ECAE6]/50 [&>option]:text-[#023047]";
+  const labelStyle = "block text-[9px] font-black text-[#8ECAE6] uppercase tracking-widest mb-2 ml-1";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-purple-300" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFB701]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#6b21a8] via-[#4c1d95] to-[#312e81] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
+      {/* PALETTE 2 BACKGROUND GRADIENT */}
+      <div className="min-h-full bg-gradient-to-br from-[#023047] via-[#209EBB]/20 to-[#023047] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
-        {/* Decorative ambient glowing orbs */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/30 blur-[120px] rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/30 blur-[120px] rounded-full pointer-events-none"></div>
+        {/* Ambient background decorative elements */}
+        <div className="absolute top-0 left-0 w-96 h-96 bg-[#8ECAE6]/10 blur-[120px] rounded-full pointer-events-none"></div>
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFB701]/10 blur-[120px] rounded-full pointer-events-none"></div>
 
         <div className="relative z-10 space-y-6 animate-fade-in max-w-[1400px] mx-auto">
           
           {notification.message && (
-            <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-              {notification.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
-              <span className="font-extrabold">{notification.message}</span>
+            <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in text-[10px] uppercase tracking-widest font-black ${notification.type === 'success' ? 'bg-[#FFB701] text-[#023047]' : 'bg-red-500 text-white'}`}>
+              {notification.type === 'success' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
+              <span>{notification.message}</span>
             </div>
           )}
 
-          <div className="flex items-center gap-4 border-b border-white/10 pb-6 mb-4">
-            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><Settings size={32} /></div>
-            <div>
-              <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">System Settings</h1>
-              <p className="font-bold text-purple-200">Configure core network parameters and global branding assets.</p>
+          {/* ========================================================= */}
+          {/* STICKY HEADER (Locks to top when scrolling down)          */}
+          {/* ========================================================= */}
+          <div className="sticky top-0 z-30 bg-[#023047] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#209EBB]/20 mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-[#209EBB]/10 p-3 rounded-xl text-[#FFB701] border border-[#FFB701]/20 hidden md:block">
+                <Settings size={24} />
+              </div>
+              <div>
+                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">System Settings</h1>
+                <p className="font-bold text-[#8ECAE6] text-[10px] uppercase tracking-widest mt-1">Configure core network parameters and branding.</p>
+              </div>
             </div>
           </div>
 
@@ -334,65 +342,65 @@ export default function SystemSettings() {
             {/* ========================================== */}
             {/* COLUMN 1: LOCAL ASSEMBLIES CARD            */}
             {/* ========================================== */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-white/10">
-                <MapPin className="text-blue-300" size={20} />
-                <h2 className="text-lg font-black text-white uppercase tracking-tight">Local Assemblies</h2>
+            <div className="bg-[#023047] rounded-2xl border border-[#209EBB]/30 shadow-xl flex flex-col h-[520px] p-6">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#209EBB]/20">
+                <MapPin className="text-[#8ECAE6]" size={16} />
+                <h2 className="text-xs font-black text-white uppercase tracking-widest">Local Assemblies</h2>
               </div>
 
               <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
                 <input 
                   type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
                   placeholder="Type Local Name (e.g. Central)"
-                  className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-xl font-bold text-xs focus:outline-none focus:border-purple-400 focus:ring-4 focus:ring-purple-500/20 text-white placeholder:text-purple-300 transition-all"
+                  className="flex-1 px-4 py-2.5 bg-[#209EBB]/10 border border-[#209EBB]/30 rounded-xl font-bold text-xs focus:outline-none focus:border-[#FFB701] text-white placeholder:text-[#8ECAE6]/50 transition-all"
                   required
                 />
-                <button type="submit" disabled={isSubmitting} className="px-4 bg-[#4f46e5] hover:bg-[#4338ca] text-white rounded-xl font-black text-xs uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40">
-                  <Plus size={16} />
+                <button type="submit" disabled={isSubmitting} className="px-4 bg-[#FFB701] hover:bg-[#FC8500] text-[#023047] rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40 border border-[#FFB701]">
+                  <Plus size={14} />
                 </button>
               </form>
 
               <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
                 {assemblies.map((assem) => (
-                  <div key={assem.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors group">
+                  <div key={assem.id} className="flex items-center justify-between p-3 bg-[#209EBB]/5 rounded-xl border border-[#209EBB]/20 hover:border-[#FFB701]/30 transition-colors group">
                     {editingAssemblyId === assem.id ? (
                       <div className="flex items-center gap-2 w-full">
                         <input 
                           type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-white/10 border border-purple-400 rounded-lg text-sm font-bold text-white focus:outline-none"
+                          className="flex-1 px-3 py-1.5 bg-[#023047] border border-[#FFB701] rounded-lg text-xs font-bold text-white focus:outline-none"
                           autoFocus
                         />
-                        <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg disabled:opacity-40 transition-colors"><Check size={14}/></button>
-                        <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-white/10 text-purple-200 hover:bg-white/20 rounded-lg transition-colors"><X size={14}/></button>
+                        <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                        <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-[#209EBB]/10 text-[#8ECAE6] hover:bg-[#209EBB]/20 rounded-lg transition-colors border border-[#209EBB]/30"><X size={14}/></button>
                       </div>
                     ) : (
                       <>
-                        <span className="font-black text-white text-sm">{assem.name}</span>
+                        <span className="font-black text-white text-xs uppercase tracking-widest">{assem.name}</span>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }} className="p-1.5 text-purple-300 hover:bg-white/10 hover:text-white rounded-md transition-colors"><Edit2 size={14} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteAssembly(assem.id, assem.name)} className="p-1.5 text-purple-300 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={14} /></button>}
+                          <button onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }} className="p-1.5 text-[#8ECAE6] hover:bg-[#209EBB]/20 hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                          {isTier1 && <button onClick={() => handleDeleteAssembly(assem.id, assem.name)} className="p-1.5 text-[#8ECAE6] hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
                         </div>
                       </>
                     )}
                   </div>
                 ))}
-                {assemblies.length === 0 && <p className="text-center text-xs font-bold text-purple-300 pt-10 italic">No locals found.</p>}
+                {assemblies.length === 0 && <p className="text-center text-[10px] font-bold text-[#8ECAE6] pt-10 uppercase tracking-widest">No locals found.</p>}
               </div>
             </div>
 
             {/* ========================================== */}
             {/* COLUMN 2: HOME CELLS RADAR                 */}
             {/* ========================================== */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-white/10">
+            <div className="bg-[#023047] rounded-2xl border border-[#209EBB]/30 shadow-xl flex flex-col h-[520px] p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#209EBB]/20">
                 <div className="flex items-center gap-2">
-                  <Home className="text-orange-300" size={20} />
-                  <h2 className="text-lg font-black text-white uppercase tracking-tight">Home Cells</h2>
+                  <Home className="text-[#FFB701]" size={16} />
+                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Home Cells</h2>
                 </div>
                 
-                <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1.5 rounded-xl border border-white/10 shadow-sm">
-                  <Filter size={12} className="text-purple-300 shrink-0" />
-                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[10px] uppercase tracking-wider text-purple-200 focus:outline-none cursor-pointer [&>option]:text-gray-900">
+                <div className="flex items-center gap-1.5 bg-[#209EBB]/10 px-2 py-1.5 rounded-xl border border-[#209EBB]/30 shadow-sm">
+                  <Filter size={10} className="text-[#FFB701] shrink-0" />
+                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-[#8ECAE6] focus:outline-none cursor-pointer [&>option]:text-[#023047]">
                     <option value="All Assemblies">All Assemblies</option>
                     {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
                   </select>
@@ -401,46 +409,46 @@ export default function SystemSettings() {
 
               <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
                 {displayedCells.map((cell) => (
-                  <div key={cell.key} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors group">
+                  <div key={cell.key} className="flex items-center justify-between p-3 bg-[#209EBB]/5 rounded-xl border border-[#209EBB]/20 hover:border-[#FFB701]/30 transition-colors group">
                     {editingCellKey === cell.key ? (
                       <div className="flex items-center gap-2 w-full">
-                        <input type="text" value={editingCellName} onChange={e => setEditingCellName(e.target.value)} className="flex-1 px-3 py-1.5 bg-white/10 border border-orange-400 rounded-md text-sm font-bold text-white focus:outline-none" autoFocus />
+                        <input type="text" value={editingCellName} onChange={e => setEditingCellName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#023047] border border-[#FC8500] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
                         <div className="flex gap-1">
-                          <button onClick={() => handleUpdateCell(cell.name, cell.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md disabled:opacity-40 transition-colors"><Check size={14}/></button>
-                          <button onClick={() => setEditingCellKey(null)} className="p-1.5 bg-white/10 text-purple-200 hover:bg-white/20 rounded-md transition-colors"><X size={14}/></button>
+                          <button onClick={() => handleUpdateCell(cell.name, cell.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                          <button onClick={() => setEditingCellKey(null)} className="p-1.5 bg-[#209EBB]/10 text-[#8ECAE6] hover:bg-[#209EBB]/20 rounded-lg transition-colors border border-[#209EBB]/30"><X size={14}/></button>
                         </div>
                       </div>
                     ) : (
                       <>
                         <div className="flex flex-col">
-                          <span className="font-black text-white text-sm">{cell.name}</span>
-                          <span className="text-[10px] font-black text-purple-300 uppercase mt-0.5 tracking-wider">{cell.assemblyName}</span>
+                          <span className="font-black text-white text-xs uppercase tracking-widest">{cell.name}</span>
+                          <span className="text-[9px] font-black text-[#8ECAE6] uppercase mt-0.5 tracking-widest">{cell.assemblyName}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingCellKey(cell.key); setEditingCellName(cell.name); }} className="p-1.5 text-purple-300 hover:bg-white/10 hover:text-white rounded-md transition-colors"><Edit2 size={14} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteCell(cell.name, cell.assemblyName)} className="p-1.5 text-purple-300 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={14} /></button>}
+                          <button onClick={() => { setEditingCellKey(cell.key); setEditingCellName(cell.name); }} className="p-1.5 text-[#8ECAE6] hover:bg-[#209EBB]/20 hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                          {isTier1 && <button onClick={() => handleDeleteCell(cell.name, cell.assemblyName)} className="p-1.5 text-[#8ECAE6] hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
                         </div>
                       </>
                     )}
                   </div>
                 ))}
-                {displayedCells.length === 0 && <p className="text-center text-xs font-bold text-purple-300 pt-10 italic">No Home Cells detected.</p>}
+                {displayedCells.length === 0 && <p className="text-center text-[10px] font-bold text-[#8ECAE6] pt-10 uppercase tracking-widest">No Home Cells detected.</p>}
               </div>
             </div>
 
             {/* ========================================== */}
             {/* COLUMN 3: BIBLE STUDY GROUPS RADAR         */}
             {/* ========================================== */}
-            <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-white/10">
+            <div className="bg-[#023047] rounded-2xl border border-[#209EBB]/30 shadow-xl flex flex-col h-[520px] p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#209EBB]/20">
                 <div className="flex items-center gap-2">
-                  <BookOpen className="text-purple-300" size={20} />
-                  <h2 className="text-lg font-black text-white uppercase tracking-tight">Bible Studies</h2>
+                  <BookOpen className="text-[#FC8500]" size={16} />
+                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Bible Studies</h2>
                 </div>
                 
-                <div className="flex items-center gap-1.5 bg-white/5 px-2 py-1.5 rounded-xl border border-white/10 shadow-sm">
-                  <Filter size={12} className="text-purple-300 shrink-0" />
-                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[10px] uppercase tracking-wider text-purple-200 focus:outline-none cursor-pointer [&>option]:text-gray-900">
+                <div className="flex items-center gap-1.5 bg-[#209EBB]/10 px-2 py-1.5 rounded-xl border border-[#209EBB]/30 shadow-sm">
+                  <Filter size={10} className="text-[#FFB701] shrink-0" />
+                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-[#8ECAE6] focus:outline-none cursor-pointer [&>option]:text-[#023047]">
                     <option value="All Assemblies">All Assemblies</option>
                     {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
                   </select>
@@ -449,30 +457,30 @@ export default function SystemSettings() {
 
               <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
                 {displayedStudies.map((study) => (
-                  <div key={study.key} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors group">
+                  <div key={study.key} className="flex items-center justify-between p-3 bg-[#209EBB]/5 rounded-xl border border-[#209EBB]/20 hover:border-[#FFB701]/30 transition-colors group">
                     {editingStudyKey === study.key ? (
                       <div className="flex items-center gap-2 w-full">
-                        <input type="text" value={editingStudyName} onChange={e => setEditingStudyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-white/10 border border-purple-400 rounded-md text-sm font-bold text-white focus:outline-none" autoFocus />
+                        <input type="text" value={editingStudyName} onChange={e => setEditingStudyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#023047] border border-[#FFB701] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
                         <div className="flex gap-1">
-                          <button onClick={() => handleUpdateStudy(study.name, study.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-md disabled:opacity-40 transition-colors"><Check size={14}/></button>
-                          <button onClick={() => setEditingStudyKey(null)} className="p-1.5 bg-white/10 text-purple-200 hover:bg-white/20 rounded-md transition-colors"><X size={14}/></button>
+                          <button onClick={() => handleUpdateStudy(study.name, study.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-300 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                          <button onClick={() => setEditingStudyKey(null)} className="p-1.5 bg-[#209EBB]/10 text-[#8ECAE6] hover:bg-[#209EBB]/20 rounded-lg transition-colors border border-[#209EBB]/30"><X size={14}/></button>
                         </div>
                       </div>
                     ) : (
                       <>
                         <div className="flex flex-col">
-                          <span className="font-black text-white text-sm">{study.name}</span>
-                          <span className="text-[10px] font-black text-purple-300 uppercase mt-0.5 tracking-wider">{study.assemblyName}</span>
+                          <span className="font-black text-white text-xs uppercase tracking-widest">{study.name}</span>
+                          <span className="text-[9px] font-black text-[#8ECAE6] uppercase mt-0.5 tracking-widest">{study.assemblyName}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingStudyKey(study.key); setEditingStudyName(study.name); }} className="p-1.5 text-purple-300 hover:bg-white/10 hover:text-white rounded-md transition-colors"><Edit2 size={14} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteStudy(study.name, study.assemblyName)} className="p-1.5 text-purple-300 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={14} /></button>}
+                          <button onClick={() => { setEditingStudyKey(study.key); setEditingStudyName(study.name); }} className="p-1.5 text-[#8ECAE6] hover:bg-[#209EBB]/20 hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                          {isTier1 && <button onClick={() => handleDeleteStudy(study.name, study.assemblyName)} className="p-1.5 text-[#8ECAE6] hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
                         </div>
                       </>
                     )}
                   </div>
                 ))}
-                {displayedStudies.length === 0 && <p className="text-center text-xs font-bold text-purple-300 pt-10 italic">No Bible Study groups detected.</p>}
+                {displayedStudies.length === 0 && <p className="text-center text-[10px] font-bold text-[#8ECAE6] pt-10 uppercase tracking-widest">No Bible Study groups detected.</p>}
               </div>
             </div>
           </div>
@@ -480,24 +488,24 @@ export default function SystemSettings() {
           {/* ========================================== */}
           {/* ROW 2: GLOBAL SYSTEM BRANDING TRINITY      */}
           {/* ========================================== */}
-          <form onSubmit={handleSaveSettings} className="bg-white/10 backdrop-blur-xl p-6 md:p-8 rounded-[2rem] border border-white/10 shadow-xl space-y-6">
-            <div className="flex items-center gap-2 pb-2 border-b border-white/10">
-              <Building2 className="text-white" size={20} />
-              <h2 className="text-lg font-black text-white uppercase tracking-tight">Global System Branding</h2>
+          <form onSubmit={handleSaveSettings} className="bg-[#023047] p-6 md:p-8 rounded-[2rem] border border-[#209EBB]/30 shadow-xl space-y-6">
+            <div className="flex items-center gap-2 pb-3 border-b border-[#209EBB]/20">
+              <Building2 className="text-[#FFB701]" size={18} />
+              <h2 className="text-sm font-black text-white uppercase tracking-widest">Global System Branding</h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
-              <div className="flex flex-col items-center justify-center bg-white/5 border border-white/10 p-4 rounded-2xl">
+              <div className="flex flex-col items-center justify-center bg-[#209EBB]/5 border border-[#209EBB]/20 p-5 rounded-2xl">
                 <label className={labelStyle}>Official Logo Icon</label>
-                <div className="w-28 h-28 rounded-full border-4 border-white/20 shadow-md flex items-center justify-center bg-white/5 overflow-hidden relative group mb-2">
+                <div className="w-24 h-24 rounded-full border-[3px] border-[#FFB701] shadow-lg flex items-center justify-center bg-[#023047] overflow-hidden relative group mb-3">
                   <img src={logoPreview} alt="District Branding Asset" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer backdrop-blur-sm">
-                    <UploadCloud size={20} className="text-white mb-1" />
-                    <span className="text-[10px] font-black text-white uppercase">Upload</span>
+                  <div className="absolute inset-0 bg-[#023047]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                    <UploadCloud size={16} className="text-[#FFB701] mb-1" />
+                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Upload</span>
                     <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
                 </div>
-                <p className="text-[9px] font-black text-purple-300 text-center uppercase tracking-wider">PNG or JPG up to 1MB max</p>
+                <p className="text-[8px] font-black text-[#8ECAE6] text-center uppercase tracking-widest">PNG or JPG up to 1MB max</p>
               </div>
 
               <div>
@@ -505,7 +513,7 @@ export default function SystemSettings() {
                 <input 
                   type="text" required value={districtName} 
                   onChange={(e) => setDistrictName(e.target.value.toUpperCase())} 
-                  className={`${inputStyle} text-base tracking-wide`} 
+                  className={inputStyle} 
                   placeholder="e.g. KETIEJILI"
                 />
               </div>
@@ -521,9 +529,9 @@ export default function SystemSettings() {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-white/10 flex justify-end">
-              <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-3 text-white text-xs uppercase tracking-widest w-full sm:w-auto border border-white/20 ${isSubmitting ? 'bg-white/10 cursor-not-allowed' : 'bg-[#4f46e5] hover:bg-[#4338ca] shadow-indigo-500/20'}`}>
-                {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Committing...</> : <><Save size={16} /> Save Branding</>}
+            <div className="pt-5 border-t border-[#209EBB]/20 flex justify-end">
+              <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 text-[#023047] text-[10px] uppercase tracking-widest w-full sm:w-auto border border-[#FFB701] ${isSubmitting ? 'bg-[#209EBB]/10 text-[#8ECAE6] cursor-not-allowed border-[#209EBB]/30' : 'bg-[#FFB701] hover:bg-[#FC8500]'}`}>
+                {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Committing...</> : <><Save size={14} /> Save Branding</>}
               </button>
             </div>
           </form>

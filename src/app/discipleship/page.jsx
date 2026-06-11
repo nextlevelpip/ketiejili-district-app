@@ -159,91 +159,94 @@ export default function DiscipleshipTracker() {
   const report = generatePastorReport();
   
   const getTagColor = (tag) => {
-    if (tag === 'Putting into practice') return 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30';
-    if (tag === 'Understood') return 'bg-blue-500/20 text-blue-300 border-blue-400/30';
-    if (tag === 'Conviction') return 'bg-purple-500/20 text-purple-300 border-purple-400/30';
-    if (tag === 'Confused') return 'bg-amber-500/20 text-amber-300 border-amber-400/30';
-    if (tag === 'Avoidance') return 'bg-red-500/20 text-red-300 border-red-400/30';
-    return 'bg-white/10 text-white/50 border-white/10';
+    if (tag === 'Putting into practice') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30';
+    if (tag === 'Understood') return 'bg-blue-500/10 text-blue-400 border-blue-500/30';
+    if (tag === 'Conviction') return 'bg-purple-500/10 text-purple-400 border-purple-500/30';
+    if (tag === 'Confused') return 'bg-amber-500/10 text-amber-400 border-amber-500/30';
+    if (tag === 'Avoidance') return 'bg-red-500/10 text-red-400 border-red-500/30';
+    return 'bg-[#001D3D] text-white/50 border-[#003566]';
   };
 
-  const inputStyle = "w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:bg-black/30 focus:border-cyan-400 focus:ring-4 focus:ring-cyan-500/20 outline-none transition-all text-sm text-white font-bold placeholder:text-cyan-200/50 [&>option]:text-gray-900";
-  const labelStyle = "block text-[10px] font-black text-cyan-200 uppercase tracking-widest mb-2 ml-1";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-cyan-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#0c4a6e] via-[#0369a1] to-[#082f49] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
+      <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
-        {/* Decorative background orbs */}
-        <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/20 blur-[120px] rounded-full pointer-events-none"></div>
-
-        <div className="relative z-10 max-w-7xl mx-auto space-y-8 animate-fade-in">
+        <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
-            <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-              <CheckCircle2 size={24} /> <span className="font-extrabold">{notification.message}</span>
+            <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
+              <CheckCircle2 size={18} /> {notification.message}
             </div>
           )}
 
-          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
-            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><Target size={32} /></div>
-            <div>
-              <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">Discipleship Command</h1>
-              <p className="font-bold text-cyan-100">Tracking daily spiritual progression and pastoral care.</p>
+          {/* ========================================================= */}
+          {/* STICKY HEADER & TABS (Locks to top when scrolling down) */}
+          {/* ========================================================= */}
+          <div className="sticky top-0 z-30 bg-[#001D3D] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block"><Target size={24} /></div>
+              <div>
+                <h1 className="text-3xl md:text-base font-black text-white uppercase tracking-widest">Discipleship</h1>
+                <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">Tracking daily spiritual progression.</p>
+              </div>
             </div>
-          </div>
 
-          {/* TAB NAVIGATION */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            {['converts', 'baptism', 'daily', 'weekly'].map((tab) => (
-              <button 
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-6 py-3 rounded-xl font-bold transition-all text-sm border backdrop-blur-md ${activeTab === tab ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-cyan-100 border-white/10 hover:bg-white/10'}`}
-              >
-                {tab === 'converts' && 'New Converts'}
-                {tab === 'baptism' && 'Baptisms'}
-                {tab === 'daily' && 'Daily Contact'}
-                {tab === 'weekly' && 'Pastor Report'}
-              </button>
-            ))}
+            {/* TAB NAVIGATION */}
+            <div className="flex flex-wrap gap-2">
+              {['converts', 'baptism', 'daily', 'weekly'].map((tab) => (
+                <button 
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[9px] border ${activeTab === tab ? 'bg-[#FFC300] text-[#000814] shadow-md border-transparent' : 'bg-[#000814] text-white/50 border-[#003566] hover:text-white'}`}
+                >
+                  {tab === 'converts' && 'New Converts'}
+                  {tab === 'baptism' && 'Baptisms'}
+                  {tab === 'daily' && 'Daily Contact'}
+                  {tab === 'weekly' && 'Pastor Report'}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* ================= TAB 1: NEW CONVERTS ================= */}
           {activeTab === 'converts' && (
-            <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 overflow-hidden shadow-xl">
-               <div className="p-6 border-b border-white/10 bg-black/10">
+            <div className="bg-[#000814] rounded-2xl border border-[#003566] overflow-hidden shadow-2xl">
+               <div className="p-5 border-b border-[#003566] bg-[#001D3D]">
                  <div className="relative">
-                   <Search className="absolute left-4 top-3.5 text-cyan-200/50" size={16}/>
-                   <input type="text" placeholder="Search new converts..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className={`${inputStyle} pl-10`} />
+                   <Search className="absolute left-3 top-2.5 text-white/30" size={14}/>
+                   <input type="text" placeholder="Search new converts..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className={`${inputStyle} pl-9`} />
                  </div>
                </div>
-               <div className="overflow-x-auto">
-                 <table className="w-full text-left text-sm text-white whitespace-nowrap">
-                   <thead className="bg-black/20 text-cyan-200 uppercase font-black text-[10px] tracking-widest border-b border-white/10">
-                     <tr><th className="p-5">Convert Name</th><th className="p-5">Assembly</th><th className="p-5 text-center">Baptisms</th><th className="p-5 text-center">Action</th></tr>
+               <div className="overflow-x-auto custom-scrollbar">
+                 <table className="w-full text-left text-xs text-white whitespace-nowrap">
+                   <thead className="bg-[#001D3D] text-[#FFC300] uppercase font-black text-[9px] tracking-widest border-b border-[#003566]">
+                     <tr><th className="p-4">Convert Name</th><th className="p-4">Assembly</th><th className="p-4 text-center">Baptisms</th><th className="p-4 text-center">Action</th></tr>
                    </thead>
-                   <tbody className="divide-y divide-white/5">
+                   <tbody className="divide-y divide-[#003566]">
                      {members.filter(m => m.churchRole === 'New Convert').map(m => (
-                       <tr key={m.id} className="hover:bg-white/5 transition-colors">
-                         <td className="p-5 font-black text-white text-base">{m.name}</td>
-                         <td className="p-5 text-cyan-100/70 font-bold">{m.localAssembly}</td>
-                         <td className="p-5 text-center">
+                       <tr key={m.id} className="hover:bg-[#001D3D]/50 transition-colors">
+                         <td className="p-4 font-black text-white text-xs">{m.name}</td>
+                         <td className="p-4 text-white/50 font-bold text-[9px] uppercase tracking-widest">{m.localAssembly}</td>
+                         <td className="p-4 text-center">
                            <div className="flex gap-2 justify-center">
-                             <span className={`px-2 py-1 border rounded-lg text-[9px] font-black uppercase tracking-widest ${m.waterBaptismStatus === 'Yes' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' : 'bg-white/5 text-white/30 border-white/10'}`}>Water</span>
-                             <span className={`px-2 py-1 border rounded-lg text-[9px] font-black uppercase tracking-widest ${m.spiritBaptism === 'Yes' ? 'bg-purple-500/20 text-purple-300 border-purple-400/30' : 'bg-white/5 text-white/30 border-white/10'}`}>Spirit</span>
+                             <span className={`px-2 py-0.5 border rounded text-[8px] font-black uppercase tracking-widest ${m.waterBaptismStatus === 'Yes' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[#001D3D] text-white/30 border-[#003566]'}`}>Water</span>
+                             <span className={`px-2 py-0.5 border rounded text-[8px] font-black uppercase tracking-widest ${m.spiritBaptism === 'Yes' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-[#001D3D] text-white/30 border-[#003566]'}`}>Spirit</span>
                            </div>
                          </td>
-                         <td className="p-5 text-center">
-                           <button onClick={() => graduateToMember(m.id, m.name)} disabled={m.waterBaptismStatus !== 'Yes'} className="bg-blue-600 border border-blue-500/50 hover:bg-blue-500 px-4 py-2 rounded-xl font-bold text-xs text-white shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                         <td className="p-4 text-center">
+                           <button onClick={() => graduateToMember(m.id, m.name)} disabled={m.waterBaptismStatus !== 'Yes'} className="bg-[#FFC300] border border-[#FFC300] hover:bg-[#FFD60A] px-4 py-1.5 rounded-lg font-black uppercase tracking-widest text-[9px] text-[#000814] shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition-all">
                              Graduate
                            </button>
                          </td>
                        </tr>
                      ))}
-                     {members.filter(m => m.churchRole === 'New Convert').length === 0 && <tr><td colSpan="4" className="p-12 text-center text-cyan-200/50 font-bold italic">No new converts currently logged.</td></tr>}
+                     {members.filter(m => m.churchRole === 'New Convert').length === 0 && <tr><td colSpan="4" className="p-10 text-center text-white/50 font-bold italic text-xs">No new converts currently logged.</td></tr>}
                    </tbody>
                  </table>
                </div>
@@ -252,16 +255,18 @@ export default function DiscipleshipTracker() {
 
           {/* ================= TAB 2: BAPTISMS ================= */}
           {activeTab === 'baptism' && (
-             <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 p-8 text-center text-cyan-200/50 font-bold italic">
-                <Droplet size={48} className="mx-auto mb-4 opacity-30" />
+             <div className="bg-[#000814] rounded-2xl border border-[#003566] p-10 text-center text-white/50 font-bold italic text-xs shadow-2xl">
+                <Droplet size={36} className="mx-auto mb-4 opacity-30 text-[#FFC300]" />
                 Select members from the directory to update their baptism records.
              </div>
           )}
 
           {/* ================= TAB 3: DAILY CONTACT ================= */}
           {activeTab === 'daily' && (
-             <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 p-8 space-y-6 animate-fade-in">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-black/20 p-6 rounded-2xl border border-white/5 backdrop-blur-md">
+             <div className="bg-[#000814] rounded-2xl shadow-2xl border border-[#003566] p-6 md:p-8 space-y-6 animate-fade-in relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFC300] to-[#FCA311]"></div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 bg-[#001D3D] p-5 rounded-xl border border-[#003566]">
                   <div>
                     <label className={labelStyle}>Date</label>
                     <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputStyle} />
@@ -283,19 +288,19 @@ export default function DiscipleshipTracker() {
                 </div>
 
                 {assembly && group && membersToLog.length > 0 && (
-                  <div className="space-y-4 pt-4">
+                  <div className="space-y-4 pt-2">
                     {membersToLog.map(m => {
                       const currentStage = Math.min(m.discipleshipStage || 0, 6); // 6 Days
                       const stepInfo = sequenceSteps[currentStage];
                       const record = contactRecords[m.id] || { status: 'Not Reached', tag: '', notes: '' };
 
                       return (
-                        <div key={m.id} className="bg-black/20 border border-white/5 p-5 rounded-2xl flex flex-col gap-4 shadow-inner">
+                        <div key={m.id} className="bg-[#001D3D] border border-[#003566] p-5 rounded-xl flex flex-col gap-4">
                           <div className="flex flex-col lg:flex-row gap-4 lg:items-center justify-between">
                             <div className="flex-1">
-                              <div className="font-black text-white text-lg">{m.name}</div>
-                              <div className="text-[10px] font-black text-cyan-200/70 uppercase tracking-widest mt-1">
-                                {stepInfo.day}: {stepInfo.prompt}
+                              <div className="font-black text-white text-sm">{m.name}</div>
+                              <div className="text-[10px] font-black text-white/50 uppercase tracking-widest mt-1.5">
+                                <span className="text-[#FFC300]">{stepInfo.day}:</span> {stepInfo.prompt}
                               </div>
                             </div>
                             
@@ -305,7 +310,7 @@ export default function DiscipleshipTracker() {
                                   <select 
                                     value={record.status} 
                                     onChange={(e) => handleRecordChange(m.id, 'status', e.target.value)} 
-                                    className="p-3 bg-white/5 border border-white/10 rounded-xl text-xs font-bold text-white outline-none focus:border-cyan-400 [&>option]:text-gray-900"
+                                    className="p-2.5 bg-[#000814] border border-[#003566] rounded-lg text-[10px] uppercase tracking-widest font-black text-white outline-none focus:border-[#FFC300] [&>option]:text-[#000814]"
                                   >
                                     <option value="Not Reached">Not Reached</option>
                                     <option value="Contacted">Contacted</option>
@@ -315,7 +320,7 @@ export default function DiscipleshipTracker() {
                                     value={record.tag} 
                                     disabled={record.status === 'Not Reached'}
                                     onChange={(e) => handleRecordChange(m.id, 'tag', e.target.value)} 
-                                    className={`p-3 border rounded-xl text-xs font-bold outline-none focus:border-cyan-400 disabled:opacity-30 disabled:cursor-not-allowed [&>option]:text-gray-900 ${record.tag ? getTagColor(record.tag) : 'bg-white/5 border-white/10 text-white'}`}
+                                    className={`p-2.5 border rounded-lg text-[10px] uppercase tracking-widest font-black outline-none focus:border-[#FFC300] disabled:opacity-30 disabled:cursor-not-allowed [&>option]:text-[#000814] ${record.tag ? getTagColor(record.tag) : 'bg-[#000814] border-[#003566] text-white'}`}
                                   >
                                     <option value="">- Select Tag -</option>
                                     {stepInfo.tags.map(t => <option key={t} value={t}>{t}</option>)}
@@ -323,8 +328,8 @@ export default function DiscipleshipTracker() {
                                 </>
                               )}
                               {currentStage === 6 && (
-                                <div className="flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest">
-                                  <CheckCircle2 size={16} /> Completed
+                                <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-3 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                                  <CheckCircle2 size={14} /> Completed
                                 </div>
                               )}
                             </div>
@@ -332,31 +337,30 @@ export default function DiscipleshipTracker() {
 
                           {/* DYNAMIC NOTES FIELD */}
                           {currentStage < 6 && record.status === 'Contacted' && (
-                            <div className="animate-fade-in pt-2 border-t border-white/5">
+                            <div className="animate-fade-in pt-3 border-t border-[#003566]">
                               <input 
                                 type="text"
                                 placeholder="Add a pastoral note (e.g., 'Struggling with grace concept')..."
                                 value={record.notes || ''}
                                 onChange={(e) => handleRecordChange(m.id, 'notes', e.target.value)}
-                                className="w-full p-3 bg-black/40 border border-white/10 rounded-xl text-xs font-bold text-white outline-none focus:border-cyan-400 placeholder:text-cyan-200/30"
+                                className="w-full p-2.5 bg-[#000814] border border-[#003566] rounded-lg text-xs font-bold text-white outline-none focus:border-[#FFC300] placeholder:text-white/30"
                               />
                             </div>
                           )}
-
                         </div>
                       )
                     })}
                     
-                    <div className="pt-4 border-t border-white/10">
-                      <button onClick={handleSaveLogs} disabled={isSubmitting} className="w-full md:w-auto px-10 py-4 bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/30 rounded-xl font-black uppercase tracking-widest text-sm text-white shadow-lg transition-all flex items-center justify-center gap-3">
-                        {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    <div className="pt-4 border-t border-[#003566]">
+                      <button onClick={handleSaveLogs} disabled={isSubmitting} className="w-full md:w-auto px-8 py-3.5 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg transition-all flex items-center justify-center gap-2">
+                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                         Save & Advance Sequence
                       </button>
                     </div>
                   </div>
                 )}
                 {assembly && group && membersToLog.length === 0 && (
-                  <div className="p-12 text-center text-cyan-200/50 font-bold italic bg-black/10 border border-dashed border-white/10 rounded-2xl">
+                  <div className="p-12 text-center text-white/50 font-bold italic bg-[#001D3D] border border-dashed border-[#003566] rounded-xl text-xs">
                     No members found in this Bible Study Group.
                   </div>
                 )}
@@ -365,58 +369,56 @@ export default function DiscipleshipTracker() {
 
           {/* ================= TAB 4: PASTOR REPORT ================= */}
           {activeTab === 'weekly' && (
-             <div className="bg-white/10 backdrop-blur-xl p-8 rounded-[2rem] border border-white/10 text-white shadow-xl animate-fade-in">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-white/10 pb-6 mb-8">
-                  <h2 className="text-xl font-black text-white flex items-center gap-2 drop-shadow-md"><Activity className="text-cyan-400" /> Pastoral Intelligence</h2>
-                  <select value={reportAssembly} onChange={e => setReportAssembly(e.target.value)} className="p-3 bg-black/30 border border-white/20 rounded-xl font-bold text-sm outline-none text-white shadow-sm [&>option]:text-gray-900">
+             <div className="bg-[#000814] p-6 md:p-8 rounded-2xl border border-[#003566] text-white shadow-2xl animate-fade-in">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-[#003566] pb-5 mb-6">
+                  <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-md"><Activity size={16} className="text-[#FFC300]" /> Pastoral Intelligence</h2>
+                  <select value={reportAssembly} onChange={e => setReportAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest outline-none text-white shadow-sm [&>option]:text-[#000814]">
                     <option value="All Assemblies">All Assemblies</option>
                     {[...new Set(members.map(m => m.localAssembly).filter(Boolean))].map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
                 </div>
 
-                <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 p-8 rounded-[2rem] border border-white/10 mb-8 shadow-inner">
-                  <p className="text-[10px] text-cyan-200 uppercase font-black tracking-widest mb-2 flex items-center gap-2"><Lightbulb size={14}/> Spiritual Temperature</p>
-                  <p className="text-2xl font-black leading-tight drop-shadow-md">{report.temperature}</p>
+                <div className="bg-[#001D3D] p-6 rounded-xl border border-[#003566] mb-6 shadow-inner">
+                  <p className="text-[9px] text-[#FFC300] uppercase font-black tracking-widest mb-1.5 flex items-center gap-2"><Lightbulb size={12}/> Spiritual Temperature</p>
+                  <p className="text-base font-black leading-tight drop-shadow-md">{report.temperature}</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* IMMEDIATE ATTENTION */}
-                  <div className="bg-black/20 p-8 rounded-[2rem] border border-red-500/20 shadow-inner">
-                    <h3 className="text-red-400 font-black mb-6 uppercase tracking-widest text-sm flex items-center gap-2"><ShieldAlert size={18}/> Immediate Attention</h3>
+                  <div className="bg-[#001D3D] p-6 rounded-xl border border-red-500/20 shadow-inner">
+                    <h3 className="text-red-400 font-black mb-5 uppercase tracking-widest text-[10px] flex items-center gap-2"><ShieldAlert size={14}/> Immediate Attention</h3>
                     <div className="space-y-3">
                       {report.immediateAttention.map((m, i) => (
-                        <div key={i} className="bg-white/5 border border-white/10 p-4 rounded-xl shadow-sm">
-                          <div className="font-bold text-white text-base mb-1">{m.name}</div>
-                          <div className="text-xs font-bold text-red-300 bg-red-500/10 px-2 py-1 inline-block rounded border border-red-500/20">{m.issue}</div>
-                          {/* INJECTED NOTES */}
+                        <div key={i} className="bg-[#000814] border border-[#003566] p-4 rounded-lg shadow-sm">
+                          <div className="font-black text-white text-xs mb-1">{m.name}</div>
+                          <div className="text-[9px] font-black text-red-400 uppercase tracking-widest bg-red-500/10 px-2 py-0.5 inline-block rounded border border-red-500/20">{m.issue}</div>
                           {m.notes && (
-                            <div className="mt-3 pl-3 border-l-2 border-red-500/30 text-xs italic text-cyan-100/70">
+                            <div className="mt-3 pl-2.5 border-l-2 border-red-500/30 text-[10px] italic font-bold text-white/50">
                               "{m.notes}"
                             </div>
                           )}
                         </div>
                       ))}
-                      {report.immediateAttention.length === 0 && <p className="text-cyan-200/40 text-sm italic">No critical issues flagged recently.</p>}
+                      {report.immediateAttention.length === 0 && <p className="text-white/30 text-xs italic font-bold">No critical issues flagged recently.</p>}
                     </div>
                   </div>
 
                   {/* GROWTH SIGNALS */}
-                  <div className="bg-black/20 p-8 rounded-[2rem] border border-emerald-500/20 shadow-inner">
-                    <h3 className="text-emerald-400 font-black mb-6 uppercase tracking-widest text-sm flex items-center gap-2"><TrendingUp size={18}/> Growth Signals</h3>
+                  <div className="bg-[#001D3D] p-6 rounded-xl border border-emerald-500/20 shadow-inner">
+                    <h3 className="text-emerald-400 font-black mb-5 uppercase tracking-widest text-[10px] flex items-center gap-2"><TrendingUp size={14}/> Growth Signals</h3>
                     <div className="space-y-3">
                       {report.growthSignals.map((m, i) => (
-                        <div key={i} className="bg-white/5 border border-white/10 p-4 rounded-xl shadow-sm">
-                          <div className="font-bold text-white text-base mb-1">{m.name}</div>
-                          <div className="text-xs font-bold text-emerald-300 bg-emerald-500/10 px-2 py-1 inline-block rounded border border-emerald-500/20">{m.tag}</div>
-                          {/* INJECTED NOTES */}
+                        <div key={i} className="bg-[#000814] border border-[#003566] p-4 rounded-lg shadow-sm">
+                          <div className="font-black text-white text-xs mb-1">{m.name}</div>
+                          <div className="text-[9px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/10 px-2 py-0.5 inline-block rounded border border-emerald-500/20">{m.tag}</div>
                           {m.notes && (
-                            <div className="mt-3 pl-3 border-l-2 border-emerald-500/30 text-xs italic text-cyan-100/70">
+                            <div className="mt-3 pl-2.5 border-l-2 border-emerald-500/30 text-[10px] italic font-bold text-white/50">
                               "{m.notes}"
                             </div>
                           )}
                         </div>
                       ))}
-                      {report.growthSignals.length === 0 && <p className="text-cyan-200/40 text-sm italic">No significant growth milestones flagged recently.</p>}
+                      {report.growthSignals.length === 0 && <p className="text-white/30 text-xs italic font-bold">No significant growth milestones flagged recently.</p>}
                     </div>
                   </div>
                 </div>

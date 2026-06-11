@@ -93,53 +93,55 @@ export default function DistrictHeritage() {
     }
   };
 
-  const inputStyle = "w-full px-4 py-3 bg-black/20 border border-white/10 rounded-xl focus:bg-black/30 focus:border-amber-400 focus:ring-4 focus:ring-amber-500/20 outline-none transition-all text-sm text-white placeholder:text-amber-200/40 shadow-sm font-bold [&>option]:text-gray-900";
-  const labelStyle = "block text-[10px] font-black text-amber-200 uppercase tracking-widest mb-2 ml-1";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
-  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={40} className="animate-spin text-amber-400" /></div></DashboardLayout>;
+  if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      {/* HERITAGE AMBER GRADIENT WRAPPER */}
-      <div className="min-h-full rounded-[2.5rem] bg-gradient-to-br from-[#78350f] via-[#b45309] to-[#451a03] p-6 md:p-10 text-white relative overflow-hidden shadow-2xl pb-20">
+      <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
-        {/* Ambient background glow */}
-        <div className="absolute top-0 left-0 w-96 h-96 bg-amber-500/20 blur-[120px] rounded-full pointer-events-none"></div>
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-orange-500/10 blur-[120px] rounded-full pointer-events-none"></div>
-        
-        <div className="relative z-10 space-y-8 animate-fade-in max-w-7xl mx-auto">
+        <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
           {notification.message && (
-            <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-              {notification.type === 'success' ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
-              <span className="font-extrabold">{notification.message}</span>
+            <div className={`fixed top-10 right-10 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in text-xs uppercase tracking-widest font-black ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
+              {notification.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              <span>{notification.message}</span>
             </div>
           )}
 
-          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
-            <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg backdrop-blur-md border border-white/20"><BookOpen size={32} /></div>
-            <div>
-              <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">District Heritage</h1>
-              <p className="font-bold text-amber-200">The Book of Chronicles for the Ketiejili District</p>
+          {/* ========================================================= */}
+          {/* STICKY HEADER & TABS (Locks to top when scrolling down) */}
+          {/* ========================================================= */}
+          <div className="sticky top-0 z-30 bg-[#001D3D] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block"><BookOpen size={24} /></div>
+              <div>
+                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">District Heritage</h1>
+                <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">The Book of Chronicles for the District.</p>
+              </div>
             </div>
-          </div>
 
-          {/* TAB NAVIGATION */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            <button onClick={() => setActiveTab('timeline')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'timeline' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-amber-200 border-white/10 hover:bg-white/10'}`}>
-              <History size={18} /> Historical Timeline
-            </button>
-            <button onClick={() => setActiveTab('roll')} className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all text-sm border backdrop-blur-md ${activeTab === 'roll' ? 'bg-white/20 text-white border-white/30 shadow-lg' : 'bg-white/5 text-amber-200 border-white/10 hover:bg-white/10'}`}>
-              <Award size={18} /> Ministerial Roll of Honor
-            </button>
+            {/* TAB NAVIGATION */}
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setActiveTab('timeline')} className={`px-4 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[9px] border flex items-center gap-1.5 ${activeTab === 'timeline' ? 'bg-[#FFC300] text-[#000814] shadow-md border-transparent' : 'bg-[#000814] text-white/50 border-[#003566] hover:text-white'}`}>
+                <History size={12} /> Historical Timeline
+              </button>
+              <button onClick={() => setActiveTab('roll')} className={`px-4 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[9px] border flex items-center gap-1.5 ${activeTab === 'roll' ? 'bg-[#FFC300] text-[#000814] shadow-md border-transparent' : 'bg-[#000814] text-white/50 border-[#003566] hover:text-white'}`}>
+                <Award size={12} /> Ministerial Roll of Honor
+              </button>
+            </div>
           </div>
 
           {/* ================= TAB 1: HISTORICAL TIMELINE ================= */}
           {activeTab === 'timeline' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 p-6 shadow-xl h-fit sticky top-6">
-                <h2 className="text-lg font-extrabold text-white flex items-center gap-2 mb-6">
-                  <Milestone size={20} className="text-amber-300" /> Record Milestone
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              <div className="lg:col-span-1 bg-[#000814] rounded-2xl border border-[#003566] p-6 shadow-xl h-fit sticky top-32">
+                <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2 mb-6 pb-4 border-b border-[#003566]">
+                  <Milestone size={16} className="text-[#FFC300]" /> Record Milestone
                 </h2>
                 <form onSubmit={handleSaveTimeline} className="space-y-5">
                   <div>
@@ -165,32 +167,32 @@ export default function DistrictHeritage() {
                     <label className={labelStyle}>Historical Details</label>
                     <textarea rows="3" placeholder="Brief description of the event..." value={eventDescription} onChange={e => setEventDescription(e.target.value)} className={`${inputStyle} resize-none`}></textarea>
                   </div>
-                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-2 text-white border border-white/20 ${isSubmitting ? 'bg-white/10' : 'bg-[#d97706] hover:bg-[#b45309]'}`}>
-                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><Save size={18} /> Archive Event</>}
+                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md flex items-center justify-center gap-2 ${isSubmitting ? 'bg-white/10 text-white/50 cursor-not-allowed border border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] border border-[#FFC300]'}`}>
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <><Save size={14} /> Archive Event</>}
                   </button>
                 </form>
               </div>
 
               <div className="lg:col-span-2">
-                <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] shadow-xl border border-white/10 p-8">
+                <div className="bg-[#000814] rounded-2xl shadow-xl border border-[#003566] p-6 md:p-8">
                   {timeline.length === 0 ? (
-                    <div className="text-center py-12 text-amber-200/50">
-                      <History size={48} className="mx-auto mb-4 opacity-30" />
-                      <p className="font-bold">The archives are currently empty.</p>
+                    <div className="text-center py-12 text-white/30">
+                      <History size={36} className="mx-auto mb-4 opacity-30 text-[#FFC300]" />
+                      <p className="font-bold text-xs uppercase tracking-widest">The archives are currently empty.</p>
                     </div>
                   ) : (
-                    <div className="relative border-l-4 border-amber-500/30 ml-4 md:ml-6 space-y-8 pb-4">
+                    <div className="relative border-l-[3px] border-[#003566] ml-4 md:ml-6 space-y-6 pb-4">
                       {timeline.map((event) => (
-                        <div key={event.id} className="relative pl-8 md:pl-10 group">
-                          <div className="absolute -left-[18px] top-1 w-8 h-8 bg-amber-500 rounded-full border-4 border-[#78350f] shadow-[0_0_15px_rgba(245,158,11,0.5)]"></div>
-                          <div className="bg-black/20 border border-white/5 rounded-2xl p-6 hover:bg-white/5 transition-all shadow-inner">
-                            <button onClick={() => handleDelete('heritage_timeline', event.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={16} /></button>
-                            <span className="inline-block px-3 py-1 bg-amber-500/20 text-amber-300 font-black text-sm rounded-lg mb-2 tracking-wider border border-amber-500/30">
+                        <div key={event.id} className="relative pl-6 md:pl-10 group">
+                          <div className="absolute -left-[14px] top-1 w-6 h-6 bg-[#000814] rounded-full border-[3px] border-[#FFC300] shadow-[0_0_10px_rgba(255,195,0,0.4)]"></div>
+                          <div className="bg-[#001D3D] border border-[#003566] rounded-xl p-5 hover:border-[#FFC300]/50 transition-all shadow-inner relative">
+                            <button onClick={() => handleDelete('heritage_timeline', event.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                            <span className="inline-block px-3 py-1 bg-[#000814] text-[#FFC300] font-black text-[10px] rounded-lg mb-2 tracking-widest uppercase border border-[#003566]">
                               {event.year}
                             </span>
-                            <h3 className="text-xl font-black text-white">{event.title}</h3>
-                            <span className="text-[10px] font-black text-amber-200/70 uppercase tracking-widest block mb-3">{event.category}</span>
-                            <p className="text-amber-50 font-medium text-sm leading-relaxed">{event.description}</p>
+                            <h3 className="text-sm font-black text-white">{event.title}</h3>
+                            <span className="text-[8px] font-black text-white/50 uppercase tracking-widest block mb-2">{event.category}</span>
+                            <p className="text-white/70 font-bold text-xs leading-relaxed">{event.description}</p>
                           </div>
                         </div>
                       ))}
@@ -203,10 +205,11 @@ export default function DistrictHeritage() {
 
           {/* ================= TAB 2: MINISTERIAL ROLL OF HONOR ================= */}
           {activeTab === 'roll' && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 p-6 shadow-xl h-fit sticky top-6">
-                <h2 className="text-lg font-extrabold text-white flex items-center gap-2 mb-6">
-                  <UserCheck size={20} className="text-amber-300" /> Induct Minister
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              
+              <div className="lg:col-span-1 bg-[#000814] rounded-2xl border border-[#003566] p-6 shadow-xl h-fit sticky top-32">
+                <h2 className="text-sm font-black uppercase tracking-widest text-white flex items-center gap-2 mb-6 pb-4 border-b border-[#003566]">
+                  <UserCheck size={16} className="text-[#FFC300]" /> Induct Minister
                 </h2>
                 <form onSubmit={handleSaveMinister} className="space-y-5">
                   <div>
@@ -227,26 +230,26 @@ export default function DistrictHeritage() {
                     <label className={labelStyle}>Key Legacy / Achievement</label>
                     <textarea rows="3" placeholder="e.g. Pioneered 3 new assemblies..." value={keyAchievement} onChange={e => setKeyAchievement(e.target.value)} className={`${inputStyle} resize-none`}></textarea>
                   </div>
-                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-extrabold transition-all shadow-md flex items-center justify-center gap-2 text-white border border-white/20 ${isSubmitting ? 'bg-white/10' : 'bg-[#d97706] hover:bg-[#b45309]'}`}>
-                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><Award size={18} /> Add to Roll</>}
+                  <button type="submit" disabled={isSubmitting} className={`w-full py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-md flex items-center justify-center gap-2 ${isSubmitting ? 'bg-white/10 text-white/50 cursor-not-allowed border border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] border border-[#FFC300]'}`}>
+                    {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <><Award size={14} /> Add to Roll</>}
                   </button>
                 </form>
               </div>
 
               <div className="lg:col-span-2">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {rollOfHonor.map((minister) => (
-                    <div key={minister.id} className="bg-black/20 backdrop-blur-md rounded-[2rem] p-6 shadow-xl border border-white/5 relative overflow-hidden group hover:bg-white/5 transition-all">
-                      <button onClick={() => handleDelete('heritage_roll', minister.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 z-10"><Trash2 size={16} /></button>
-                      <div className="absolute top-0 left-0 w-1.5 h-full bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.8)]"></div>
-                      <Award size={100} className="absolute -bottom-4 -right-4 text-amber-500/10 transform rotate-12 group-hover:scale-110 transition-transform" />
+                    <div key={minister.id} className="bg-[#000814] rounded-2xl p-6 shadow-xl border border-[#003566] relative overflow-hidden group hover:border-[#FFC300]/50 transition-all">
+                      <button onClick={() => handleDelete('heritage_roll', minister.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 z-10"><Trash2 size={14} /></button>
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-[#FFC300] shadow-[0_0_10px_rgba(255,195,0,0.5)]"></div>
+                      <Award size={80} className="absolute -bottom-4 -right-4 text-[#FFC300]/5 transform rotate-12 group-hover:scale-110 transition-transform" />
                       
-                      <div className="relative z-10 pl-2">
-                        <span className="inline-block px-3 py-1 bg-amber-500/20 text-amber-200 font-black text-[10px] uppercase tracking-widest rounded-lg mb-3 border border-amber-500/30">
+                      <div className="relative z-10 pl-2 flex flex-col h-full">
+                        <span className="inline-block px-3 py-1 bg-[#001D3D] text-[#FFC300] font-black text-[9px] uppercase tracking-widest rounded-lg mb-3 border border-[#003566] w-fit">
                           {minister.startYear} — {minister.endYear || 'Present'}
                         </span>
-                        <h3 className="text-xl font-black text-white mb-2 leading-tight">{minister.name}</h3>
-                        <p className="text-sm text-amber-100/70 font-medium italic border-l-2 border-amber-500/50 pl-3 mt-4">
+                        <h3 className="text-sm font-black text-white mb-2 leading-tight uppercase tracking-widest">{minister.name}</h3>
+                        <p className="text-xs text-white/60 font-bold italic border-l-2 border-[#003566] pl-3 mt-auto">
                           "{minister.achievement || 'Faithfully served the Ketiejili District.'}"
                         </p>
                       </div>
@@ -254,9 +257,9 @@ export default function DistrictHeritage() {
                   ))}
                   
                   {rollOfHonor.length === 0 && (
-                    <div className="md:col-span-2 text-center py-12 text-amber-200/40 bg-white/5 rounded-[2rem] border border-white/5">
-                      <Award size={48} className="mx-auto mb-4 opacity-30" />
-                      <p className="font-bold">The Ministerial Roll of Honor is empty.</p>
+                    <div className="md:col-span-2 text-center py-12 text-white/30 bg-[#000814] rounded-[2rem] border border-[#003566]">
+                      <Award size={36} className="mx-auto mb-4 opacity-30 text-[#FFC300]" />
+                      <p className="font-bold text-xs uppercase tracking-widest">The Ministerial Roll of Honor is empty.</p>
                     </div>
                   )}
                 </div>
