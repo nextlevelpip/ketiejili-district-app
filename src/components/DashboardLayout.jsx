@@ -17,6 +17,7 @@ export default function DashboardLayout({ children }) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
+  const [showLogoutModal, setShowLogoutModal] = useState(false); // NEW: Custom Modal State
   const router = useRouter();
   const pathname = usePathname();
 
@@ -99,7 +100,7 @@ export default function DashboardLayout({ children }) {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (isAuthorized) setIsLocked(true);
-      }, 300000); 
+      }, 60000); 
     };
 
     if (!isLocked) {
@@ -137,15 +138,19 @@ export default function DashboardLayout({ children }) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
   };
 
-  const handleLogout = async () => {
-    if (window.confirm("Are you sure you want to securely log out?")) {
-      try {
-        sessionStorage.removeItem('session_logged'); 
-        await signOut(auth);
-        router.push('/login');
-      } catch (error) {
-        alert("Failed to log out. Please check your connection.");
-      }
+  // NEW: Triggers the beautiful custom modal instead of browser confirm
+  const triggerLogout = () => {
+    setShowLogoutModal(true);
+    setIsProfileMenuOpen(false);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      sessionStorage.removeItem('session_logged'); 
+      await signOut(auth);
+      router.push('/login');
+    } catch (error) {
+      alert("Failed to securely disconnect. Check your connection.");
     }
   };
 
@@ -159,7 +164,7 @@ export default function DashboardLayout({ children }) {
     { name: 'Visitation Command', href: '/visitation', icon: HeartHandshake },
     { name: 'Welfare & Social', href: '/welfare', icon: HeartHandshake },
     { name: 'Presbytery', href: '/presbytery', icon: Shield },
-    { name: 'District Communication Hub', href: '/sms', icon: MessageSquare },
+    { name: 'District Communications Hub', href: '/sms', icon: MessageSquare },
     { name: 'District Heritage', href: '/heritage', icon: BookOpen },
     { name: 'Data Export', href: '/export', icon: Download },
   ];
@@ -233,7 +238,7 @@ export default function DashboardLayout({ children }) {
             </button>
           </form>
           
-          <button onClick={handleLogout} className="mt-8 text-[9px] font-black uppercase tracking-widest text-red-400/70 hover:text-red-400 transition-colors">
+          <button onClick={triggerLogout} className="mt-8 text-[9px] font-black uppercase tracking-widest text-red-400/70 hover:text-red-400 transition-colors">
             Switch Account
           </button>
         </div>
@@ -244,6 +249,37 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="flex h-screen bg-[#001D3D] overflow-hidden text-white font-sans relative selection:bg-[#FFC300] selection:text-[#000814]">
       
+      {/* NEW: Custom Logout Modal Overlay */}
+      {showLogoutModal && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                <LogOut size={28} />
+              </div>
+              <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Secure Disconnect</h3>
+              <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                Are you sure you want to terminate your session and exit the Command Centre?
+              </p>
+            </div>
+            <div className="flex border-t border-[#003566]">
+              <button 
+                onClick={() => setShowLogoutModal(false)}
+                className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmLogout}
+                className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+              >
+                Confirm Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 bg-[#000814]/80 z-40 md:hidden backdrop-blur-sm transition-opacity"
@@ -251,10 +287,8 @@ export default function DashboardLayout({ children }) {
         />
       )}
 
-      {/* SIDEBAR NAVIGATION - NAVY & GOLD */}
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#000814] border-r border-[#003566] flex flex-col transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 shadow-2xl`}>
         
-        {/* FIXED: Exact 80px height to perfectly match the main header. The horizontal border logic prevents intersection gaps. */}
         <div className="h-[80px] px-6 border-b border-[#003566] bg-[#000814] flex items-center justify-center shrink-0">
           <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2.5 flex items-center justify-center gap-2 w-full">
             <div className="w-2 h-2 rounded-full bg-[#FFC300] animate-pulse shadow-[0_0_8px_rgba(255,195,0,0.8)]"></div>
@@ -310,7 +344,6 @@ export default function DashboardLayout({ children }) {
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10 bg-[#001D3D]">
         
-        {/* FIXED: Exact 80px height to perfectly intersect with the sidebar */}
         <header className="h-[80px] bg-[#000814] border-b border-[#003566] px-4 sm:px-6 z-20 shadow-sm relative flex items-center justify-between shrink-0">
           
           <div className="flex-1 flex items-center">
@@ -359,14 +392,14 @@ export default function DashboardLayout({ children }) {
               {isProfileMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 bg-[#000814] border border-[#003566] rounded-xl shadow-2xl py-1.5 z-50 animate-fade-in overflow-hidden">
                   <button 
-                    onClick={() => { setIsProfileMenuOpen(false); handleLogout(); }} 
+                    onClick={() => { setIsProfileMenuOpen(false); triggerLogout(); }} 
                     className="w-full text-left px-4 py-2.5 text-xs font-bold text-white/70 hover:bg-[#001D3D] hover:text-white transition-colors flex items-center gap-2"
                   >
                     <UserCog size={14}/> Switch User
                   </button>
                   <div className="h-px w-full bg-[#003566] my-1"></div>
                   <button 
-                    onClick={() => { setIsProfileMenuOpen(false); handleLogout(); }} 
+                    onClick={triggerLogout} 
                     className="w-full text-left px-4 py-2.5 text-xs font-bold text-red-400 hover:bg-[#001D3D] transition-colors flex items-center gap-2"
                   >
                     <LogOut size={14}/> Secure Logout

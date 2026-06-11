@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit3, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, Plus, X, Filter } from 'lucide-react';
+import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -16,6 +16,9 @@ export default function Directory() {
   
   // --- NETWORK AWARENESS STATE ---
   const [isOffline, setIsOffline] = useState(false);
+
+  // --- CUSTOM MODAL STATE ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, name: '', type: '' });
 
   // --- FORM STATES ---
   const [editingId, setEditingId] = useState(null);
@@ -211,12 +214,25 @@ export default function Directory() {
     setActiveTab('register');
   };
 
-  const handleDelete = async (id, mName) => {
-    if (window.confirm(`Delete ${mName} from the database?`)) {
-      try {
+  // --- REPLACED BROWSER POPUPS WITH CUSTOM MODAL ---
+  const triggerDelete = (id, name, type) => {
+    setDeleteModal({ isOpen: true, id, name, type });
+  };
+
+  const confirmDelete = async () => {
+    const { id, type } = deleteModal;
+    try {
+      if (type === 'member') {
         await deleteDoc(doc(db, 'members', id));
         showNotification('success', isOffline ? 'Purge queued in Offline Vault.' : 'Member Purged.');
-      } catch (err) { showNotification('error', 'Purge Failed.'); }
+      } else if (type === 'certificate') {
+        await deleteDoc(doc(db, 'certificates', id));
+        showNotification('success', 'Certificate record purged.');
+      }
+    } catch (err) {
+      showNotification('error', 'Purge Failed.');
+    } finally {
+      setDeleteModal({ isOpen: false, id: null, name: '', type: '' });
     }
   };
 
@@ -274,24 +290,13 @@ export default function Directory() {
     finally { setIsSubmitting(false); }
   };
 
-  const handleDeleteCert = async (id) => {
-    if (!isTier1) return showNotification('error', 'Requires Tier 1 Clearance to delete records.');
-    if (window.confirm(`Delete this certificate record permanently?`)) {
-      try {
-        await deleteDoc(doc(db, 'certificates', id));
-        showNotification('success', 'Certificate record purged.');
-      } catch (err) { showNotification('error', 'Failed to delete certificate.'); }
-    }
-  };
-
-  // FILTER ENGINE - REPAIRED TO HANDLE OLD DATA
+  // FILTER ENGINE
   const filtered = members.filter(m => {
     const age = calculateAge(m.dob);
     const matchesSearch = String(m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(m.phone || '').includes(searchTerm);
     const matchesAssem = fAssem === 'All Assemblies' || m.localAssembly === fAssem;
     const matchesRole = fRole === 'All Roles' || m.churchRole === fRole;
     
-    // NORMALIZED LOGIC: Treats old "Active" records identically to "Active Member"
     const rawStatus = m.membershipStatus || m.memberStatus || 'Active Member';
     const normalizedStatus = rawStatus === 'Active' ? 'Active Member' : rawStatus;
     const matchesStatus = fStatus === 'All Statuses' || normalizedStatus === fStatus;
@@ -315,6 +320,37 @@ export default function Directory() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
+        {/* CUSTOM DELETE MODAL OVERLAY */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">System Purge</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to permanently delete <span className="text-white">{deleteModal.name}</span> from the database?
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setDeleteModal({ isOpen: false, id: null, name: '', type: '' })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -631,7 +667,7 @@ export default function Directory() {
                           <td className="p-5 text-center">
                             <div className="flex justify-center gap-2">
                               <button onClick={() => handleEdit(m)} className="p-2 text-white/40 hover:bg-[#FFC300]/20 hover:text-[#FFC300] rounded-lg transition-colors"><Edit size={16}/></button>
-                              <button onClick={() => handleDelete(m.id, m.name)} className="p-2 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                              <button onClick={() => triggerDelete(m.id, m.name, 'member')} className="p-2 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"><Trash2 size={16}/></button>
                             </div>
                           </td>
                         </tr>
@@ -718,7 +754,9 @@ export default function Directory() {
                             <div className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1.5">Issued by: {cert.issuedBy || 'N/A'} {cert.notes && `• ${cert.notes}`}</div>
                           </td>
                           <td className="p-4 text-center">
-                            <button onClick={() => handleDeleteCert(cert.id)} className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                            {isTier1 && (
+                              <button onClick={() => triggerDelete(cert.id, cert.certificateType, 'certificate')} className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                            )}
                           </td>
                         </tr>
                       ))}
