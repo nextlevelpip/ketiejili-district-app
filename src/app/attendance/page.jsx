@@ -1,7 +1,6 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-// FIXED: Imported all required icons, including CalendarDays, History, Trash2, Filter, and aliased AlertCircle
 import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle, MapPin, Home, History, Trash2, Filter, CalendarDays } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
@@ -39,8 +38,12 @@ export default function Attendance() {
   const [analyticsAssembly, setAnalyticsAssembly] = useState('All Assemblies');
   const [analyticsServiceType, setAnalyticsServiceType] = useState('All Services');
 
-  // --- HISTORY STATES ---
+  // --- HISTORY FILTER STATES ---
   const [historySearch, setHistorySearch] = useState('');
+  const [historyFilterAssembly, setHistoryFilterAssembly] = useState('All Assemblies');
+  const [historyFilterService, setHistoryFilterService] = useState('All Services');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
 
   useEffect(() => {
     const userStr = localStorage.getItem('ketiejili_user');
@@ -214,6 +217,8 @@ export default function Attendance() {
 
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
 
+  const uniqueServiceTypes = [...new Set(attendanceLogs.map(log => log.serviceType).filter(Boolean))].sort();
+
   // --- REPORT ANALYTICS COMPUTATIONS ---
   const matchingLogs = attendanceLogs.filter(log => {
     return log.date >= reportStartDate && 
@@ -241,10 +246,19 @@ export default function Attendance() {
 
   const absenteeList = Object.values(absenteeStats).sort((a, b) => b.absentCount - a.absentCount);
 
-  // --- HISTORY FILTERING ---
+  // --- HISTORY FILTERING ENGINE ---
   const filteredHistoryLogs = attendanceLogs.filter(log => {
     const searchString = `${log.serviceType} ${log.assembly} ${log.group}`.toLowerCase();
-    return searchString.includes(historySearch.toLowerCase());
+    const matchesSearch = historySearch === '' || searchString.includes(historySearch.toLowerCase());
+    const matchesAssembly = historyFilterAssembly === 'All Assemblies' || log.assembly === historyFilterAssembly;
+    const matchesService = historyFilterService === 'All Services' || log.serviceType === historyFilterService;
+    
+    let matchesDate = true;
+    if (historyDateFrom && historyDateTo) matchesDate = log.date >= historyDateFrom && log.date <= historyDateTo;
+    else if (historyDateFrom) matchesDate = log.date >= historyDateFrom;
+    else if (historyDateTo) matchesDate = log.date <= historyDateTo;
+
+    return matchesSearch && matchesAssembly && matchesService && matchesDate;
   });
 
   // GLASSMORPHISM STYLING
@@ -435,14 +449,37 @@ export default function Attendance() {
           {/* ================= TAB 2: SERVICE HISTORY LEDGER ================= */}
           {activeTab === 'history' && (
             <div className="bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/10 overflow-hidden shadow-2xl animate-fade-in">
-              <div className="p-5 border-b border-white/10 bg-black/20 flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h3 className="font-black text-cyan-300 uppercase tracking-widest text-xs flex items-center gap-2"><History size={16}/> Attendance Ledger</h3>
-                <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-2.5 text-cyan-200/50" size={14}/>
-                  <input type="text" placeholder="Search service or assembly..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} className="w-full pl-9 p-2 bg-black/30 border border-white/10 rounded-lg font-bold text-xs outline-none focus:border-cyan-400 text-white placeholder:text-cyan-200/50" />
+              <div className="p-5 border-b border-white/10 bg-black/20 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h3 className="font-black text-cyan-300 uppercase tracking-widest text-xs flex items-center gap-2"><History size={16}/> Service Ledger</h3>
+                
+                {/* INJECTED MULTI-LAYER FILTER ENGINE */}
+                <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full md:w-auto">
+                  <div className="col-span-2 md:col-span-1 relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-2.5 text-cyan-200/50" size={14}/>
+                    <input type="text" placeholder="Keyword search..." value={historySearch} onChange={e => setHistorySearch(e.target.value)} className="w-full pl-9 p-2 bg-black/30 border border-white/10 rounded-lg font-bold text-xs outline-none focus:border-cyan-400 text-white placeholder:text-cyan-200/50" />
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/30 px-2 py-0.5 rounded-lg border border-white/10">
+                    <Filter size={12} className="text-cyan-400 shrink-0" />
+                    <select value={historyFilterAssembly} onChange={e => setHistoryFilterAssembly(e.target.value)} className="bg-transparent font-bold text-[10px] uppercase tracking-wider text-white outline-none cursor-pointer [&>option]:text-gray-900 w-full">
+                      <option value="All Assemblies">All Assemblies</option>
+                      {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/30 px-2 py-0.5 rounded-lg border border-white/10">
+                    <select value={historyFilterService} onChange={e => setHistoryFilterService(e.target.value)} className="bg-transparent font-bold text-[10px] uppercase tracking-wider text-white outline-none cursor-pointer [&>option]:text-gray-900 w-full">
+                      <option value="All Services">All Services</option>
+                      {uniqueServiceTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 bg-black/30 px-2 py-0.5 rounded-lg border border-white/10 col-span-2 md:col-span-1">
+                    <input type="date" value={historyDateFrom} onChange={e => setHistoryDateFrom(e.target.value)} className="bg-transparent font-bold text-[10px] text-white outline-none w-full" />
+                    <span className="text-[10px] text-cyan-500 font-black">TO</span>
+                    <input type="date" value={historyDateTo} onChange={e => setHistoryDateTo(e.target.value)} className="bg-transparent font-bold text-[10px] text-white outline-none w-full" />
+                  </div>
                 </div>
               </div>
-              <div className="overflow-x-auto max-h-[500px] custom-scrollbar">
+
+              <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
                 <table className="w-full text-left text-sm whitespace-nowrap">
                   <thead className="sticky top-0 bg-black/80 backdrop-blur z-10 text-[9px] font-black text-cyan-200 uppercase tracking-widest border-b border-white/10">
                     <tr>
@@ -476,7 +513,7 @@ export default function Attendance() {
                         </td>
                       </tr>
                     ))}
-                    {filteredHistoryLogs.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-cyan-200/50 font-bold italic text-xs">No service records found.</td></tr>}
+                    {filteredHistoryLogs.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-cyan-200/50 font-bold italic text-xs">No service records match your filters.</td></tr>}
                   </tbody>
                 </table>
               </div>
