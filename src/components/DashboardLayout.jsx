@@ -10,14 +10,14 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
   Settings, LogOut, Menu, Cloud, Lock,
-  Heart, HeartHandshake 
+  Heart, HeartHandshake, FileSpreadsheet
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
-  const [showLogoutModal, setShowLogoutModal] = useState(false); // NEW: Custom Modal State
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -100,7 +100,7 @@ export default function DashboardLayout({ children }) {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (isAuthorized) setIsLocked(true);
-      }, 60000); 
+      }, 600000); // Set to 10 minutes (600,000ms) for better usability, or keep 60000 (1 min) if strict
     };
 
     if (!isLocked) {
@@ -138,7 +138,6 @@ export default function DashboardLayout({ children }) {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
   };
 
-  // NEW: Triggers the beautiful custom modal instead of browser confirm
   const triggerLogout = () => {
     setShowLogoutModal(true);
     setIsProfileMenuOpen(false);
@@ -154,6 +153,7 @@ export default function DashboardLayout({ children }) {
     }
   };
 
+  // ADDED: HQ Statistical Reports to the nav items
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
@@ -164,6 +164,7 @@ export default function DashboardLayout({ children }) {
     { name: 'Visitation Command', href: '/visitation', icon: HeartHandshake },
     { name: 'Welfare & Social', href: '/welfare', icon: HeartHandshake },
     { name: 'Presbytery', href: '/presbytery', icon: Shield },
+    { name: 'HQ Statistical Reports', href: '/report', icon: FileSpreadsheet },
     { name: 'District Communications Hub', href: '/sms', icon: MessageSquare },
     { name: 'District Heritage', href: '/heritage', icon: BookOpen },
     { name: 'Data Export', href: '/export', icon: Download },
@@ -249,7 +250,6 @@ export default function DashboardLayout({ children }) {
   return (
     <div className="flex h-screen bg-[#001D3D] overflow-hidden text-white font-sans relative selection:bg-[#FFC300] selection:text-[#000814]">
       
-      {/* NEW: Custom Logout Modal Overlay */}
       {showLogoutModal && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">

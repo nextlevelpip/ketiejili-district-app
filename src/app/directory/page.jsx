@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter } from 'lucide-react';
+import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter, Send } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -17,8 +17,9 @@ export default function Directory() {
   // --- NETWORK AWARENESS STATE ---
   const [isOffline, setIsOffline] = useState(false);
 
-  // --- CUSTOM MODAL STATE ---
+  // --- CUSTOM MODAL STATES ---
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, name: '', type: '' });
+  const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '' });
 
   // --- FORM STATES ---
   const [editingId, setEditingId] = useState(null);
@@ -27,7 +28,10 @@ export default function Directory() {
     name: '', phone: '', dob: '', gender: 'Male', localAssembly: 'Central',
     membershipStatus: 'Active Member', homeCell: '', bibleStudy: '', occupation: '',
     churchRole: 'Member', maritalStatus: 'Single', childrenCount: '0',
-    holySpiritBaptism: 'No', spiritGift: '', waterBaptismStatus: 'No', waterBaptismDate: '',
+    holySpiritBaptism: 'No', spiritGift: '', 
+    waterBaptismStatus: 'No', waterBaptismDate: '', baptizedBy: '',
+    isDedicated: 'No', dateDedicated: '', dedicatedBy: '',
+    hometown: '', emergencyContact: '', remarks: '',
     disability: 'None', disabilityType: ''
   };
   const [formData, setFormData] = useState(initialFormState);
@@ -145,8 +149,8 @@ export default function Directory() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (formData.phone.length !== 10) {
-      showNotification('error', 'Phone number must be exactly 10 digits.');
+    if (formData.phone.length !== 10 && formData.phone.length > 0) {
+      showNotification('error', 'Phone number must be exactly 10 digits if provided.');
       setIsSubmitting(false);
       return;
     }
@@ -171,7 +175,10 @@ export default function Directory() {
         bibleStudy: formData.bibleStudy || 'None', 
         soulWinner: formData.churchRole === 'New Convert' ? formData.soulWinner : '',
         waterBaptismDate: formData.waterBaptismStatus === 'Yes' ? formData.waterBaptismDate : '',
-        childrenCount: (formData.maritalStatus === 'Married' || formData.maritalStatus === 'Widowed') ? formData.childrenCount : 0,
+        baptizedBy: formData.waterBaptismStatus === 'Yes' ? formData.baptizedBy : '',
+        dateDedicated: formData.isDedicated === 'Yes' ? formData.dateDedicated : '',
+        dedicatedBy: formData.isDedicated === 'Yes' ? formData.dedicatedBy : '',
+        childrenCount: (formData.maritalStatus === 'Married' || formData.maritalStatus === 'Widowed' || formData.maritalStatus === 'Divorced') ? formData.childrenCount : 0,
         spiritGift: formData.spiritBaptism === 'Yes' ? formData.spiritGift : '',
         disabilityType: formData.hasDisability === 'Yes' ? formData.disabilityType : '',
         ageGroup: getAgeDemographic(formData.dob),
@@ -206,7 +213,9 @@ export default function Directory() {
       occupation: m.occupation || '', churchRole: m.churchRole || 'Member',
       soulWinner: m.soulWinner || '',
       waterBaptismStatus: m.waterBaptismStatus || m.waterBaptized || 'No',
-      waterBaptismDate: m.waterBaptismDate || '',
+      waterBaptismDate: m.waterBaptismDate || '', baptizedBy: m.baptizedBy || '',
+      isDedicated: m.isDedicated || 'No', dateDedicated: m.dateDedicated || '', dedicatedBy: m.dedicatedBy || '',
+      hometown: m.hometown || '', emergencyContact: m.emergencyContact || '', remarks: m.remarks || '',
       maritalStatus: m.maritalStatus || 'Single', childrenCount: m.childrenCount || '',
       spiritBaptism: m.spiritBaptism || 'No', spiritGift: m.spiritGift || '',
       hasDisability: m.hasDisability || 'No', disabilityType: m.disabilityType || ''
@@ -214,8 +223,10 @@ export default function Directory() {
     setActiveTab('register');
   };
 
-  // --- REPLACED BROWSER POPUPS WITH CUSTOM MODAL ---
   const triggerDelete = (id, name, type) => {
+    if (type === 'certificate' && !isTier1) {
+      return showNotification('error', 'Requires Tier 1 Clearance to delete records.');
+    }
     setDeleteModal({ isOpen: true, id, name, type });
   };
 
@@ -236,15 +247,20 @@ export default function Directory() {
     }
   };
 
-  const handleSendDirectSMS = async (member) => {
+  const triggerSMS = (member) => {
     if (isOffline) {
-      showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
-      return;
+      return showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
     }
     const defaultMsg = `Praise the Lord ${String(member.name).split(' ')[0]}! We pray this message finds you well. God bless you! - COP Ketiejili District`;
-    const message = window.prompt(`[TIER 1] Send Official SMS to ${member.name}:`, defaultMsg);
-    if (!message) return;
+    setSmsModal({ isOpen: true, member, message: defaultMsg });
+  };
 
+  const confirmSendSMS = async () => {
+    const { member, message } = smsModal;
+    if (!message.trim()) return showNotification('error', 'Message cannot be empty.');
+    
+    setSmsModal({ isOpen: false, member: null, message: '' });
+    
     let formattedPhone = String(member.phone || '').replace(/\D/g, '');
     if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
@@ -264,7 +280,6 @@ export default function Directory() {
     }
   };
 
-  // --- CERTIFICATE SUBMISSION ---
   const handleMemberSelectForCert = (e) => {
     const id = e.target.value;
     const member = members.find(m => m.id === id);
@@ -290,7 +305,6 @@ export default function Directory() {
     finally { setIsSubmitting(false); }
   };
 
-  // FILTER ENGINE
   const filtered = members.filter(m => {
     const age = calculateAge(m.dob);
     const matchesSearch = String(m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(m.phone || '').includes(searchTerm);
@@ -312,7 +326,6 @@ export default function Directory() {
 
   const filteredCerts = certificates.filter(c => String(c.memberName || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(c.certificateNumber || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
   const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
   const labelStyle = "text-[9px] font-black text-white/50 uppercase ml-1 mb-2 block tracking-widest";
 
@@ -345,6 +358,40 @@ export default function Directory() {
                   className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
                 >
                   Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CUSTOM SMS PROMPT MODAL OVERLAY */}
+        {smsModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-[#003566]">
+                <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><MessageSquare size={16}/> Dispatch SMS</h3>
+                <p className="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-widest">To: <span className="text-white">{smsModal.member?.name}</span> ({smsModal.member?.phone})</p>
+              </div>
+              <div className="p-6">
+                <textarea 
+                  rows="4" 
+                  value={smsModal.message} 
+                  onChange={(e) => setSmsModal({ ...smsModal, message: e.target.value })}
+                  className="w-full p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-bold text-white outline-none focus:border-[#FFC300] transition-all resize-none shadow-inner leading-relaxed"
+                />
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setSmsModal({ isOpen: false, member: null, message: '' })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmSendSMS}
+                  className="flex-1 py-4 text-[10px] font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  <Send size={14} /> Send Now
                 </button>
               </div>
             </div>
@@ -420,32 +467,53 @@ export default function Directory() {
               
               <form onSubmit={handleSave} className="space-y-6">
                 
+                {/* 1. ORIGIN & EMERGENCY */}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mt-2 mb-3 border-b border-[#003566] pb-2">Basic & Origin Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className={labelStyle}>Full Name *</label>
                     <input required placeholder="Enter full name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} className={inputStyle} />
                   </div>
                   <div>
-                    <label className={labelStyle}>Phone Number *</label>
-                    <input required type="tel" placeholder="024XXXXXXX" value={formData.phone} onChange={handlePhoneChange} className={`${inputStyle} tracking-widest`} />
-                  </div>
-                  <div>
                     <label className={labelStyle}>Date of Birth *</label>
                     <input required type="date" value={formData.dob} onChange={e => setFormData({...formData, dob: e.target.value})} className={inputStyle} />
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className={labelStyle}>Gender *</label>
                     <select required value={formData.gender} onChange={e => setFormData({...formData, gender: e.target.value})} className={inputStyle}>
                       <option value="">- Select -</option><option value="Male">Male</option><option value="Female">Female</option>
                     </select>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className={labelStyle}>Phone Number</label>
+                    <input type="tel" placeholder="024XXXXXXX" value={formData.phone} onChange={handlePhoneChange} className={`${inputStyle} tracking-widest`} />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Hometown</label>
+                    <input type="text" placeholder="e.g. Obo Kwahu" value={formData.hometown} onChange={e => setFormData({...formData, hometown: e.target.value})} className={inputStyle} />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Emergency Contact Person/Number</label>
+                    <input type="text" placeholder="e.g. Mr. John - 024XXXXXXX" value={formData.emergencyContact} onChange={e => setFormData({...formData, emergencyContact: e.target.value})} className={inputStyle} />
+                  </div>
+                </div>
+
+                {/* 2. CHURCH INFO */}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mt-8 mb-3 border-b border-[#003566] pb-2">Church Affiliation & Mobility</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className={labelStyle}>Local Assembly *</label>
                     <select required value={formData.localAssembly} onChange={e => setFormData({...formData, localAssembly: e.target.value})} className={inputStyle}>
                       {assemblies.map((assemblyName, index) => <option key={index} value={assemblyName}>{assemblyName}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Church Status / Role *</label>
+                    <select required value={formData.churchRole} onChange={e => setFormData({...formData, churchRole: e.target.value})} className={inputStyle}>
+                      {churchRoles.map(r => <option key={r} value={r}>{r}</option>)}
                     </select>
                   </div>
                   <div>
@@ -455,6 +523,18 @@ export default function Directory() {
                     </select>
                   </div>
                 </div>
+
+                {formData.churchRole === 'New Convert' && (
+                  <div className="bg-[#FFC300]/10 border border-[#FFC300]/30 p-6 rounded-xl grid grid-cols-1 gap-6 animate-fade-in mt-2">
+                    <div>
+                      <label className={`${labelStyle} text-[#FFC300] flex items-center gap-1`}><Flame size={12}/> Soul Winning Category</label>
+                      <select value={formData.soulWinner} onChange={e => setFormData({...formData, soulWinner: e.target.value})} className={`${inputStyle} border-[#FFC300]/30 bg-[#000814] text-[#FFC300]`}>
+                        <option value="">- Select Origin / Category -</option>
+                        {specializedSoulCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#001D3D] border border-[#003566] p-6 rounded-xl">
                   <div>
@@ -479,73 +559,29 @@ export default function Directory() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                  <div>
-                    <label className={labelStyle}>Occupation</label>
-                    <input placeholder="e.g. Teacher, Unemployed" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} className={inputStyle} />
-                  </div>
-                  <div>
-                    <label className={labelStyle}>Church Status / Role *</label>
-                    <select required value={formData.churchRole} onChange={e => setFormData({...formData, churchRole: e.target.value})} className={inputStyle}>
-                      {churchRoles.map(r => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {formData.churchRole === 'New Convert' && (
-                  <div className="bg-[#FFC300]/10 border border-[#FFC300]/30 p-6 rounded-xl grid grid-cols-1 gap-6 animate-fade-in mt-2">
-                    <div>
-                      <label className={`${labelStyle} text-[#FFC300] flex items-center gap-1`}><Flame size={12}/> Soul Winning Category</label>
-                      <select value={formData.soulWinner} onChange={e => setFormData({...formData, soulWinner: e.target.value})} className={`${inputStyle} border-[#FFC300]/30 bg-[#000814] text-[#FFC300]`}>
-                        <option value="">- Select Origin / Category -</option>
-                        {specializedSoulCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                      </select>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2 border-t border-[#003566] mt-4">
+                {/* 3. MARITAL & DEMOGRAPHICS */}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mt-8 mb-3 border-b border-[#003566] pb-2">Family & Demographics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <label className={labelStyle}>Marital Status *</label>
                     <select required value={formData.maritalStatus} onChange={e => setFormData({...formData, maritalStatus: e.target.value})} className={inputStyle}>
-                      <option value="">- Select -</option><option value="Single">Single</option><option value="Married">Married</option><option value="Widowed">Widowed</option>
+                      <option value="">- Select -</option>
+                      <option value="Single">Single</option>
+                      <option value="Married">Married</option>
+                      <option value="Divorced">Divorced</option>
+                      <option value="Widowed">Widowed</option>
                     </select>
                   </div>
-                  {(formData.maritalStatus === 'Married' || formData.maritalStatus === 'Widowed') && (
+                  {(formData.maritalStatus === 'Married' || formData.maritalStatus === 'Widowed' || formData.maritalStatus === 'Divorced') && (
                     <div className="animate-fade-in">
                       <label className={labelStyle}>How many children?</label>
                       <input type="number" min="0" placeholder="Accepts 0" value={formData.childrenCount} onChange={e => setFormData({...formData, childrenCount: e.target.value})} className={inputStyle} />
                     </div>
                   )}
-                </div>
-
-                {/* BAPTISM MODULE */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566]">
-                     <label className={labelStyle}>Water Baptised?</label>
-                     <select value={formData.waterBaptismStatus} onChange={e => setFormData({...formData, waterBaptismStatus: e.target.value})} className={inputStyle}>
-                       <option value="No">No</option><option value="Yes">Yes</option>
-                     </select>
-                     {formData.waterBaptismStatus === 'Yes' && (
-                       <div className="animate-fade-in mt-3">
-                         <label className={labelStyle}>Water Baptism Date</label>
-                         <input type="date" value={formData.waterBaptismDate} onChange={e => setFormData({...formData, waterBaptismDate: e.target.value})} className={inputStyle} />
-                       </div>
-                     )}
-                   </div>
-
-                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566]">
-                     <label className={labelStyle}>Holy Spirit Baptised?</label>
-                     <select value={formData.spiritBaptism} onChange={e => setFormData({...formData, spiritBaptism: e.target.value})} className={inputStyle}>
-                       <option value="No">No</option><option value="Yes">Yes</option>
-                     </select>
-                     {formData.spiritBaptism === 'Yes' && (
-                       <div className="animate-fade-in mt-3">
-                         <label className={labelStyle}>Spiritual Gift(s)</label>
-                         <input type="text" placeholder="e.g. Tongues, Prophecy" value={formData.spiritGift} onChange={e => setFormData({...formData, spiritGift: e.target.value})} className={inputStyle} />
-                       </div>
-                     )}
-                   </div>
+                  <div>
+                    <label className={labelStyle}>Occupation</label>
+                    <input placeholder="e.g. Teacher, Unemployed" value={formData.occupation} onChange={e => setFormData({...formData, occupation: e.target.value})} className={inputStyle} />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#001D3D] border border-[#003566] p-6 rounded-xl mt-4">
@@ -566,9 +602,72 @@ export default function Directory() {
                   )}
                 </div>
 
-                <div className="pt-4">
+                {/* 4. SACRAMENTAL RECORDS */}
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mt-8 mb-3 border-b border-[#003566] pb-2">Sacramental Records</h3>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                   <div className="bg-[#001D3D] p-5 rounded-xl border border-[#003566]">
+                     <label className={labelStyle}>Water Baptised?</label>
+                     <select value={formData.waterBaptismStatus} onChange={e => setFormData({...formData, waterBaptismStatus: e.target.value})} className={inputStyle}>
+                       <option value="No">No</option><option value="Yes">Yes</option>
+                     </select>
+                     {formData.waterBaptismStatus === 'Yes' && (
+                       <div className="animate-fade-in mt-4 space-y-4">
+                         <div>
+                           <label className={labelStyle}>Water Baptism Date</label>
+                           <input type="date" value={formData.waterBaptismDate} onChange={e => setFormData({...formData, waterBaptismDate: e.target.value})} className={inputStyle} />
+                         </div>
+                         <div>
+                           <label className={labelStyle}>Baptized By (Minister)</label>
+                           <input type="text" placeholder="e.g. Pastor John Doe" value={formData.baptizedBy} onChange={e => setFormData({...formData, baptizedBy: e.target.value})} className={inputStyle} />
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   <div className="bg-[#001D3D] p-5 rounded-xl border border-[#003566]">
+                     <label className={labelStyle}>Holy Spirit Baptised?</label>
+                     <select value={formData.spiritBaptism} onChange={e => setFormData({...formData, spiritBaptism: e.target.value})} className={inputStyle}>
+                       <option value="No">No</option><option value="Yes">Yes</option>
+                     </select>
+                     {formData.spiritBaptism === 'Yes' && (
+                       <div className="animate-fade-in mt-4 space-y-4">
+                         <div>
+                           <label className={labelStyle}>Spiritual Gift(s)</label>
+                           <input type="text" placeholder="e.g. Tongues, Prophecy" value={formData.spiritGift} onChange={e => setFormData({...formData, spiritGift: e.target.value})} className={inputStyle} />
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   <div className="bg-[#001D3D] p-5 rounded-xl border border-[#003566]">
+                     <label className={labelStyle}>Child Dedicated? (Under 13)</label>
+                     <select value={formData.isDedicated} onChange={e => setFormData({...formData, isDedicated: e.target.value})} className={inputStyle}>
+                       <option value="No">No</option><option value="Yes">Yes</option>
+                     </select>
+                     {formData.isDedicated === 'Yes' && (
+                       <div className="animate-fade-in mt-4 space-y-4">
+                         <div>
+                           <label className={labelStyle}>Date Dedicated</label>
+                           <input type="date" value={formData.dateDedicated} onChange={e => setFormData({...formData, dateDedicated: e.target.value})} className={inputStyle} />
+                         </div>
+                         <div>
+                           <label className={labelStyle}>Dedicated By (Minister)</label>
+                           <input type="text" placeholder="e.g. Pastor John Doe" value={formData.dedicatedBy} onChange={e => setFormData({...formData, dedicatedBy: e.target.value})} className={inputStyle} />
+                         </div>
+                       </div>
+                     )}
+                   </div>
+                </div>
+
+                {/* 5. REMARKS */}
+                <div className="pt-2 border-t border-[#003566] mt-6">
+                  <label className={labelStyle}>Administrative Remarks</label>
+                  <textarea rows="3" placeholder="Any additional pastoral or administrative notes regarding this member..." value={formData.remarks} onChange={e => setFormData({...formData, remarks: e.target.value})} className={`${inputStyle} resize-none`} />
+                </div>
+
+                <div className="pt-4 border-t border-[#003566] mt-6">
                   <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-3.5 bg-[#FFC300] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-[#FFD60A] transition-all flex justify-center items-center gap-2">
-                    {isSubmitting ? <Loader2 className="animate-spin" /> : <><Save size={16}/> {editingId ? 'Update District Record' : 'Save Record'}</>}
+                    {isSubmitting ? <Loader2 className="animate-spin" size={14}/> : <><Save size={14}/> {editingId ? 'Update District Record' : 'Save Record'}</>}
                   </button>
                 </div>
               </form>
@@ -648,16 +747,20 @@ export default function Directory() {
                             </div>
                           </td>
                           <td className="p-5">
-                            <div className="font-mono font-bold text-[#FFC300] mb-2">{m.phone}</div>
+                            <div className="font-mono font-bold text-[#FFC300] mb-2">{m.phone || 'No Contact'}</div>
                             <div className="flex gap-2">
-                              <a href={`https://wa.me/${m.phone?.startsWith('0') ? '233' + m.phone.substring(1) : m.phone}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-all shadow-sm">
-                                <MessageCircle size={14} />
-                              </a>
-                              <a href={`tel:${m.phone}`} className="p-2 bg-[#001D3D] border border-[#003566] text-white rounded-lg hover:bg-[#003566] transition-all shadow-sm">
-                                <PhoneCall size={14} />
-                              </a>
-                              {isTier1 && (
-                                <button onClick={() => handleSendDirectSMS(m)} className={`p-2 rounded-lg transition-all shadow-sm relative group/btn border ${isOffline ? 'bg-[#000814] border-[#003566] text-white/30 cursor-not-allowed' : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:text-white'}`}>
+                              {m.phone && (
+                                <>
+                                  <a href={`https://wa.me/${m.phone?.startsWith('0') ? '233' + m.phone.substring(1) : m.phone}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-all shadow-sm">
+                                    <MessageCircle size={14} />
+                                  </a>
+                                  <a href={`tel:${m.phone}`} className="p-2 bg-[#001D3D] border border-[#003566] text-white rounded-lg hover:bg-[#003566] transition-all shadow-sm">
+                                    <PhoneCall size={14} />
+                                  </a>
+                                </>
+                              )}
+                              {isTier1 && m.phone && (
+                                <button onClick={() => triggerSMS(m)} className={`p-2 rounded-lg transition-all shadow-sm relative group/btn border ${isOffline ? 'bg-[#000814] border-[#003566] text-white/30 cursor-not-allowed' : 'bg-blue-500/10 border-blue-500/30 text-blue-400 hover:bg-blue-500/20 hover:text-white'}`}>
                                   <MessageSquare size={14} />
                                   {!isOffline && <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-[#FFC300] rounded-full flex items-center justify-center border border-[#000814] shadow-sm"><Shield size={6} className="text-[#000814]" /></div>}
                                 </button>
@@ -721,7 +824,7 @@ export default function Directory() {
                     <input type="text" placeholder="e.g. Dedicated at Central Assembly" value={certFormData.notes} onChange={e => setCertFormData({...certFormData, notes: e.target.value})} className={inputStyle} />
                   </div>
                   <div className="md:col-span-2 lg:col-span-3 flex justify-end mt-2">
-                    <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-8 py-3 bg-[#FFC300] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-[#FFD60A] transition-all flex justify-center items-center gap-2">
+                    <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-3.5 bg-[#FFC300] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-[#FFD60A] transition-all flex justify-center items-center gap-2">
                       {isSubmitting ? <Loader2 className="animate-spin" size={14}/> : <><Save size={14}/> Log Certificate</>}
                     </button>
                   </div>

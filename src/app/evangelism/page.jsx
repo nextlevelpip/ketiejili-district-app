@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Flame, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Save, Filter, MapPin, CalendarDays, Users, Megaphone, Droplet, Wind, Target, FileSpreadsheet } from 'lucide-react';
+import { Flame, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Save, Filter, MapPin, CalendarDays, Users, Megaphone, Target, FileSpreadsheet, Info } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 
@@ -14,6 +14,9 @@ export default function EvangelismAndSouls() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- CUSTOM MODAL STATE ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, location: '' });
 
   // --- FORM STATES ---
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -33,10 +36,14 @@ export default function EvangelismAndSouls() {
   const [fAssembly, setFAssembly] = useState('All Assemblies');
   const [fDemographic, setFDemographic] = useState('All Categories');
 
+  // ALIGNED WITH HEADQUARTERS CATEGORIES
   const outreachTypes = [
-    "House to House", "Mass Rally / Crusade", "Street Evangelism", "Dawn Broadcast", 
-    "Hospital / Healing Ministry", "Prison Ministry", "Digital / Media Outreach", 
-    "Schools / Campus Outreach", "Tract Distribution", "Personal Evangelism"
+    "Crusades", 
+    "Rallies & Campaigns", 
+    "House-to-House Outreach", 
+    "Traditional Ministries Outreaches", 
+    "HUM, MPWDs & Specialized Ministries", 
+    "Other Organized Evangelistic Activities"
   ];
 
   const pentChmsDemographics = [
@@ -122,13 +129,20 @@ export default function EvangelismAndSouls() {
     }
   };
 
-  const handleDeleteLog = async (id, loc) => {
+  // --- REPLACED BROWSER POPUP WITH CUSTOM MODAL ---
+  const triggerDelete = (id, location) => {
     if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
-    if (window.confirm(`Delete the outreach record for ${loc}?`)) {
-      try {
-        await deleteDoc(doc(db, 'evangelism_logs', id));
-        showNotification('success', 'Outreach log purged.');
-      } catch (err) { showNotification('error', 'Purge Failed.'); }
+    setDeleteModal({ isOpen: true, id, location });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteDoc(doc(db, 'evangelism_logs', deleteModal.id));
+      showNotification('success', 'Outreach log successfully purged.');
+    } catch (err) { 
+      showNotification('error', 'Purge Failed.'); 
+    } finally {
+      setDeleteModal({ isOpen: false, id: null, location: '' });
     }
   };
 
@@ -152,19 +166,49 @@ export default function EvangelismAndSouls() {
   const totalGospelSunday = filteredLogs.reduce((sum, log) => sum + (log.gospelSundaySouls || 0), 0);
   const totalChildren = filteredLogs.reduce((sum, log) => sum + (log.childrenWon || 0), 0);
   
-  // NEW: Calculate the Grand Total of all souls combined
   const totalAllSouls = totalAdultCop + totalOtherNonCop + totalGospelSunday + totalChildren;
 
   // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
   const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
-  const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
+  const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-1.5 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
-      <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
+      <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
+        {/* CUSTOM DELETE MODAL OVERLAY */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Purge Record</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to permanently delete the outreach log for <span className="text-white">{deleteModal.location}</span>?
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setDeleteModal({ isOpen: false, id: null, location: '' })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -212,9 +256,22 @@ export default function EvangelismAndSouls() {
             <div className="bg-[#000814] p-6 md:p-10 rounded-2xl shadow-xl border border-[#003566] max-w-5xl mx-auto relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFC300] to-[#FCA311]"></div>
               
-              <div className="mb-6 border-b border-[#003566] pb-4">
-                <h2 className="text-sm font-black uppercase tracking-widest text-white">Record Evangelism Event</h2>
-                <p className="text-[9px] font-bold text-[#FFC300] uppercase tracking-widest mt-1.5">Inputs are strictly aligned with the Headquarters portal.</p>
+              <div className="mb-6 border-b border-[#003566] pb-4 flex justify-between items-start flex-wrap gap-4">
+                <div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-white">Record Evangelism Event</h2>
+                  <p className="text-[9px] font-bold text-[#FFC300] uppercase tracking-widest mt-1.5">Inputs are strictly aligned with the Headquarters portal.</p>
+                </div>
+              </div>
+
+              {/* HEADQUARTERS COUNTING RULE BANNER */}
+              <div className="bg-[#001D3D] border border-[#003566] p-4 rounded-xl mb-6 flex items-start gap-3">
+                <Info size={16} className="text-[#FFC300] shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mb-1">Counting Rule Notice</h4>
+                  <p className="text-[10px] font-bold text-white/70 leading-relaxed uppercase tracking-widest">
+                    If a particular outreach is held for two or three continuous days, it should be counted as two or three separate events — not as one event.
+                  </p>
+                </div>
               </div>
 
               <form onSubmit={handleSave} className="space-y-6">
@@ -228,16 +285,35 @@ export default function EvangelismAndSouls() {
                 <div><label className={labelStyle}>Specific Location / Community *</label><input required type="text" placeholder="e.g. Katanga Market Square" value={location} onChange={e => setLocation(e.target.value)} className={inputStyle} /></div>
 
                 <div className="bg-[#001D3D] p-6 rounded-xl border border-[#003566]">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mb-4 flex items-center gap-2"><Target size={14}/> Souls Won Breakdown</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className={labelStyle}>Adult Souls Won (COP)</label><input type="number" min="0" placeholder="0" value={adultSoulsCop} onChange={e => setAdultSoulsCop(e.target.value)} className={inputStyle} /></div>
-                    <div><label className={labelStyle}>Other Souls Won (Non-COP)</label><input type="number" min="0" placeholder="0" value={otherSoulsNonCop} onChange={e => setOtherSoulsNonCop(e.target.value)} className={inputStyle} /></div>
-                    <div><label className={labelStyle}>Gospel Sunday Souls</label><input type="number" min="0" placeholder="0" value={gospelSundaySouls} onChange={e => setGospelSundaySouls(e.target.value)} className={inputStyle} /></div>
-                    <div><label className={labelStyle}>Children Won And Retained</label><input type="number" min="0" placeholder="0" value={childrenWon} onChange={e => setChildrenWon(e.target.value)} className={inputStyle} /></div>
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-[#FFC300] mb-5 flex items-center gap-2"><Target size={14}/> Souls Won Breakdown</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-8">
+                    <div>
+                      <label className={labelStyle}>Adult Souls Won (COP)</label>
+                      <input type="number" min="0" placeholder="0" value={adultSoulsCop} onChange={e => setAdultSoulsCop(e.target.value)} className={inputStyle} />
+                      <p className="text-[8px] font-bold text-white/40 mt-2 uppercase tracking-widest leading-relaxed">Souls won who accepted Christ and decided to fellowship with the local assembly from outreach programs.</p>
+                    </div>
+                    
+                    <div>
+                      <label className={labelStyle}>Other Souls Won (Non-COP)</label>
+                      <input type="number" min="0" placeholder="0" value={otherSoulsNonCop} onChange={e => setOtherSoulsNonCop(e.target.value)} className={inputStyle} />
+                      <p className="text-[8px] font-bold text-white/40 mt-2 uppercase tracking-widest leading-relaxed">Souls won who accepted Christ but opted to fellowship with other denominations.</p>
+                    </div>
+                    
+                    <div className="md:col-span-2">
+                      <label className={labelStyle}>Gospel Sunday Souls</label>
+                      <input type="number" min="0" placeholder="0" value={gospelSundaySouls} onChange={e => setGospelSundaySouls(e.target.value)} className={inputStyle} />
+                      <p className="text-[8px] font-bold text-white/40 mt-2 uppercase tracking-widest leading-relaxed">Observed on the last Sunday of every month. All adult souls and children won for Christ during the Gospel Sunday morning through any form of outreach are recorded here.</p>
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className={labelStyle}>Children Won And Retained</label>
+                      <input type="number" min="0" placeholder="0" value={childrenWon} onChange={e => setChildrenWon(e.target.value)} className={inputStyle} />
+                    </div>
                   </div>
                 </div>
 
-                <div><label className={labelStyle}>Testimonies & Notes</label><textarea rows="3" placeholder="Any notable miracles?" value={testimonies} onChange={e => setTestimonies(e.target.value)} className={inputStyle} /></div>
+                <div><label className={labelStyle}>Testimonies & Notes</label><textarea rows="3" placeholder="Any notable miracles or occurrences?" value={testimonies} onChange={e => setTestimonies(e.target.value)} className={inputStyle} /></div>
 
                 <div className="pt-4 border-t border-[#003566] flex justify-end">
                   <button type="submit" disabled={isSubmitting} className="w-full md:w-auto px-10 py-3.5 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all flex justify-center items-center gap-2 disabled:opacity-50">
@@ -256,7 +332,7 @@ export default function EvangelismAndSouls() {
                   <h2 className="text-[10px] font-black text-white uppercase tracking-widest">Auto-Generated Report</h2>
                 </div>
                 
-                {/* NEW 5-COLUMN TOTALS ROW */}
+                {/* 5-COLUMN TOTALS ROW */}
                 <div className="p-6 max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-4">
                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Programs</p><p className="text-base font-black text-white mt-1">{totalPrograms}</p></div>
                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Adult COP</p><p className="text-base font-black text-white mt-1">{totalAdultCop}</p></div>
@@ -282,7 +358,7 @@ export default function EvangelismAndSouls() {
                         <td className="p-5 font-black text-white text-xs">{log.location}<br/><span className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1">{log.outreachType}</span></td>
                         <td className="p-5 font-bold text-white/70">{log.targetDemographic}</td>
                         <td className="p-5 text-center font-black text-sm text-emerald-400">{log.totalSoulsWon || 0}</td>
-                        {isTier1 && <td className="p-5 text-center"><button onClick={() => handleDeleteLog(log.id, log.location)} className="p-2 text-white/30 hover:text-red-400"><Trash2 size={14}/></button></td>}
+                        {isTier1 && <td className="p-5 text-center"><button onClick={() => triggerDelete(log.id, log.location)} className="p-2 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"><Trash2 size={14}/></button></td>}
                       </tr>
                     ))}
                     {filteredLogs.length === 0 && <tr><td colSpan={isTier1 ? "5" : "4"} className="p-10 text-center text-white/50 font-bold italic text-xs">No outreach records found.</td></tr>}
