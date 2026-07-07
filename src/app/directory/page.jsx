@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter, Send } from 'lucide-react';
+import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter, Send, Mic, UploadCloud } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -19,7 +19,7 @@ export default function Directory() {
 
   // --- CUSTOM MODAL STATES ---
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, name: '', type: '' });
-  const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '' });
+  const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
 
   // --- FORM STATES ---
   const [editingId, setEditingId] = useState(null);
@@ -55,6 +55,7 @@ export default function Directory() {
   const [fDemo, setFDemo] = useState('All Ages');
 
   const churchRoles = ["New Convert", "Member", "Leader", "Local Secretary", "Deacon", "Deaconess", "Elder", "Presiding Brother", "Presiding Deacon", "Presiding Elder", "District Minister", "District Minister's Wife"];
+  const filterRolesOptions = ["All Roles", "Officers", "Presiding", ...churchRoles]; // Includes Macro-Categories
   const statuses = ["Active Member", "MFS", "Backslidden", "Transferred", "Deceased", "Pending"];
   const certTypes = ["Baptism Certificate", "Child Dedication Certificate", "Marriage Certificate"];
   const disabilityTypes = ["Visually Impaired", "Deaf/Hard of Hearing", "Speech Impairment", "Physical/Mobility Impaired", "Autism Spectrum", "Albinism", "Epilepsy", "Cerebral Palsy", "Mental Health Condition", "Multiple Disabilities", "Other"];
@@ -252,29 +253,42 @@ export default function Directory() {
       return showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
     }
     const defaultMsg = `Praise the Lord ${String(member.name).split(' ')[0]}! We pray this message finds you well. God bless you! - COP Ketiejili District`;
-    setSmsModal({ isOpen: true, member, message: defaultMsg });
+    setSmsModal({ isOpen: true, member, message: defaultMsg, mode: 'text', audioFile: null });
+  };
+
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5000000) { 
+        return showNotification('error', 'Audio file must be under 5MB.');
+      }
+      setSmsModal({ ...smsModal, audioFile: file });
+    }
   };
 
   const confirmSendSMS = async () => {
-    const { member, message } = smsModal;
-    if (!message.trim()) return showNotification('error', 'Message cannot be empty.');
+    const { member, message, mode, audioFile } = smsModal;
     
-    setSmsModal({ isOpen: false, member: null, message: '' });
+    if (mode === 'text' && !message.trim()) return showNotification('error', 'Message cannot be empty.');
+    if (mode === 'voice' && !audioFile) return showNotification('error', 'Please upload a valid audio file.');
+
+    setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
     
     let formattedPhone = String(member.phone || '').replace(/\D/g, '');
     if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
 
     try {
-      showNotification('success', 'Transmitting message to network...');
+      showNotification('success', `Transmitting ${mode === 'voice' ? 'Voice Broadcast' : 'Text Message'} to network...`);
+      // NOTE: For Voice, you would send FormData containing the audio file. For now we mock the API response.
       const response = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, recipients: [formattedPhone] })
+        body: JSON.stringify({ message: message, recipients: [formattedPhone], type: mode })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'API Connection Failed');
-      showNotification('success', `Official SMS delivered to ${member.name}!`);
+      showNotification('success', `Official Broadcast delivered to ${member.name}!`);
     } catch (err) {
       showNotification('error', `Transmission Failed: ${err.message}`);
     }
@@ -305,11 +319,21 @@ export default function Directory() {
     finally { setIsSubmitting(false); }
   };
 
+  // --- SMART HIERARCHICAL FILTER ENGINE ---
   const filtered = members.filter(m => {
     const age = calculateAge(m.dob);
     const matchesSearch = String(m.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(m.phone || '').includes(searchTerm);
     const matchesAssem = fAssem === 'All Assemblies' || m.localAssembly === fAssem;
-    const matchesRole = fRole === 'All Roles' || m.churchRole === fRole;
+    
+    // Macro-Category Role Logic
+    let matchesRole = false;
+    const presidingRoles = ["Presiding Brother", "Presiding Deacon", "Presiding Elder"];
+    const officerRoles = ["Elder", "Deacon", "Deaconess", ...presidingRoles];
+
+    if (fRole === 'All Roles') matchesRole = true;
+    else if (fRole === 'Officers') matchesRole = officerRoles.includes(m.churchRole);
+    else if (fRole === 'Presiding') matchesRole = presidingRoles.includes(m.churchRole);
+    else matchesRole = m.churchRole === fRole;
     
     const rawStatus = m.membershipStatus || m.memberStatus || 'Active Member';
     const normalizedStatus = rawStatus === 'Active' ? 'Active Member' : rawStatus;
@@ -326,7 +350,8 @@ export default function Directory() {
 
   const filteredCerts = certificates.filter(c => String(c.memberName || '').toLowerCase().includes(searchTerm.toLowerCase()) || String(c.certificateNumber || '').toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN COLOR FIX
+  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const labelStyle = "text-[9px] font-black text-white/50 uppercase ml-1 mb-2 block tracking-widest";
 
   return (
@@ -364,25 +389,57 @@ export default function Directory() {
           </div>
         )}
 
-        {/* CUSTOM SMS PROMPT MODAL OVERLAY */}
+        {/* CUSTOM OMNI-CHANNEL BROADCAST MODAL OVERLAY */}
         {smsModal.isOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
-              <div className="p-6 border-b border-[#003566]">
-                <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><MessageSquare size={16}/> Dispatch SMS</h3>
-                <p className="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-widest">To: <span className="text-white">{smsModal.member?.name}</span> ({smsModal.member?.phone})</p>
+              <div className="p-6 border-b border-[#003566] flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><MessageSquare size={16}/> Dispatch Broadcast</h3>
+                  <p className="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-widest">To: <span className="text-white">{smsModal.member?.name}</span> ({smsModal.member?.phone})</p>
+                </div>
+                {/* Broadcast Toggle Switch */}
+                <div className="flex bg-[#000814] p-1 rounded-lg border border-[#003566]">
+                   <button 
+                     onClick={() => setSmsModal({ ...smsModal, mode: 'text' })} 
+                     className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all ${smsModal.mode === 'text' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}
+                   >
+                     Text
+                   </button>
+                   <button 
+                     onClick={() => setSmsModal({ ...smsModal, mode: 'voice' })} 
+                     className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${smsModal.mode === 'voice' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}
+                   >
+                     <Mic size={10} /> Voice
+                   </button>
+                </div>
               </div>
+              
               <div className="p-6">
-                <textarea 
-                  rows="4" 
-                  value={smsModal.message} 
-                  onChange={(e) => setSmsModal({ ...smsModal, message: e.target.value })}
-                  className="w-full p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-bold text-white outline-none focus:border-[#FFC300] transition-all resize-none shadow-inner leading-relaxed"
-                />
+                {smsModal.mode === 'text' ? (
+                  <textarea 
+                    rows="4" 
+                    value={smsModal.message} 
+                    onChange={(e) => setSmsModal({ ...smsModal, message: e.target.value })}
+                    className="w-full p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-bold text-white outline-none focus:border-[#FFC300] transition-all resize-none shadow-inner leading-relaxed"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center bg-[#000814] border border-[#003566] border-dashed p-8 rounded-xl relative group hover:border-[#FFC300]/50 transition-colors">
+                    <Mic size={32} className={`${smsModal.audioFile ? 'text-[#FFC300]' : 'text-white/20'} mb-3`} />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-white mb-1">
+                      {smsModal.audioFile ? 'Audio File Attached' : 'Upload Voice Broadcast'}
+                    </h4>
+                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest text-center">
+                      {smsModal.audioFile ? smsModal.audioFile.name : 'MP3 or WAV files only (Max 5MB)'}
+                    </p>
+                    <input type="file" accept="audio/mp3, audio/wav" onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </div>
+                )}
               </div>
+
               <div className="flex border-t border-[#003566]">
                 <button 
-                  onClick={() => setSmsModal({ isOpen: false, member: null, message: '' })}
+                  onClick={() => setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null })}
                   className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
                 >
                   Cancel
@@ -687,16 +744,18 @@ export default function Directory() {
                 <div className="flex flex-wrap gap-3">
                   <div className="flex items-center gap-2 bg-[#001D3D] px-3 py-1 rounded-xl border border-[#003566]">
                     <Filter size={14} className="text-[#FFC300] shrink-0" />
-                    <select value={fAssem} onChange={e => setFAssem(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814]"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
+                    <select value={fAssem} onChange={e => setFAssem(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
                   </div>
                   <div className="flex items-center gap-2 bg-[#001D3D] px-3 py-1 rounded-xl border border-[#003566]">
-                    <select value={fRole} onChange={e => setFRole(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814]"><option value="All Roles">All Roles</option>{churchRoles.map(r => <option key={r} value={r}>{r}</option>)}</select>
+                    <select value={fRole} onChange={e => setFRole(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white">
+                      {filterRolesOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                    </select>
                   </div>
                   <div className="flex items-center gap-2 bg-[#001D3D] px-3 py-1 rounded-xl border border-[#003566]">
-                    <select value={fStatus} onChange={e => setFStatus(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814]"><option value="All Statuses">All Statuses</option>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
+                    <select value={fStatus} onChange={e => setFStatus(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white"><option value="All Statuses">All Statuses</option>{statuses.map(s => <option key={s} value={s}>{s}</option>)}</select>
                   </div>
                   <div className="flex items-center gap-2 bg-[#001D3D] px-3 py-1 rounded-xl border border-[#003566]">
-                    <select value={fDemo} onChange={e => setFDemo(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814]">
+                    <select value={fDemo} onChange={e => setFDemo(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white">
                       <option value="All Ages">All Ages</option>
                       <option value="< 13">Children (&lt; 13)</option>
                       <option value="13 - 19">Teens (13 - 19)</option>

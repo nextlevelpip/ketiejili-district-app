@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle, MapPin, Home, History, Trash2, Filter, CalendarDays, WifiOff } from 'lucide-react';
+import { CalendarCheck, Save, Search, CheckCircle2, XCircle, AlertCircle, BarChart3, ClipboardCheck, AlertCircle as AlertIcon, Loader2, Users, PhoneCall, MessageSquare, MessageCircle, MapPin, Home, History, Trash2, Filter, CalendarDays, WifiOff, Send, Mic, X } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc } from 'firebase/firestore';
 
@@ -14,8 +14,12 @@ export default function Attendance() {
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [currentUser, setCurrentUser] = useState(null);
 
-  // --- NETWORK AWARENESS STATE (RESTORED) ---
+  // --- NETWORK AWARENESS STATE ---
   const [isOffline, setIsOffline] = useState(false);
+
+  // --- CUSTOM MODAL STATES (REPLACING NATIVE ALERTS) ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null });
+  const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
 
   // --- MASTER TOGGLE ---
   const [meetingFormat, setMeetingFormat] = useState('Church House'); // 'Church House' | 'Home Cell'
@@ -49,7 +53,6 @@ export default function Attendance() {
   const [historyDateTo, setHistoryDateTo] = useState('');
 
   useEffect(() => {
-    // RESTORED: Network Event Listeners
     const handleOnline = () => setIsOffline(false);
     const handleOffline = () => setIsOffline(true);
     
@@ -99,7 +102,6 @@ export default function Attendance() {
     ];
   };
 
-  // Auto-reset service type when format changes
   useEffect(() => {
     const defaultService = meetingFormat === 'Home Cell' ? 'Monday Cell Meeting' : 'Sunday Service';
     setServiceType(defaultService);
@@ -193,45 +195,63 @@ export default function Attendance() {
     }
   };
 
-  const handleDeleteLog = async (id) => {
+  // --- REPLACED BROWSER POPUPS WITH CUSTOM MODALS ---
+  const triggerDelete = (id) => {
     if (!isTier1) return showNotification('error', 'Requires Tier 1 Clearance to delete records.');
-    if (window.confirm("Permanently delete this attendance record? This will alter analytics.")) {
-      try {
-        await deleteDoc(doc(db, 'attendance_logs', id));
-        showNotification('success', 'Attendance record purged.');
-      } catch (err) {
-        showNotification('error', 'Failed to delete record.');
-      }
+    setDeleteModal({ isOpen: true, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteDoc(doc(db, 'attendance_logs', deleteModal.id));
+      showNotification('success', 'Attendance record purged.');
+    } catch (err) {
+      showNotification('error', 'Failed to delete record.');
+    } finally {
+      setDeleteModal({ isOpen: false, id: null });
     }
   };
 
-  const handleSendDirectSMS = async (member, serviceType) => {
+  const triggerSMS = (member, serviceType) => {
     if (isOffline) {
-      showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
-      return;
+      return showNotification('error', 'SMS Gateway Offline: Connect to network to transmit.');
     }
-    
     const defaultMsg = `Praise the Lord ${String(member.name).split(' ')[0]}! We missed you at ${serviceType === 'All Services' ? 'church' : serviceType} recently. We pray all is well with you. God bless you! - Ketiejili District`;
-    const message = window.prompt(`[TIER 1] Send Official SMS to ${member.name}:`, defaultMsg);
-    
-    if (!message) return;
+    setSmsModal({ isOpen: true, member, message: defaultMsg, mode: 'text', audioFile: null });
+  };
 
-    let formattedPhone = String(member.phone || '').replace(/\D/g, '');
-    if (!formattedPhone) {
-      showNotification('error', 'Member does not have a valid phone number.'); return;
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5000000) { 
+        return showNotification('error', 'Audio file must be under 5MB.');
+      }
+      setSmsModal({ ...smsModal, audioFile: file });
     }
+  };
+
+  const confirmSendSMS = async () => {
+    const { member, message, mode, audioFile } = smsModal;
+    
+    if (mode === 'text' && !message.trim()) return showNotification('error', 'Message cannot be empty.');
+    if (mode === 'voice' && !audioFile) return showNotification('error', 'Please upload a valid audio file.');
+
+    setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
+    
+    let formattedPhone = String(member.phone || '').replace(/\D/g, '');
+    if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
     if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
 
     try {
-      showNotification('success', 'Transmitting message to network...');
+      showNotification('success', `Transmitting ${mode === 'voice' ? 'Voice Broadcast' : 'Text Message'} to network...`);
       const response = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, recipients: [formattedPhone] })
+        body: JSON.stringify({ message: message, recipients: [formattedPhone], type: mode })
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'API Connection Failed');
-      showNotification('success', `Official SMS delivered to ${member.name}!`);
+      showNotification('success', `Official Broadcast delivered to ${member.name}!`);
     } catch (err) {
       showNotification('error', `Transmission Failed: ${err.message}`);
     }
@@ -282,8 +302,8 @@ export default function Attendance() {
     return matchesSearch && matchesAssembly && matchesService && matchesDate;
   });
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN COLOR FIX
+  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white [&>optgroup>option]:bg-[#001D3D] [&>optgroup>option]:text-white";
   const labelStyle = "text-[9px] font-black text-white/50 uppercase ml-1 mb-2 block tracking-widest";
 
   const getFaithfulness = (memberId) => {
@@ -309,6 +329,113 @@ export default function Attendance() {
   return (
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
+        
+        {/* CUSTOM DELETE MODAL OVERLAY */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">System Purge</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to permanently delete this attendance record? This will alter analytics.
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setDeleteModal({ isOpen: false, id: null })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* CUSTOM OMNI-CHANNEL BROADCAST MODAL OVERLAY */}
+        {smsModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-[#003566] flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><MessageSquare size={16}/> Dispatch Broadcast</h3>
+                  <p className="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-widest">To: <span className="text-white">{smsModal.member?.name}</span> ({smsModal.member?.phone})</p>
+                </div>
+                {/* Broadcast Toggle Switch */}
+                <div className="flex bg-[#000814] p-1 rounded-lg border border-[#003566]">
+                   <button 
+                     onClick={() => setSmsModal({ ...smsModal, mode: 'text' })} 
+                     className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all ${smsModal.mode === 'text' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}
+                   >
+                     Text
+                   </button>
+                   <button 
+                     onClick={() => setSmsModal({ ...smsModal, mode: 'voice' })} 
+                     className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${smsModal.mode === 'voice' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}
+                   >
+                     <Mic size={10} /> Voice
+                   </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {smsModal.mode === 'text' ? (
+                  <textarea 
+                    rows="4" 
+                    value={smsModal.message} 
+                    onChange={(e) => setSmsModal({ ...smsModal, message: e.target.value })}
+                    className="w-full p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-bold text-white outline-none focus:border-[#FFC300] transition-all resize-none shadow-inner leading-relaxed"
+                  />
+                ) : (
+                  <div className="w-full flex-1 min-h-[150px] flex flex-col items-center justify-center bg-[#000814] border border-[#003566] border-dashed rounded-xl relative group hover:border-[#FFC300]/50 transition-colors p-6">
+                    <Mic size={32} className={`${smsModal.audioFile ? 'text-[#FFC300]' : 'text-white/20'} mb-3`} />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-white mb-2">
+                      {smsModal.audioFile ? 'Audio File Attached' : 'Upload Voice Broadcast'}
+                    </h4>
+                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest text-center">
+                      {smsModal.audioFile ? smsModal.audioFile.name : 'MP3 or WAV files only (Max 5MB)'}
+                    </p>
+                    {smsModal.audioFile && (
+                      <button 
+                        type="button" 
+                        onClick={(e) => { e.preventDefault(); setSmsModal({ ...smsModal, audioFile: null }); }} 
+                        className="mt-4 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center gap-1 z-20 relative"
+                      >
+                        <X size={12} /> Remove File
+                      </button>
+                    )}
+                    <input type="file" accept="audio/mp3, audio/wav" onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="" />
+                  </div>
+                )}
+              </div>
+
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmSendSMS}
+                  className="flex-1 py-4 text-[10px] font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  <Send size={14} /> Send Now
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -487,7 +614,6 @@ export default function Attendance() {
               <div className="p-5 border-b border-[#003566] bg-[#001D3D] flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h3 className="font-black text-[#FFC300] uppercase tracking-widest text-[10px] flex items-center gap-2"><History size={14}/> Service Ledger</h3>
                 
-                {/* INJECTED MULTI-LAYER FILTER ENGINE */}
                 <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 w-full md:w-auto">
                   <div className="col-span-2 md:col-span-1 relative flex-1 min-w-[200px]">
                     <Search className="absolute left-3 top-2.5 text-white/30" size={14}/>
@@ -495,13 +621,13 @@ export default function Attendance() {
                   </div>
                   <div className="flex items-center gap-2 bg-[#000814] px-2 py-0.5 rounded-lg border border-[#003566]">
                     <Filter size={12} className="text-[#FFC300] shrink-0" />
-                    <select value={historyFilterAssembly} onChange={e => setHistoryFilterAssembly(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814] w-full">
+                    <select value={historyFilterAssembly} onChange={e => setHistoryFilterAssembly(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white w-full">
                       <option value="All Assemblies">All Assemblies</option>
                       {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
                     </select>
                   </div>
                   <div className="flex items-center gap-2 bg-[#000814] px-2 py-0.5 rounded-lg border border-[#003566]">
-                    <select value={historyFilterService} onChange={e => setHistoryFilterService(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:text-[#000814] w-full">
+                    <select value={historyFilterService} onChange={e => setHistoryFilterService(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white w-full">
                       <option value="All Services">All Services</option>
                       {uniqueServiceTypes.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
@@ -544,7 +670,9 @@ export default function Attendance() {
                         <td className="p-4 text-center font-black text-emerald-400 text-sm">{log.presentCount}</td>
                         <td className="p-4 text-center font-black text-red-400 text-sm">{log.absentCount}</td>
                         <td className="p-4 text-center">
-                          <button onClick={() => handleDeleteLog(log.id)} className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                          {isTier1 && (
+                            <button onClick={() => triggerDelete(log.id)} className="p-1.5 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -633,9 +761,9 @@ export default function Attendance() {
                             
                             {isTier1 && (
                               <button 
-                                onClick={() => handleSendDirectSMS(member, reportService)}
+                                onClick={() => triggerSMS(member, reportService)}
                                 className="p-2 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/20 transition-all shadow-sm" 
-                                title="Send Official API SMS"
+                                title="Send Official Broadcast"
                               >
                                 <MessageSquare size={14} />
                               </button>
@@ -670,7 +798,7 @@ export default function Attendance() {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#003566] pb-5">
                 <h2 className="text-sm font-black text-white flex items-center gap-2 drop-shadow-md uppercase tracking-widest"><BarChart3 size={16} className="text-[#FFC300]" /> District Health Overview</h2>
                 <div className="w-full md:w-auto">
-                  <select value={analyticsAssembly} onChange={e => setAnalyticsAssembly(e.target.value)} className="w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none text-white shadow-sm [&>option]:text-[#000814]">
+                  <select value={analyticsAssembly} onChange={e => setAnalyticsAssembly(e.target.value)} className="w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none text-white shadow-sm [&>option]:bg-[#001D3D] [&>option]:text-white">
                     <option value="All Assemblies">District (All Assemblies)</option>
                     {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
@@ -700,7 +828,7 @@ export default function Attendance() {
               <div className="mt-8 pt-5 border-t border-[#003566]">
                 <div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3">
                   <h3 className="text-[11px] font-black text-white flex items-center gap-2 drop-shadow-md uppercase tracking-widest">Faithfulness Tracker</h3>
-                  <select value={analyticsServiceType} onChange={e => setAnalyticsServiceType(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[9px] uppercase tracking-widest outline-none text-white shadow-sm [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]">
+                  <select value={analyticsServiceType} onChange={e => setAnalyticsServiceType(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[9px] uppercase tracking-widest outline-none text-white shadow-sm [&>option]:bg-[#001D3D] [&>option]:text-white [&>optgroup>option]:bg-[#001D3D] [&>optgroup>option]:text-white">
                     <option value="All Services">All Services</option>
                     <optgroup label="Church House">
                        <option value="Sunday Service">Sunday Service</option>

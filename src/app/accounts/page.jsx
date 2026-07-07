@@ -17,6 +17,11 @@ export default function UserAccounts() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(null); 
 
+  // --- CUSTOM MODAL STATES (REPLACING NATIVE ALERTS) ---
+  const [resetModal, setResetModal] = useState({ isOpen: false, id: null, userName: '' });
+  const [revokeModal, setRevokeModal] = useState({ isOpen: false, id: null, userName: '', role: '' });
+  const [smsModal, setSmsModal] = useState({ isOpen: false, user: null });
+
   // --- NEW USER STATES ---
   const [selectedMemberId, setSelectedMemberId] = useState('');
   const [accessRole, setAccessRole] = useState('');
@@ -130,12 +135,12 @@ export default function UserAccounts() {
     }
   };
 
-  const handleResetDevice = async (id, userName) => {
-    if (!window.confirm(`Reset device lock for ${userName}? They will need a new Setup Code to log in.`)) return;
-    
+  // --- CUSTOM MODAL HANDLERS ---
+  const triggerReset = (id, userName) => setResetModal({ isOpen: true, id, userName });
+  const confirmReset = async () => {
     const newSetupCode = Math.floor(100000 + Math.random() * 900000).toString();
     try {
-      await updateDoc(doc(db, 'users', id), {
+      await updateDoc(doc(db, 'users', resetModal.id), {
         authorizedDevice: null,
         localPin: null,
         setupCode: newSetupCode
@@ -143,38 +148,35 @@ export default function UserAccounts() {
       showNotification('success', `Device Reset. New Setup Code: ${newSetupCode}`);
     } catch (error) {
       showNotification('error', 'Failed to reset device.');
+    } finally {
+      setResetModal({ isOpen: false, id: null, userName: '' });
     }
   };
 
-  const handleRevokeAccess = async (id, name, role) => {
-    if (role === 'District Minister' && systemUsers.filter(u => u.role === 'District Minister').length <= 1) {
+  const triggerRevoke = (id, name, role) => setRevokeModal({ isOpen: true, id, userName: name, role });
+  const confirmRevoke = async () => {
+    if (revokeModal.role === 'District Minister' && systemUsers.filter(u => u.role === 'District Minister').length <= 1) {
       showNotification('error', 'SYSTEM HALTED: Cannot delete the final District Minister account.');
+      setRevokeModal({ isOpen: false, id: null, userName: '', role: '' });
       return;
     }
 
-    if (window.confirm(`PERMANENTLY Revoke system access for ${name}?`)) {
-      try {
-        await deleteDoc(doc(db, 'users', id));
-        showNotification('success', 'Access permanently revoked.');
-      } catch (error) {
-        showNotification('error', 'Failed to revoke access.');
-      }
+    try {
+      await deleteDoc(doc(db, 'users', revokeModal.id));
+      showNotification('success', 'Access permanently revoked.');
+    } catch (error) {
+      showNotification('error', 'Failed to revoke access.');
+    } finally {
+      setRevokeModal({ isOpen: false, id: null, userName: '', role: '' });
     }
   };
 
-  const getWhatsAppLink = (user) => {
-    if (!user.phone) return '#';
-    let formattedPhone = user.phone.replace(/\D/g, '');
-    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
-    
-    const msg = `Praise the Lord ${String(user.name).split(' ')[0]}!\n\nYou have been granted official access to the Ketiejili Command Centre.\n\n*Your Setup Code is:* ${user.setupCode}\n\nPlease go to https://tinyurl.com/kddapp to secure your account and set your private PIN. God bless you!`;
-    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
-  };
-
-  const handleSendSetupSMS = async (user) => {
+  const triggerSMS = (user) => setSmsModal({ isOpen: true, user });
+  const confirmSendSetupSMS = async () => {
+    const user = smsModal.user;
     const message = `Praise the Lord ${String(user.name).split(' ')[0]}! You have been granted access to the Ketiejili Command Centre. Your Setup Code is: ${user.setupCode}. Go to https://tinyurl.com/kddapp to secure your account.`;
     
-    if (!window.confirm(`Send this official SMS to ${user.name}?\n\n"${message}"`)) return;
+    setSmsModal({ isOpen: false, user: null });
 
     let formattedPhone = user.phone?.replace(/\D/g, '');
     if (!formattedPhone) return showNotification('error', 'User does not have a valid phone number.');
@@ -200,8 +202,17 @@ export default function UserAccounts() {
     }
   };
 
-  // PALETTE 2 (MODERN CYAN & GOLD) INPUT STYLE
-  const inputStyle = "w-full p-3 bg-[#023047] border border-[#209EBB]/30 rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFB701] transition-all shadow-sm placeholder:text-[#8ECAE6]/50 [&>option]:text-[#023047]";
+  const getWhatsAppLink = (user) => {
+    if (!user.phone) return '#';
+    let formattedPhone = user.phone.replace(/\D/g, '');
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+    
+    const msg = `Praise the Lord ${String(user.name).split(' ')[0]}!\n\nYou have been granted official access to the Ketiejili Command Centre.\n\n*Your Setup Code is:* ${user.setupCode}\n\nPlease go to https://tinyurl.com/kddapp to secure your account and set your private PIN. God bless you!`;
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(msg)}`;
+  };
+
+  // PALETTE 2 (MODERN CYAN & GOLD) INPUT STYLE WITH DROPDOWN FIX
+  const inputStyle = "w-full p-3 bg-[#023047] border border-[#209EBB]/30 rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFB701] transition-all shadow-sm placeholder:text-[#8ECAE6]/50 [&>option]:bg-[#023047] [&>option]:text-white";
   const labelStyle = "block text-[9px] font-black text-[#8ECAE6] uppercase tracking-widest mb-2 ml-1";
 
   // --- ACCESS DENIED SCREEN (PALETTE 2) ---
@@ -235,6 +246,67 @@ export default function UserAccounts() {
         {/* Ambient background decorative elements */}
         <div className="absolute top-0 left-0 w-96 h-96 bg-[#8ECAE6]/10 blur-[120px] rounded-full pointer-events-none"></div>
         <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFB701]/10 blur-[120px] rounded-full pointer-events-none"></div>
+
+        {/* CUSTOM MODALS */}
+        {resetModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#023047]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#023047] border border-[#209EBB]/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-blue-400">
+                  <Smartphone size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Reset Device Lock</h3>
+                <p className="text-[10px] font-bold text-[#8ECAE6] leading-relaxed uppercase tracking-widest">
+                  Reset security lock for <span className="text-white">{resetModal.userName}</span>? They will need a new Setup Code to log in.
+                </p>
+              </div>
+              <div className="flex border-t border-[#209EBB]/20">
+                <button onClick={() => setResetModal({ isOpen: false, id: null, userName: '' })} className="flex-1 py-4 text-[10px] font-black text-[#8ECAE6]/50 uppercase tracking-widest hover:bg-[#209EBB]/10 transition-colors border-r border-[#209EBB]/20">Cancel</button>
+                <button onClick={confirmReset} className="flex-1 py-4 text-[10px] font-black text-blue-400 uppercase tracking-widest hover:bg-blue-500/10 transition-colors">Confirm Reset</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {revokeModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#023047]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#023047] border border-[#209EBB]/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <ShieldAlert size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Revoke Access</h3>
+                <p className="text-[10px] font-bold text-[#8ECAE6] leading-relaxed uppercase tracking-widest">
+                  Permanently revoke system access for <span className="text-white">{revokeModal.userName}</span>?
+                </p>
+              </div>
+              <div className="flex border-t border-[#209EBB]/20">
+                <button onClick={() => setRevokeModal({ isOpen: false, id: null, userName: '', role: '' })} className="flex-1 py-4 text-[10px] font-black text-[#8ECAE6]/50 uppercase tracking-widest hover:bg-[#209EBB]/10 transition-colors border-r border-[#209EBB]/20">Cancel</button>
+                <button onClick={confirmRevoke} className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors">Revoke Access</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {smsModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#023047]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#023047] border border-[#209EBB]/30 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-[#FFB701]/10 border border-[#FFB701]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FFB701]">
+                  <MessageSquare size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Dispatch Setup Code</h3>
+                <p className="text-[10px] font-bold text-[#8ECAE6] leading-relaxed uppercase tracking-widest">
+                  Transmit official API SMS with Setup Code to <span className="text-white">{smsModal.user?.name}</span>?
+                </p>
+              </div>
+              <div className="flex border-t border-[#209EBB]/20">
+                <button onClick={() => setSmsModal({ isOpen: false, user: null })} className="flex-1 py-4 text-[10px] font-black text-[#8ECAE6]/50 uppercase tracking-widest hover:bg-[#209EBB]/10 transition-colors border-r border-[#209EBB]/20">Cancel</button>
+                <button onClick={confirmSendSetupSMS} className="flex-1 py-4 text-[10px] font-black text-[#FFB701] uppercase tracking-widest hover:bg-[#FFB701]/10 transition-colors">Send SMS</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
@@ -372,7 +444,7 @@ export default function UserAccounts() {
                                   <a href={getWhatsAppLink(user)} target="_blank" rel="noopener noreferrer" className="p-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors shadow-sm flex items-center justify-center" title="WhatsApp Setup Code">
                                     <MessageCircle size={14} />
                                   </a>
-                                  <button onClick={() => handleSendSetupSMS(user)} className="p-2 bg-[#209EBB]/10 border border-[#209EBB]/30 text-[#8ECAE6] hover:bg-[#209EBB]/20 rounded-lg transition-colors shadow-sm flex items-center justify-center" title="SMS Setup Code">
+                                  <button onClick={() => triggerSMS(user)} className="p-2 bg-[#209EBB]/10 border border-[#209EBB]/30 text-[#8ECAE6] hover:bg-[#209EBB]/20 rounded-lg transition-colors shadow-sm flex items-center justify-center" title="SMS Setup Code">
                                     <MessageSquare size={14} />
                                   </button>
                                 </div>
@@ -387,11 +459,11 @@ export default function UserAccounts() {
                           <td className="p-5">
                             <div className="flex items-center justify-center gap-2">
                               {!user.setupCode && (
-                                <button onClick={() => handleResetDevice(user.id, user.name)} className="px-3 py-1.5 bg-[#023047] border border-[#209EBB]/30 text-[#8ECAE6] hover:bg-[#FFB701]/10 hover:text-[#FFB701] hover:border-[#FFB701]/30 text-[9px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 shadow-sm">
+                                <button onClick={() => triggerReset(user.id, user.name)} className="px-3 py-1.5 bg-[#023047] border border-[#209EBB]/30 text-[#8ECAE6] hover:bg-[#FFB701]/10 hover:text-[#FFB701] hover:border-[#FFB701]/30 text-[9px] font-black uppercase tracking-widest rounded-lg transition-colors flex items-center gap-1 shadow-sm">
                                   <Smartphone size={12}/> Reset
                                 </button>
                               )}
-                              <button onClick={() => handleRevokeAccess(user.id, user.name, user.role)} className="p-1.5 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors" title="Revoke Access">
+                              <button onClick={() => triggerRevoke(user.id, user.name, user.role)} className="p-1.5 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors" title="Revoke Access">
                                 <Trash2 size={14} />
                               </button>
                             </div>

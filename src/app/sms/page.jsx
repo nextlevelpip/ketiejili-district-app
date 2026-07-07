@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone, ShieldAlert } from 'lucide-react';
+import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone, ShieldAlert, Mic, UploadCloud, X } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc } from 'firebase/firestore';
 
@@ -14,6 +14,13 @@ export default function BulkSMS() {
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [notification, setNotification] = useState({ type: '', message: '' });
+
+  // --- DUAL BROADCAST STATES ---
+  const [broadcastMode, setBroadcastMode] = useState('text'); // 'text' or 'voice'
+  const [audioFile, setAudioFile] = useState(null);
+
+  // --- CUSTOM CONFIRMATION MODAL ---
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false });
 
   // --- TARGETING FILTERS ---
   const [targetRole, setTargetRole] = useState('All Roles');
@@ -60,6 +67,16 @@ export default function BulkSMS() {
     setTimeout(() => setNotification({ type: '', message: '' }), 5000);
   };
 
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5000000) { 
+        return showNotification('error', 'Audio file must be under 5MB.');
+      }
+      setAudioFile(file);
+    }
+  };
+
   // --- AGE CALCULATION ---
   const calculateAge = (dobString) => {
     if (!dobString) return null;
@@ -71,14 +88,23 @@ export default function BulkSMS() {
     return age;
   };
 
-  // --- RECIPIENT FILTERING LOGIC ---
+  // --- SMART HIERARCHICAL FILTERING LOGIC ---
   const validRecipients = members.filter(m => {
     if (!m.phone || m.phone.length !== 10) return false;
 
     const age = calculateAge(m.dob);
     const matchesAssem = targetAssembly === 'All Assemblies' || m.localAssembly === targetAssembly;
-    const matchesRole = targetRole === 'All Roles' || m.churchRole === targetRole;
     const matchesGen = targetGender === 'All Genders' || m.gender === targetGender;
+    
+    // Macro-Category Role Logic
+    let matchesRole = false;
+    const presidingRoles = ["Presiding Brother", "Presiding Deacon", "Presiding Elder"];
+    const officerRoles = ["Elder", "Deacon", "Deaconess", ...presidingRoles];
+
+    if (targetRole === 'All Roles') matchesRole = true;
+    else if (targetRole === 'Officers') matchesRole = officerRoles.includes(m.churchRole);
+    else if (targetRole === 'Presiding') matchesRole = presidingRoles.includes(m.churchRole);
+    else matchesRole = m.churchRole === targetRole;
     
     let matchesDemo = true;
     if (targetDemo === '< 13') matchesDemo = age !== null && age < 13;
@@ -91,19 +117,27 @@ export default function BulkSMS() {
   // --- SMS CALCULATIONS ---
   const characterCount = message.length;
   const smsPages = Math.ceil(characterCount / 160) || 1;
-  const totalCostEstimate = validRecipients.length * smsPages * 0.04; 
+  const totalCostEstimate = validRecipients.length * (broadcastMode === 'text' ? smsPages : 1) * 0.04; 
 
-  const handleSendSMS = async (e) => {
+  // --- TRIGGER MODAL INSTEAD OF NATIVE ALERT ---
+  const triggerBroadcast = (e) => {
     e.preventDefault();
     if (validRecipients.length === 0) {
-      showNotification('error', 'No valid recipients found matching these filters.');
-      return;
+      return showNotification('error', 'No valid recipients found matching these filters.');
     }
-    if (!message.trim()) {
-      showNotification('error', 'Please type a message before sending.');
-      return;
+    if (broadcastMode === 'text' && !message.trim()) {
+      return showNotification('error', 'Please type a message before sending.');
     }
+    if (broadcastMode === 'voice' && !audioFile) {
+      return showNotification('error', 'Please upload a voice file before broadcasting.');
+    }
+    
+    setConfirmModal({ isOpen: true });
+  };
 
+  // --- EXECUTE BROADCAST ---
+  const executeBroadcast = async () => {
+    setConfirmModal({ isOpen: false });
     setIsSending(true);
 
     try {
@@ -115,12 +149,14 @@ export default function BulkSMS() {
         return num;
       });
 
+      // API Payload - includes mode to differentiate Text vs Voice
       const response = await fetch('/api/send-sms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: message,
-          recipients: formattedPhones
+          message: broadcastMode === 'text' ? message : 'Voice Broadcast File',
+          recipients: formattedPhones,
+          mode: broadcastMode
         })
       });
 
@@ -131,7 +167,7 @@ export default function BulkSMS() {
       }
 
       await addDoc(collection(db, 'sms_logs'), {
-        messageBody: message,
+        messageBody: broadcastMode === 'text' ? message : `🎤 Voice Broadcast: ${audioFile.name}`,
         recipientCount: validRecipients.length,
         targetFilters: `${targetAssembly}, ${targetRole}, ${targetGender}, ${targetDemo}`,
         estimatedCost: totalCostEstimate,
@@ -140,6 +176,7 @@ export default function BulkSMS() {
 
       showNotification('success', `Broadcast successfully dispatched to ${validRecipients.length} members!`);
       setMessage('');
+      setAudioFile(null);
       
     } catch (error) {
       console.error(error);
@@ -152,15 +189,15 @@ export default function BulkSMS() {
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
   
   const churchRoles = [
-    "Member", "New Convert", "Elder", "Deacon", "Deaconess", 
+    "New Convert", "Member", "Elder", "Deacon", "Deaconess", 
     "District Minister", "District Minister's Wife", 
     "Presiding Elder", "Presiding Deacon", "Presiding Brother"
   ];
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const filterSelectStyle = "w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none focus:border-[#FFC300] transition-all text-white placeholder:text-white/30 [&>option]:text-[#000814]";
+  // FIXED: Dropdown Visibility Fix Applied
+  const filterSelectStyle = "w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none focus:border-[#FFC300] transition-all text-white placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
 
-  // --- ACCESS DENIED SCREEN (RESTYLED) ---
+  // --- ACCESS DENIED SCREEN ---
   if (isAuthorized === false) {
     return (
       <DashboardLayout>
@@ -170,8 +207,8 @@ export default function BulkSMS() {
             <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mb-6 text-red-500 border border-red-500/20 shadow-inner">
               <ShieldAlert size={36} />
             </div>
-            <h1 className="text-xl font-black text-white uppercase tracking-widest mb-3 border-b border-[#003566] pb-3 w-full">Restricted Area</h1>
-            <p className="text-xs font-bold text-white/50 uppercase tracking-widest leading-relaxed">
+            <h1 className="text-sm font-black text-white uppercase tracking-widest mb-3 border-b border-[#003566] pb-3 w-full">Restricted Area</h1>
+            <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest leading-relaxed">
               The District Communication Hub is strictly reserved for Tier 1 Supreme Command.
             </p>
           </div>
@@ -187,6 +224,41 @@ export default function BulkSMS() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
+        {/* CUSTOM CONFIRMATION MODAL OVERLAY */}
+        {confirmModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FFC300]">
+                  <Send size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Confirm Transmission</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest mb-4">
+                  You are about to transmit a <span className="text-[#FFC300]">{broadcastMode === 'voice' ? 'Voice' : 'Text'} Broadcast</span> to <span className="text-white">{validRecipients.length} recipients</span>.
+                </p>
+                <div className="bg-[#000814] border border-[#003566] rounded-xl p-3 inline-block">
+                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-1">Estimated Provider Cost</span>
+                  <span className="text-xs font-mono font-bold text-emerald-400">GHS {totalCostEstimate.toFixed(2)}</span>
+                </div>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setConfirmModal({ isOpen: false })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executeBroadcast}
+                  className="flex-1 py-4 text-[10px] font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  <Send size={14} /> Execute Broadcast
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
           {notification.message && (
@@ -220,6 +292,7 @@ export default function BulkSMS() {
 
           {activeTab === 'compose' ? (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
+              
               {/* LEFT COLUMN: FILTER & TARGETING */}
               <div className="lg:col-span-1 space-y-6">
                 <div className="bg-[#000814] p-6 rounded-2xl shadow-xl border border-[#003566]">
@@ -239,6 +312,8 @@ export default function BulkSMS() {
                       <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1 mb-1 block">Church Role</label>
                       <select value={targetRole} onChange={e => setTargetRole(e.target.value)} className={filterSelectStyle}>
                         <option value="All Roles">All Roles</option>
+                        <option value="Officers">All Officers (Elders/Deacons/Presiding)</option>
+                        <option value="Presiding">Presiding Officers Only</option>
                         {churchRoles.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </div>
@@ -264,7 +339,7 @@ export default function BulkSMS() {
                   {/* LIVE AUDIENCE METRIC */}
                   <div className="mt-6 p-5 bg-[#001D3D] border border-[#003566] rounded-xl flex items-center justify-between shadow-inner">
                     <div>
-                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Valid Phones</p>
+                      <p className="text-[9px] font-black text-white/50 uppercase tracking-widest">Valid Phones Found</p>
                       <p className="text-2xl font-black text-white leading-none mt-1">{validRecipients.length}</p>
                     </div>
                     <Smartphone size={24} className="text-[#FFC300]" />
@@ -274,23 +349,65 @@ export default function BulkSMS() {
 
               {/* RIGHT COLUMN: MESSAGE COMPOSER */}
               <div className="lg:col-span-2">
-                <form onSubmit={handleSendSMS} className="bg-[#000814] p-6 rounded-2xl shadow-xl border border-[#003566] flex flex-col h-full">
+                <form onSubmit={triggerBroadcast} className="bg-[#000814] p-6 rounded-2xl shadow-xl border border-[#003566] flex flex-col h-full">
                   
                   <div className="flex-1 flex flex-col">
-                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-[#003566]">
-                      <span className="text-xs font-black text-white uppercase tracking-widest">Message Content</span>
-                      <span className={`text-[8px] px-2 py-1 rounded font-black uppercase tracking-widest border ${characterCount > 160 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-[#001D3D] text-white/50 border-[#003566]'}`}>
-                        {smsPages} Page{smsPages > 1 ? 's' : ''} ({characterCount} chars)
-                      </span>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-[#003566]">
+                      
+                      {/* DUAL BROADCAST TOGGLE */}
+                      <div className="flex bg-[#001D3D] p-1 rounded-xl border border-[#003566]">
+                        <button 
+                          type="button"
+                          onClick={() => setBroadcastMode('text')} 
+                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'text' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
+                        >
+                          <MessageSquare size={12} /> Text SMS
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setBroadcastMode('voice')} 
+                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'voice' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
+                        >
+                          <Mic size={12} /> Voice Broadcast
+                        </button>
+                      </div>
+
+                      {broadcastMode === 'text' && (
+                        <span className={`text-[8px] px-2 py-1 rounded font-black uppercase tracking-widest border ${characterCount > 160 ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-[#001D3D] text-white/50 border-[#003566]'}`}>
+                          {smsPages} Page{smsPages > 1 ? 's' : ''} ({characterCount} chars)
+                        </span>
+                      )}
                     </div>
                     
-                    <textarea 
-                      required
-                      placeholder="Type your official broadcast message here..." 
-                      value={message} 
-                      onChange={e => setMessage(e.target.value)}
-                      className="w-full flex-1 min-h-[300px] p-5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-white font-bold resize-none text-sm leading-relaxed placeholder:text-white/30"
-                    />
+                    {broadcastMode === 'text' ? (
+                      <textarea 
+                        required
+                        placeholder="Type your official broadcast message here..." 
+                        value={message} 
+                        onChange={e => setMessage(e.target.value)}
+                        className="w-full flex-1 min-h-[300px] p-5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-white font-bold resize-none text-sm leading-relaxed placeholder:text-white/30 custom-scrollbar"
+                      />
+                    ) : (
+                      <div className="w-full flex-1 min-h-[300px] flex flex-col items-center justify-center bg-[#001D3D] border border-[#003566] border-dashed rounded-xl relative group hover:border-[#FFC300]/50 transition-colors">
+                        <Mic size={48} className={`${audioFile ? 'text-[#FFC300]' : 'text-white/20'} mb-4`} />
+                        <h4 className="text-xs font-black uppercase tracking-widest text-white mb-2">
+                          {audioFile ? 'Audio File Attached Ready' : 'Upload Voice Broadcast File'}
+                        </h4>
+                        <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest text-center px-4">
+                          {audioFile ? audioFile.name : 'Drag & drop MP3 or WAV files here (Max 5MB)'}
+                        </p>
+                        {audioFile && (
+                          <button 
+                            type="button" 
+                            onClick={(e) => { e.preventDefault(); setAudioFile(null); }} 
+                            className="mt-4 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center gap-1 z-20 relative"
+                          >
+                            <X size={12} /> Remove File
+                          </button>
+                        )}
+                        <input type="file" accept="audio/mp3, audio/wav" onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="" />
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 pt-5 border-t border-[#003566] flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -305,7 +422,7 @@ export default function BulkSMS() {
                       className={`w-full sm:w-auto px-8 py-3.5 rounded-xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg flex items-center justify-center gap-2 text-[#000814] border border-[#FFC300] ${isSending || validRecipients.length === 0 ? 'bg-white/5 text-white/30 cursor-not-allowed border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A]'}`}
                     >
                       {isSending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-                      {isSending ? 'Dispatching...' : 'Send Broadcast'}
+                      {isSending ? 'Initializing...' : 'Transmit Broadcast'}
                     </button>
                   </div>
                 </form>
@@ -336,7 +453,10 @@ export default function BulkSMS() {
                           <div className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1">{new Date(log.timestamp).toLocaleTimeString()}</div>
                         </td>
                         <td className="p-4 max-w-xs">
-                          <p className="font-bold text-white/70 truncate">{log.messageBody}</p>
+                          <p className="font-bold text-white/70 truncate flex items-center gap-1.5">
+                            {log.messageBody.includes('Voice Broadcast') ? <Mic size={12} className="text-[#FFC300] shrink-0" /> : <MessageSquare size={12} className="text-white/30 shrink-0" />}
+                            {log.messageBody}
+                          </p>
                         </td>
                         <td className="p-4">
                           <div className="text-[8px] font-black text-white/70 bg-[#003566] px-2 py-1 rounded border border-[#003566] uppercase tracking-widest inline-block">

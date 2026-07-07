@@ -101,7 +101,9 @@ export default function EvangelismAndSouls() {
     const oNonCop = parseInt(otherSoulsNonCop) || 0;
     const gSunday = parseInt(gospelSundaySouls) || 0;
     const cWon = parseInt(childrenWon) || 0;
-    const totalSouls = aCop + oNonCop + gSunday + cWon;
+    
+    // Gospel Sunday is a label subset category and is excluded from the math calculation to prevent double-counting
+    const totalSouls = aCop + oNonCop + cWon;
 
     try {
       await addDoc(collection(db, 'evangelism_logs'), { 
@@ -129,7 +131,6 @@ export default function EvangelismAndSouls() {
     }
   };
 
-  // --- REPLACED BROWSER POPUP WITH CUSTOM MODAL ---
   const triggerDelete = (id, location) => {
     if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
     setDeleteModal({ isOpen: true, id, location });
@@ -166,10 +167,11 @@ export default function EvangelismAndSouls() {
   const totalGospelSunday = filteredLogs.reduce((sum, log) => sum + (log.gospelSundaySouls || 0), 0);
   const totalChildren = filteredLogs.reduce((sum, log) => sum + (log.childrenWon || 0), 0);
   
-  const totalAllSouls = totalAdultCop + totalOtherNonCop + totalGospelSunday + totalChildren;
+  // Removed Gospel Sunday from Grand Total to prevent double counting
+  const totalAllSouls = totalAdultCop + totalOtherNonCop + totalChildren;
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH GLOBAL DROPDOWN FIX
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-1.5 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
@@ -303,7 +305,7 @@ export default function EvangelismAndSouls() {
                     <div className="md:col-span-2">
                       <label className={labelStyle}>Gospel Sunday Souls</label>
                       <input type="number" min="0" placeholder="0" value={gospelSundaySouls} onChange={e => setGospelSundaySouls(e.target.value)} className={inputStyle} />
-                      <p className="text-[8px] font-bold text-white/40 mt-2 uppercase tracking-widest leading-relaxed">Observed on the last Sunday of every month. All adult souls and children won for Christ during the Gospel Sunday morning through any form of outreach are recorded here.</p>
+                      <p className="text-[8px] font-bold text-[#FFC300]/80 mt-2 uppercase tracking-widest leading-relaxed">Observed on the last Sunday of every month. Note: This field is a subset and is not added to the grand total to prevent double-counting.</p>
                     </div>
 
                     <div className="md:col-span-2">
@@ -332,11 +334,12 @@ export default function EvangelismAndSouls() {
                   <h2 className="text-[10px] font-black text-white uppercase tracking-widest">Auto-Generated Report</h2>
                 </div>
                 
-                {/* 5-COLUMN TOTALS ROW */}
-                <div className="p-6 max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-5 gap-4">
+                {/* UPGRADED 6-COLUMN TOTALS ROW INCLUDING NON-COP DATA */}
+                <div className="p-6 max-w-7xl mx-auto grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Programs</p><p className="text-base font-black text-white mt-1">{totalPrograms}</p></div>
                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Adult COP</p><p className="text-base font-black text-white mt-1">{totalAdultCop}</p></div>
-                  <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Gospel</p><p className="text-base font-black text-white mt-1">{totalGospelSunday}</p></div>
+                  <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Other Non-COP</p><p className="text-base font-black text-white mt-1">{totalOtherNonCop}</p></div>
+                  <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Gospel Subset</p><p className="text-base font-black text-white mt-1">{totalGospelSunday}</p></div>
                   <div className="bg-[#001D3D] p-4 rounded-xl border border-[#003566] text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Children</p><p className="text-base font-black text-white mt-1">{totalChildren}</p></div>
                   <div className="bg-[#FFC300]/10 p-4 rounded-xl border border-[#FFC300]/50 text-center"><p className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Total Souls</p><p className="text-xl font-black text-white mt-1">{totalAllSouls}</p></div>
                 </div>
@@ -344,21 +347,30 @@ export default function EvangelismAndSouls() {
 
               <div className="bg-[#000814] p-5 rounded-2xl border border-[#003566] grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="relative"><Search className="absolute left-3 top-3 text-white/30" size={14}/><input placeholder="Search locations..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none text-white focus:border-[#FFC300] transition-all placeholder:text-white/30" /></div>
-                <select value={fDemographic} onChange={e => setFDemographic(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:text-[#000814]"><option value="All Categories">All Demographics</option>{pentChmsDemographics.map(d => <option key={d} value={d}>{d}</option>)}</select>
-                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:text-[#000814]"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
+                <select value={fDemographic} onChange={e => setFDemographic(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:bg-[#001D3D] [&>option]:text-white"><option value="All Categories">All Demographics</option>{pentChmsDemographics.map(d => <option key={d} value={d}>{d}</option>)}</select>
+                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:bg-[#001D3D] [&>option]:text-white"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
               </div>
 
               <div className="bg-[#000814] rounded-2xl shadow-2xl border border-[#003566] overflow-hidden">
                 <table className="w-full text-left text-xs">
-                  <thead><tr className="bg-[#001D3D] border-b border-[#003566] text-[9px] font-black text-[#FFC300] uppercase tracking-widest"><th className="p-5">Date</th><th className="p-5">Location & Strategy</th><th className="p-5">Demographic</th><th className="p-5 text-center">Total Souls</th>{isTier1 && <th className="p-5 text-center">Action</th>}</tr></thead>
+                  <thead><tr className="bg-[#001D3D] border-b border-[#003566] text-[9px] font-black text-[#FFC300] uppercase tracking-widest"><th className="p-5">Date</th><th className="p-5">Location & Strategy</th><th className="p-5">Demographic</th><th className="p-5 text-center">Souls Tally</th>{isTier1 && <th className="p-5 text-center">Action</th>}</tr></thead>
                   <tbody className="divide-y divide-[#003566]">
                     {filteredLogs.map(log => (
                       <tr key={log.id} className="hover:bg-[#001D3D]/50 transition-colors">
                         <td className="p-5 font-bold text-white"><CalendarDays size={12} className="inline mr-2 text-[#FFC300]" />{new Date(log.date).toLocaleDateString()}</td>
                         <td className="p-5 font-black text-white text-xs">{log.location}<br/><span className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1">{log.outreachType}</span></td>
                         <td className="p-5 font-bold text-white/70">{log.targetDemographic}</td>
-                        <td className="p-5 text-center font-black text-sm text-emerald-400">{log.totalSoulsWon || 0}</td>
-                        {isTier1 && <td className="p-5 text-center"><button onClick={() => triggerDelete(log.id, log.location)} className="p-2 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors"><Trash2 size={14}/></button></td>}
+                        {/* REBUILT MATRIX DETAILS CELL TO EXPOSE NON-COP */}
+                        <td className="p-5 text-center">
+                          <div className="font-black text-sm text-emerald-400">{log.totalSoulsWon || 0}</div>
+                          <div className="text-[8px] text-white/40 uppercase font-black tracking-widest mt-1.5 flex flex-wrap justify-center gap-x-2 gap-y-0.5">
+                            <span><span className="text-[#FFC300]">COP:</span> {log.adultSoulsCop || 0}</span>
+                            <span><span className="text-blue-400">NON-COP:</span> {log.otherSoulsNonCop || 0}</span>
+                            <span><span className="text-purple-400">CHIL:</span> {log.childrenWon || 0}</span>
+                            {log.gospelSundaySouls > 0 && <span className="text-[#FFC300]/50"> (Gospel: {log.gospelSundaySouls})</span>}
+                          </div>
+                        </td>
+                        {isTier1 && <td className="p-5 text-center"><button onClick={() => triggerDelete(log.id, log.location)} className="p-2 text-white/30 hover:text-red-400"><Trash2 size={14}/></button></td>}
                       </tr>
                     ))}
                     {filteredLogs.length === 0 && <tr><td colSpan={isTier1 ? "5" : "4"} className="p-10 text-center text-white/50 font-bold italic text-xs">No outreach records found.</td></tr>}
@@ -378,7 +390,7 @@ export default function EvangelismAndSouls() {
 
               <div className="bg-[#000814] p-5 rounded-2xl border border-[#003566] grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative"><Search className="absolute left-3 top-3 text-white/30" size={14}/><input placeholder="Search convert names..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none text-white focus:border-[#FFC300] transition-all placeholder:text-white/30" /></div>
-                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:text-[#000814]"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
+                <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest text-white focus:outline-none focus:border-[#FFC300] [&>option]:bg-[#001D3D] [&>option]:text-white"><option value="All Assemblies">All Assemblies</option>{assemblies.map(a => <option key={a} value={a}>{a}</option>)}</select>
               </div>
 
               <div className="bg-[#000814] rounded-2xl shadow-2xl border border-[#003566] overflow-hidden">
@@ -389,10 +401,12 @@ export default function EvangelismAndSouls() {
                       <tr key={convert.id} className="hover:bg-[#001D3D]/50 transition-colors">
                         <td className="p-5 font-black text-white text-xs">{convert.name}</td>
                         <td className="p-5 font-bold text-white/70 text-[10px] uppercase tracking-widest">{convert.localAssembly}</td>
-                        <td className="p-5"><span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded border bg-[#001D3D] text-[#FFC300] border-[#003566]">{convert.soulWinner || 'General'}</span></td>
+                        <td className="p-4">
+                          <span className="text-[8px] font-black uppercase text-[#FFC300] bg-[#003566] px-2 py-0.5 rounded border border-[#FFC300]/30">{convert.soulWinner || 'General'}</span>
+                        </td>
                         <td className="p-5">
                           <div className="flex justify-center gap-2">
-                            <span className={`px-2 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest ${convert.waterBaptized === 'Yes' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[#001D3D] text-white/30 border-[#003566]'}`}>Water</span>
+                            <span className={`px-2 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest ${convert.waterWaterBaptismStatus === 'Yes' || convert.waterBaptismStatus === 'Yes' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-[#001D3D] text-white/30 border-[#003566]'}`}>Water</span>
                             <span className={`px-2 py-0.5 rounded border text-[8px] font-black uppercase tracking-widest ${convert.spiritBaptism === 'Yes' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 'bg-[#001D3D] text-white/30 border-[#003566]'}`}>Spirit</span>
                           </div>
                         </td>

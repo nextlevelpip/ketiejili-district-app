@@ -10,7 +10,7 @@ import {
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
   Settings, LogOut, Menu, Cloud, Lock,
-  Heart, HeartHandshake, FileSpreadsheet
+  Heart, HeartHandshake, FileSpreadsheet, Mic
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
@@ -29,12 +29,41 @@ export default function DashboardLayout({ children }) {
   const [globalSlogan, setGlobalSlogan] = useState('District Command');
   const [globalLogo, setGlobalLogo] = useState('/logo.jpg');
 
+  // --- LIVE MNOTIFY API COUNTERS ---
+  const [smsCredit, setSmsCredit] = useState('...');
+  const [voiceCredit, setVoiceCredit] = useState('...');
+
   const [currentUser, setCurrentUser] = useState({
     fullName: "Loading...",
     role: "Verifying",
     localPin: null,
     tierLevel: 3
   });
+
+  // --- FETCH LIVE MNOTIFY BALANCE ---
+  useEffect(() => {
+    const fetchBalances = async () => {
+      try {
+        const response = await fetch('/api/check-balance');
+        const data = await response.json();
+        if (data.status === 'success') {
+          setSmsCredit(data.smsBalance.toLocaleString());
+          setVoiceCredit(data.voiceBalance.toLocaleString());
+        } else {
+          setSmsCredit('ERR');
+          setVoiceCredit('ERR');
+        }
+      } catch (error) {
+        setSmsCredit('ERR');
+        setVoiceCredit('ERR');
+      }
+    };
+
+    fetchBalances();
+    // Refresh the balance silently every 5 minutes
+    const interval = setInterval(fetchBalances, 300000); 
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -100,7 +129,7 @@ export default function DashboardLayout({ children }) {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
         if (isAuthorized) setIsLocked(true);
-      }, 600000); // Set to 10 minutes (600,000ms) for better usability, or keep 60000 (1 min) if strict
+      }, 600000); 
     };
 
     if (!isLocked) {
@@ -153,7 +182,6 @@ export default function DashboardLayout({ children }) {
     }
   };
 
-  // ADDED: HQ Statistical Reports to the nav items
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
     { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
@@ -289,10 +317,26 @@ export default function DashboardLayout({ children }) {
 
       <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-[#000814] border-r border-[#003566] flex flex-col transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 shadow-2xl`}>
         
-        <div className="h-[80px] px-6 border-b border-[#003566] bg-[#000814] flex items-center justify-center shrink-0">
-          <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2.5 flex items-center justify-center gap-2 w-full">
+        {/* ========================================================= */}
+        {/* DASHBOARD HEADER WITH LIVE MNOTIFY COUNTERS               */}
+        {/* ========================================================= */}
+        <div className="px-4 py-5 border-b border-[#003566] bg-[#000814] flex flex-col gap-3 shrink-0">
+          <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2 flex items-center justify-center gap-2 w-full">
             <div className="w-2 h-2 rounded-full bg-[#FFC300] animate-pulse shadow-[0_0_8px_rgba(255,195,0,0.8)]"></div>
             <span className="text-[10px] font-black text-[#FFC300] uppercase tracking-widest">System Active</span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2 text-center shadow-inner relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-full h-0.5 bg-[#8ECAE6]/50"></div>
+               <p className="text-[8px] text-white/50 uppercase font-black tracking-widest mb-1 flex justify-center items-center gap-1"><MessageSquare size={10} className="text-[#8ECAE6]" /> SMS Unit</p>
+               <p className="text-xs font-mono font-bold text-[#8ECAE6]">{smsCredit}</p>
+            </div>
+            <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2 text-center shadow-inner relative overflow-hidden">
+               <div className="absolute top-0 left-0 w-full h-0.5 bg-[#FFB701]/50"></div>
+               <p className="text-[8px] text-white/50 uppercase font-black tracking-widest mb-1 flex justify-center items-center gap-1"><Mic size={10} className="text-[#FFB701]" /> Voice</p>
+               <p className="text-xs font-mono font-bold text-[#FFB701]">{voiceCredit}</p>
+            </div>
           </div>
         </div>
 

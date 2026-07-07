@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Target, Droplet, Wind, GraduationCap, FileText, Save, Search, CheckCircle2, AlertCircle, Loader2, MessageCircle, Activity, Lightbulb, RefreshCw, ShieldAlert, TrendingUp, UserMinus } from 'lucide-react';
+import { Target, Droplet, Wind, GraduationCap, FileText, Save, Search, CheckCircle2, AlertCircle, Loader2, MessageCircle, Activity, Lightbulb, RefreshCw, ShieldAlert, TrendingUp, UserMinus, X } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, updateDoc, writeBatch } from 'firebase/firestore';
 
@@ -14,6 +14,9 @@ export default function DiscipleshipTracker() {
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- CUSTOM MODAL STATE ---
+  const [graduateModal, setGraduateModal] = useState({ isOpen: false, id: null, memberName: '' });
 
   // --- DAILY LOG STATES ---
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -59,12 +62,21 @@ export default function DiscipleshipTracker() {
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
   };
 
-  const graduateToMember = async (id, memberName) => {
-    if (window.confirm(`Graduate ${memberName} to full Church Member?`)) {
-      try {
-        await updateDoc(doc(db, 'members', id), { churchRole: 'Member' });
-        showNotification('success', `${memberName} has graduated!`);
-      } catch (error) { console.error(error); }
+  // --- CUSTOM GRADUATION MODAL LOGIC ---
+  const triggerGraduate = (id, memberName) => {
+    setGraduateModal({ isOpen: true, id, memberName });
+  };
+
+  const confirmGraduate = async () => {
+    const { id, memberName } = graduateModal;
+    try {
+      await updateDoc(doc(db, 'members', id), { churchRole: 'Member' });
+      showNotification('success', `${memberName} has graduated!`);
+    } catch (error) { 
+      console.error(error); 
+      showNotification('error', 'Graduation failed.');
+    } finally {
+      setGraduateModal({ isOpen: false, id: null, memberName: '' });
     }
   };
 
@@ -110,40 +122,56 @@ export default function DiscipleshipTracker() {
     } catch (error) { showNotification('error', "Connection Error."); } finally { setIsSubmitting(false); }
   };
 
-  // --- REBUILT PASTORAL REPORT (5 Tags + Note Extraction) ---
+  // --- REBUILT PASTORAL REPORT (Fixed Cloning & Ghosting Issues) ---
   const generatePastorReport = () => {
     const recentLogs = savedLogs.slice(0, 15).filter(log => reportAssembly === 'All Assemblies' || log.assembly === reportAssembly);
-    let immediateAttention = [], growthSignals = [], tagCounts = { 'Conviction': 0, 'Putting into practice': 0, 'Confused': 0, 'Avoidance': 0, 'Understood': 0 }, contactedIds = new Set();
+    
+    let immediateAttention = [];
+    let growthSignals = [];
+    let tagCounts = { 'Conviction': 0, 'Putting into practice': 0, 'Confused': 0, 'Avoidance': 0, 'Understood': 0 };
+    
+    let contactedIds = new Set();
+    let categorizedMembers = new Set(); // Tracks members already placed in a column based on newest log
     
     recentLogs.forEach(log => {
       Object.entries(log.records).forEach(([memberId, data]) => {
         contactedIds.add(memberId);
+        
+        // 1. GHOST FIX: Check the live database to ensure they haven't graduated or been deleted
+        const currentMember = members.find(m => m.id === memberId);
+        if (!currentMember || currentMember.churchRole !== 'New Convert') return;
+
         if(tagCounts[data.tag] !== undefined) {
            tagCounts[data.tag] = tagCounts[data.tag] + 1;
         }
         
-        if (data.tag === 'Confused' || data.tag === 'Avoidance') {
-           if (!immediateAttention.some(m => m.id === memberId)) {
-               immediateAttention.push({ 
-                 id: memberId, 
-                 name: data.name, 
-                 tag: data.tag, 
-                 issue: data.tag === 'Avoidance' ? 'Avoiding engagement/application' : 'Struggling to understand the Word',
-                 notes: data.notes // Pass notes to report
-               });
-           }
-        }
-        
-        if (data.tag === 'Putting into practice' || data.tag === 'Conviction') {
-           if (!growthSignals.some(m => m.id === memberId)) {
-             growthSignals.push({ id: memberId, name: data.name, tag: data.tag, notes: data.notes });
-           }
+        // 2. CLONE FIX: If they haven't been added to a column yet (processing newest log first)
+        if (!categorizedMembers.has(memberId)) {
+          if (data.tag === 'Confused' || data.tag === 'Avoidance') {
+             immediateAttention.push({ 
+               id: memberId, 
+               name: currentMember.name, // Display current name
+               tag: data.tag, 
+               issue: data.tag === 'Avoidance' ? 'Avoiding engagement/application' : 'Struggling to understand the Word',
+               notes: data.notes 
+             });
+             categorizedMembers.add(memberId);
+          }
+          else if (data.tag === 'Putting into practice' || data.tag === 'Conviction') {
+             growthSignals.push({ 
+               id: memberId, 
+               name: currentMember.name, 
+               tag: data.tag, 
+               notes: data.notes 
+             });
+             categorizedMembers.add(memberId);
+          }
         }
       });
     });
 
-    const allFilteredMembers = members.filter(m => reportAssembly === 'All Assemblies' || m.localAssembly === reportAssembly);
-    const silentMembers = allFilteredMembers.filter(m => !contactedIds.has(m.id)).slice(0, 10); 
+    const allFilteredConverts = members.filter(m => m.churchRole === 'New Convert' && (reportAssembly === 'All Assemblies' || m.localAssembly === reportAssembly));
+    const silentMembers = allFilteredConverts.filter(m => !contactedIds.has(m.id)).slice(0, 10); 
     
     let temperature = "The spiritual temperature is mixed; requires consistent pastoral follow-up.";
     const totalTags = tagCounts['Conviction'] + tagCounts['Putting into practice'] + tagCounts['Confused'] + tagCounts['Avoidance'] + tagCounts['Understood'];
@@ -167,8 +195,8 @@ export default function DiscipleshipTracker() {
     return 'bg-[#001D3D] text-white/50 border-[#003566]';
   };
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
@@ -177,6 +205,37 @@ export default function DiscipleshipTracker() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
+        {/* CUSTOM GRADUATION MODAL */}
+        {graduateModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FFC300]">
+                  <GraduationCap size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Confirm Graduation</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to graduate <span className="text-white">{graduateModal.memberName}</span> to full Church Member? They will be removed from this tracking dashboard.
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setGraduateModal({ isOpen: false, id: null, memberName: '' })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmGraduate}
+                  className="flex-1 py-4 text-[10px] font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                >
+                  <GraduationCap size={14} /> Confirm
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -192,7 +251,7 @@ export default function DiscipleshipTracker() {
             <div className="flex items-center gap-4 mb-4">
               <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block"><Target size={24} /></div>
               <div>
-                <h1 className="text-3xl md:text-base font-black text-white uppercase tracking-widest">Discipleship</h1>
+                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">Discipleship</h1>
                 <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">Tracking daily spiritual progression.</p>
               </div>
             </div>
@@ -240,7 +299,11 @@ export default function DiscipleshipTracker() {
                            </div>
                          </td>
                          <td className="p-4 text-center">
-                           <button onClick={() => graduateToMember(m.id, m.name)} disabled={m.waterBaptismStatus !== 'Yes'} className="bg-[#FFC300] border border-[#FFC300] hover:bg-[#FFD60A] px-4 py-1.5 rounded-lg font-black uppercase tracking-widest text-[9px] text-[#000814] shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition-all">
+                           <button 
+                             onClick={() => triggerGraduate(m.id, m.name)} 
+                             disabled={m.waterBaptismStatus !== 'Yes'} 
+                             className="bg-[#FFC300] border border-[#FFC300] hover:bg-[#FFD60A] px-4 py-1.5 rounded-lg font-black uppercase tracking-widest text-[9px] text-[#000814] shadow-md disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                           >
                              Graduate
                            </button>
                          </td>
@@ -310,7 +373,7 @@ export default function DiscipleshipTracker() {
                                   <select 
                                     value={record.status} 
                                     onChange={(e) => handleRecordChange(m.id, 'status', e.target.value)} 
-                                    className="p-2.5 bg-[#000814] border border-[#003566] rounded-lg text-[10px] uppercase tracking-widest font-black text-white outline-none focus:border-[#FFC300] [&>option]:text-[#000814]"
+                                    className="p-2.5 bg-[#000814] border border-[#003566] rounded-lg text-[10px] uppercase tracking-widest font-black text-white outline-none focus:border-[#FFC300] [&>option]:bg-[#001D3D] [&>option]:text-white"
                                   >
                                     <option value="Not Reached">Not Reached</option>
                                     <option value="Contacted">Contacted</option>
@@ -320,7 +383,7 @@ export default function DiscipleshipTracker() {
                                     value={record.tag} 
                                     disabled={record.status === 'Not Reached'}
                                     onChange={(e) => handleRecordChange(m.id, 'tag', e.target.value)} 
-                                    className={`p-2.5 border rounded-lg text-[10px] uppercase tracking-widest font-black outline-none focus:border-[#FFC300] disabled:opacity-30 disabled:cursor-not-allowed [&>option]:text-[#000814] ${record.tag ? getTagColor(record.tag) : 'bg-[#000814] border-[#003566] text-white'}`}
+                                    className={`p-2.5 border rounded-lg text-[10px] uppercase tracking-widest font-black outline-none focus:border-[#FFC300] disabled:opacity-30 disabled:cursor-not-allowed [&>option]:bg-[#001D3D] [&>option]:text-white ${record.tag ? getTagColor(record.tag) : 'bg-[#000814] border-[#003566] text-white'}`}
                                   >
                                     <option value="">- Select Tag -</option>
                                     {stepInfo.tags.map(t => <option key={t} value={t}>{t}</option>)}
@@ -361,7 +424,7 @@ export default function DiscipleshipTracker() {
                 )}
                 {assembly && group && membersToLog.length === 0 && (
                   <div className="p-12 text-center text-white/50 font-bold italic bg-[#001D3D] border border-dashed border-[#003566] rounded-xl text-xs">
-                    No members found in this Bible Study Group.
+                    No active New Converts found in this Bible Study Group.
                   </div>
                 )}
              </div>
@@ -372,7 +435,7 @@ export default function DiscipleshipTracker() {
              <div className="bg-[#000814] p-6 md:p-8 rounded-2xl border border-[#003566] text-white shadow-2xl animate-fade-in">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 border-b border-[#003566] pb-5 mb-6">
                   <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 drop-shadow-md"><Activity size={16} className="text-[#FFC300]" /> Pastoral Intelligence</h2>
-                  <select value={reportAssembly} onChange={e => setReportAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest outline-none text-white shadow-sm [&>option]:text-[#000814]">
+                  <select value={reportAssembly} onChange={e => setReportAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest outline-none text-white shadow-sm [&>option]:bg-[#001D3D] [&>option]:text-white">
                     <option value="All Assemblies">All Assemblies</option>
                     {[...new Set(members.map(m => m.localAssembly).filter(Boolean))].map(a => <option key={a} value={a}>{a}</option>)}
                   </select>

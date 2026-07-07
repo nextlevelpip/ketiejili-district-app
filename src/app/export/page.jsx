@@ -192,8 +192,8 @@ export default function DataExport() {
     { id: 'heritage_timeline', name: 'District Heritage (Timeline)', desc: 'Historical milestones, assembly foundings, and dedications.', icon: History, color: 'text-[#FFC300]' },
   ];
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const selectStyle = "w-full p-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const selectStyle = "w-full p-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white [&>optgroup>option]:bg-[#001D3D] [&>optgroup>option]:text-white";
 
   return (
     <DashboardLayout>

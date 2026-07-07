@@ -15,6 +15,9 @@ export default function DistrictHeritage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
+  // --- CUSTOM MODAL STATE ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, collectionName: '', id: null });
+
   // --- TIMELINE FORM STATES ---
   const [eventYear, setEventYear] = useState('');
   const [eventTitle, setEventTitle] = useState('');
@@ -86,15 +89,24 @@ export default function DistrictHeritage() {
     } finally { setIsSubmitting(false); }
   };
 
-  const handleDelete = async (collectionName, id) => {
-    if (window.confirm('Are you sure you want to permanently delete this historical record?')) {
-      await deleteDoc(doc(db, collectionName, id));
+  // --- REPLACED BROWSER POPUP WITH CUSTOM MODAL ---
+  const triggerDelete = (collectionName, id) => {
+    setDeleteModal({ isOpen: true, collectionName, id });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteDoc(doc(db, deleteModal.collectionName, deleteModal.id));
       showNotification('success', 'Record permanently removed from archives.');
+    } catch (error) {
+      showNotification('error', 'Failed to delete record.');
+    } finally {
+      setDeleteModal({ isOpen: false, collectionName: '', id: null });
     }
   };
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
@@ -103,6 +115,37 @@ export default function DistrictHeritage() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
+        {/* CUSTOM DELETE MODAL OVERLAY */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">System Purge</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to permanently delete this historical record?
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setDeleteModal({ isOpen: false, collectionName: '', id: null })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
           {notification.message && (
@@ -186,7 +229,7 @@ export default function DistrictHeritage() {
                         <div key={event.id} className="relative pl-6 md:pl-10 group">
                           <div className="absolute -left-[14px] top-1 w-6 h-6 bg-[#000814] rounded-full border-[3px] border-[#FFC300] shadow-[0_0_10px_rgba(255,195,0,0.4)]"></div>
                           <div className="bg-[#001D3D] border border-[#003566] rounded-xl p-5 hover:border-[#FFC300]/50 transition-all shadow-inner relative">
-                            <button onClick={() => handleDelete('heritage_timeline', event.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
+                            <button onClick={() => triggerDelete('heritage_timeline', event.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
                             <span className="inline-block px-3 py-1 bg-[#000814] text-[#FFC300] font-black text-[10px] rounded-lg mb-2 tracking-widest uppercase border border-[#003566]">
                               {event.year}
                             </span>
@@ -240,7 +283,7 @@ export default function DistrictHeritage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {rollOfHonor.map((minister) => (
                     <div key={minister.id} className="bg-[#000814] rounded-2xl p-6 shadow-xl border border-[#003566] relative overflow-hidden group hover:border-[#FFC300]/50 transition-all">
-                      <button onClick={() => handleDelete('heritage_roll', minister.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 z-10"><Trash2 size={14} /></button>
+                      <button onClick={() => triggerDelete('heritage_roll', minister.id)} className="absolute top-4 right-4 text-white/30 hover:text-red-400 z-10"><Trash2 size={14} /></button>
                       <div className="absolute top-0 left-0 w-1.5 h-full bg-[#FFC300] shadow-[0_0_10px_rgba(255,195,0,0.5)]"></div>
                       <Award size={80} className="absolute -bottom-4 -right-4 text-[#FFC300]/5 transform rotate-12 group-hover:scale-110 transition-transform" />
                       

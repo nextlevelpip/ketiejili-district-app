@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Heart, HeartHandshake, Users, ClipboardList, Plus, Search, Filter, AlertCircle, CheckCircle2, Loader2, CalendarDays, UserPlus, Activity, ShieldAlert, FileText, Trash2 } from 'lucide-react';
+import { Heart, HeartHandshake, Users, ClipboardList, Plus, Search, Filter, AlertCircle, CheckCircle2, Loader2, CalendarDays, UserPlus, Activity, ShieldAlert, FileText, Trash2, MessageSquare, PhoneCall, MessageCircle, Shield, Mic, X, Send } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 
@@ -14,6 +14,11 @@ export default function VisitationTracker() {
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- CUSTOM MODAL STATES ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null });
+  const [resolveModal, setResolveModal] = useState({ isOpen: false, id: null, memberName: '' });
+  const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
 
   // --- LOG VISIT FORM STATES ---
   const [formData, setFormData] = useState({
@@ -41,6 +46,8 @@ export default function VisitationTracker() {
     "Marriage / Counseling",
     "Other / Custom..."
   ];
+
+  const officerRoles = ["Elder", "Deacon", "Deaconess", "Presiding Brother", "Presiding Deacon", "Presiding Elder"];
 
   useEffect(() => {
     const qAssem = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
@@ -72,13 +79,11 @@ export default function VisitationTracker() {
 
   // --- ANALYTICS ENGINE ---
   const totalMembers = members.length;
-  // Count unique members visited
   const uniqueMembersVisited = new Set(visitations.map(v => v.memberId)).size;
   const coveragePercentage = totalMembers > 0 ? ((uniqueMembersVisited / totalMembers) * 100).toFixed(1) : 0;
   
   const urgentFollowUps = visitations.filter(v => v.requiresFollowUp);
 
-  // Calculate Visits Per Assembly
   const visitsByAssembly = assemblies.map(assembly => {
     return {
       assembly,
@@ -97,7 +102,7 @@ export default function VisitationTracker() {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const finalPurpose = formData.purpose === "Other / Add Custom..." ? formData.customPurpose.trim() : formData.purpose;
+    const finalPurpose = formData.purpose === "Other / Custom..." ? formData.customPurpose.trim() : formData.purpose;
     
     if (!formData.memberId || !finalPurpose) {
       showNotification('error', 'Please select a member and a purpose.');
@@ -129,32 +134,93 @@ export default function VisitationTracker() {
     }
   };
 
-  const resolveFollowUp = async (id, memberName) => {
-    if (window.confirm(`Mark follow-up for ${memberName} as resolved?`)) {
-      try {
-        await updateDoc(doc(db, 'visitations', id), { requiresFollowUp: false });
-        showNotification('success', 'Follow-up marked as resolved.');
-      } catch (error) {
-        showNotification('error', 'Failed to update record.');
+  // --- CUSTOM MODAL HANDLERS ---
+  const triggerResolve = (id, memberName) => setResolveModal({ isOpen: true, id, memberName });
+  const confirmResolve = async () => {
+    try {
+      await updateDoc(doc(db, 'visitations', resolveModal.id), { requiresFollowUp: false });
+      showNotification('success', 'Follow-up marked as resolved.');
+    } catch (error) {
+      showNotification('error', 'Failed to update record.');
+    } finally {
+      setResolveModal({ isOpen: false, id: null, memberName: '' });
+    }
+  };
+
+  const triggerDelete = (id) => setDeleteModal({ isOpen: true, id });
+  const confirmDelete = async () => {
+    try {
+      await deleteDoc(doc(db, 'visitations', deleteModal.id));
+      showNotification('success', 'Record removed.');
+    } catch (err) { 
+      showNotification('error', 'Failed to delete.'); 
+    } finally {
+      setDeleteModal({ isOpen: false, id: null });
+    }
+  };
+
+  const triggerSMS = (member) => {
+    const defaultMsg = `Praise the Lord ${String(member.name).split(' ')[0]}! We pray this message finds you well. God bless you! - Ketiejili District`;
+    setSmsModal({ isOpen: true, member, message: defaultMsg, mode: 'text', audioFile: null });
+  };
+
+  const handleAudioUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5000000) { 
+        return showNotification('error', 'Audio file must be under 5MB.');
       }
+      setSmsModal({ ...smsModal, audioFile: file });
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm(`Delete this visitation record permanently?`)) {
-      try {
-        await deleteDoc(doc(db, 'visitations', id));
-        showNotification('success', 'Record removed.');
-      } catch (err) { showNotification('error', 'Failed to delete.'); }
+  const confirmSendSMS = async () => {
+    const { member, message, mode, audioFile } = smsModal;
+    
+    if (mode === 'text' && !message.trim()) return showNotification('error', 'Message cannot be empty.');
+    if (mode === 'voice' && !audioFile) return showNotification('error', 'Please upload a valid audio file.');
+
+    setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
+    
+    let formattedPhone = String(member.phone || '').replace(/\D/g, '');
+    if (!formattedPhone) return showNotification('error', 'Member does not have a valid phone number.');
+    if (formattedPhone.startsWith('0')) formattedPhone = '233' + formattedPhone.substring(1);
+
+    try {
+      showNotification('success', `Transmitting ${mode === 'voice' ? 'Voice Broadcast' : 'Text Message'} to network...`);
+      const response = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, recipients: [formattedPhone], type: mode })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'API Connection Failed');
+      showNotification('success', `Official Broadcast delivered to ${member.name}!`);
+    } catch (err) {
+      showNotification('error', `Transmission Failed: ${err.message}`);
     }
   };
 
+  // --- FILTERS ---
   const filteredVisits = visitations.filter(v => {
     const matchesSearch = (v.memberName || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (v.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesAssembly = fAssembly === 'All Assemblies' || v.assembly === fAssembly;
     return matchesSearch && matchesAssembly;
   });
+
+  const filteredOfficers = members.filter(m => {
+    const isOfficer = officerRoles.includes(m.churchRole);
+    const matchesSearch = (m.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesAssembly = fAssembly === 'All Assemblies' || m.localAssembly === fAssembly;
+    return isOfficer && matchesSearch && matchesAssembly;
+  });
+
+  const getLastVisitDate = (memberId) => {
+    const visits = visitations.filter(v => v.memberId === memberId);
+    if (visits.length === 0) return null;
+    return visits[0].date; // visitations array is already sorted descending
+  };
 
   const getPurposeColor = (purpose) => {
     if (purpose.includes('Sickness')) return 'text-rose-400 bg-rose-500/10 border-rose-500/30';
@@ -164,8 +230,13 @@ export default function VisitationTracker() {
     return 'text-blue-400 bg-blue-500/10 border-blue-500/30'; 
   };
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  const jumpToLogVisit = (member) => {
+    setFormData({ ...formData, assembly: member.localAssembly, memberId: member.id, memberName: member.name });
+    setActiveTab('log');
+  };
+
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const labelStyle = "block text-[9px] font-black text-white/50 uppercase tracking-widest mb-2 ml-1";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
@@ -174,6 +245,85 @@ export default function VisitationTracker() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
+        {/* ================= MODALS ================= */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">System Purge</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Are you sure you want to permanently delete this visitation record?
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button onClick={() => setDeleteModal({ isOpen: false, id: null })} className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]">Cancel</button>
+                <button onClick={confirmDelete} className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors">Confirm Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resolveModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-400">
+                  <CheckCircle2 size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Resolve Care Case</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Mark the urgent follow-up for <span className="text-white">{resolveModal.memberName}</span> as resolved?
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button onClick={() => setResolveModal({ isOpen: false, id: null, memberName: '' })} className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]">Cancel</button>
+                <button onClick={confirmResolve} className="flex-1 py-4 text-[10px] font-black text-emerald-400 uppercase tracking-widest hover:bg-emerald-500/10 transition-colors flex justify-center items-center gap-2"><CheckCircle2 size={14}/> Resolve Case</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {smsModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-md overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-[#003566] flex justify-between items-center">
+                <div>
+                  <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><MessageSquare size={16}/> Pastoral Message</h3>
+                  <p className="text-[10px] text-white/50 font-bold mt-1 uppercase tracking-widest">To: <span className="text-white">{smsModal.member?.name}</span> ({smsModal.member?.phone})</p>
+                </div>
+                <div className="flex bg-[#000814] p-1 rounded-lg border border-[#003566]">
+                   <button onClick={() => setSmsModal({ ...smsModal, mode: 'text' })} className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all ${smsModal.mode === 'text' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}>Text</button>
+                   <button onClick={() => setSmsModal({ ...smsModal, mode: 'voice' })} className={`px-3 py-1.5 rounded text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${smsModal.mode === 'voice' ? 'bg-[#FFC300] text-[#000814]' : 'text-white/40 hover:text-white'}`}><Mic size={10} /> Voice</button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {smsModal.mode === 'text' ? (
+                  <textarea rows="4" value={smsModal.message} onChange={(e) => setSmsModal({ ...smsModal, message: e.target.value })} className="w-full p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-bold text-white outline-none focus:border-[#FFC300] transition-all resize-none shadow-inner leading-relaxed"/>
+                ) : (
+                  <div className="w-full flex-1 min-h-[150px] flex flex-col items-center justify-center bg-[#000814] border border-[#003566] border-dashed rounded-xl relative group hover:border-[#FFC300]/50 transition-colors p-6">
+                    <Mic size={32} className={`${smsModal.audioFile ? 'text-[#FFC300]' : 'text-white/20'} mb-3`} />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-white mb-2">{smsModal.audioFile ? 'Audio File Attached' : 'Upload Voice Message'}</h4>
+                    <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest text-center">{smsModal.audioFile ? smsModal.audioFile.name : 'MP3 or WAV files only (Max 5MB)'}</p>
+                    {smsModal.audioFile && (
+                      <button type="button" onClick={(e) => { e.preventDefault(); setSmsModal({ ...smsModal, audioFile: null }); }} className="mt-4 px-3 py-1.5 bg-red-500/10 text-red-400 border border-red-500/30 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-colors flex items-center gap-1 z-20 relative"><X size={12} /> Remove File</button>
+                    )}
+                    <input type="file" accept="audio/mp3, audio/wav" onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" title="" />
+                  </div>
+                )}
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button onClick={() => setSmsModal({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null })} className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]">Cancel</button>
+                <button onClick={confirmSendSMS} className="flex-1 py-4 text-[10px] font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] uppercase tracking-widest transition-colors flex items-center justify-center gap-2"><Send size={14} /> Send Now</button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* ========================================= */}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -195,10 +345,10 @@ export default function VisitationTracker() {
               </div>
             </div>
 
-            {/* TAB NAVIGATION */}
             <div className="flex flex-wrap gap-2">
               {[
                 { id: 'dashboard', label: 'Analytics Radar', icon: Activity },
+                { id: 'officers', label: 'Officers Care', icon: Shield },
                 { id: 'log', label: 'Log Visit', icon: Plus },
                 { id: 'history', label: 'Visitation Ledger', icon: FileText }
               ].map(tab => {
@@ -221,13 +371,9 @@ export default function VisitationTracker() {
           {/* ================================================== */}
           {activeTab === 'dashboard' && (
             <div className="space-y-6 animate-fade-in">
-              
-              {/* TOP KPI CARDS */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="bg-[#000814] p-6 rounded-2xl border border-[#003566] shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-[#FFC300]">
-                    <Users size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Flock Coverage</h3>
-                  </div>
+                  <div className="flex items-center gap-2 mb-2 text-[#FFC300]"><Users size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Flock Coverage</h3></div>
                   <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Percentage of total membership visited.</p>
                   <div className="flex items-end gap-3">
                     <span className="text-3xl font-black text-white">{coveragePercentage}%</span>
@@ -236,31 +382,21 @@ export default function VisitationTracker() {
                 </div>
 
                 <div className="bg-[#000814] p-6 rounded-2xl border border-[#003566] shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-blue-400">
-                    <ClipboardList size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Total Visits Logged</h3>
-                  </div>
+                  <div className="flex items-center gap-2 mb-2 text-blue-400"><ClipboardList size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Total Visits Logged</h3></div>
                   <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Cumulative pastoral visitations recorded.</p>
                   <span className="text-3xl font-black text-white">{visitations.length}</span>
                 </div>
 
                 <div className="bg-[#000814] p-6 rounded-2xl border border-red-500/30 shadow-inner flex flex-col justify-between">
-                  <div className="flex items-center gap-2 mb-2 text-red-400">
-                    <ShieldAlert size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Urgent Follow-ups</h3>
-                  </div>
+                  <div className="flex items-center gap-2 mb-2 text-red-400"><ShieldAlert size={16}/> <h3 className="text-[10px] font-black uppercase tracking-widest">Urgent Follow-ups</h3></div>
                   <p className="text-[10px] font-bold text-white/50 mb-4 uppercase tracking-widest">Visits requiring immediate continued care.</p>
-                  <span className={`text-3xl font-black ${urgentFollowUps.length > 0 ? 'text-red-400 animate-pulse' : 'text-white'}`}>
-                    {urgentFollowUps.length}
-                  </span>
+                  <span className={`text-3xl font-black ${urgentFollowUps.length > 0 ? 'text-red-400 animate-pulse' : 'text-white'}`}>{urgentFollowUps.length}</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* ASSEMBLY COMPARISON */}
                 <div className="lg:col-span-2 bg-[#000814] border border-[#003566] rounded-2xl p-6 shadow-xl">
-                  <h3 className="text-xs font-black text-white uppercase tracking-widest border-b border-[#003566] pb-3 mb-5 flex items-center gap-2">
-                    <Activity size={14} className="text-[#FFC300]"/> Assembly Comparison Matrix
-                  </h3>
+                  <h3 className="text-xs font-black text-white uppercase tracking-widest border-b border-[#003566] pb-3 mb-5 flex items-center gap-2"><Activity size={14} className="text-[#FFC300]"/> Assembly Comparison Matrix</h3>
                   <div className="space-y-4">
                     {visitsByAssembly.map(item => {
                       const percentage = item.memberCount > 0 ? Math.min((item.count / item.memberCount) * 100, 100) : 0;
@@ -270,40 +406,105 @@ export default function VisitationTracker() {
                             <span className="text-white">{item.assembly}</span>
                             <span className="text-[#FFC300]">{item.count} Visits <span className="text-white/30 text-[8px] ml-1">({percentage.toFixed(0)}% of members)</span></span>
                           </div>
-                          <div className="w-full bg-[#001D3D] rounded-full h-2 overflow-hidden border border-[#003566]">
-                            <div className="bg-[#FFC300] h-2 rounded-full" style={{ width: `${percentage}%` }}></div>
-                          </div>
+                          <div className="w-full bg-[#001D3D] rounded-full h-2 overflow-hidden border border-[#003566]"><div className="bg-[#FFC300] h-2 rounded-full" style={{ width: `${percentage}%` }}></div></div>
                         </div>
                       )
                     })}
                   </div>
                 </div>
 
-                {/* URGENT CARE PINS */}
                 <div className="lg:col-span-1 bg-[#000814] border border-red-500/30 rounded-2xl p-6 shadow-inner overflow-y-auto max-h-[400px]">
-                   <h3 className="text-xs font-black text-red-400 uppercase tracking-widest border-b border-red-500/30 pb-3 mb-5 flex items-center gap-2">
-                    <Heart size={14}/> Critical Care Radar
-                  </h3>
+                   <h3 className="text-xs font-black text-red-400 uppercase tracking-widest border-b border-red-500/30 pb-3 mb-5 flex items-center gap-2"><Heart size={14}/> Critical Care Radar</h3>
                   <div className="space-y-3">
                     {urgentFollowUps.map(visit => (
                       <div key={visit.id} className="p-4 bg-[#001D3D] border border-red-500/20 rounded-xl">
                         <div className="font-black text-white text-xs">{visit.memberName}</div>
                         <div className="text-[9px] font-bold text-red-300 uppercase tracking-widest mt-1">{visit.purpose} • {visit.assembly}</div>
                         <p className="text-[10px] text-white/60 mt-3 italic leading-relaxed border-l-2 border-red-500/30 pl-2">"{visit.notes}"</p>
-                        
-                        <button 
-                          onClick={() => resolveFollowUp(visit.id, visit.memberName)}
-                          className="mt-4 w-full py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/30 transition-colors"
-                        >
-                          Mark Resolved
-                        </button>
+                        <button onClick={() => triggerResolve(visit.id, visit.memberName)} className="mt-4 w-full py-2 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 text-[9px] font-black uppercase tracking-widest rounded-lg border border-emerald-500/30 transition-colors">Mark Resolved</button>
                       </div>
                     ))}
-                    {urgentFollowUps.length === 0 && (
-                      <div className="text-center py-8 text-white/30 italic text-xs font-bold">No pending follow-ups.</div>
-                    )}
+                    {urgentFollowUps.length === 0 && <div className="text-center py-8 text-white/30 italic text-xs font-bold">No pending follow-ups.</div>}
                   </div>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ================================================== */}
+          {/* TAB 1.5: OFFICERS VISITATION RADAR                 */}
+          {/* ================================================== */}
+          {activeTab === 'officers' && (
+            <div className="bg-[#000814] rounded-2xl shadow-xl border border-[#003566] overflow-hidden animate-fade-in">
+              <div className="p-5 border-b border-[#003566] bg-[#001D3D] flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                  <h2 className="text-xs font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2"><Shield size={16} /> Officers Care Radar</h2>
+                  <p className="text-[9px] text-white/50 font-bold uppercase tracking-widest mt-1">Track the pastoral care of Presidings, Elders, Deacons, & Deaconesses.</p>
+                </div>
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-64">
+                    <Search className="absolute left-3 top-2.5 text-white/30" size={14}/>
+                    <input placeholder="Search officer names..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-9 p-2.5 rounded-xl bg-[#000814] border border-[#003566] text-xs font-bold outline-none focus:border-[#FFC300] text-white placeholder:text-white/30" />
+                  </div>
+                  <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="p-2.5 bg-[#000814] border border-[#003566] rounded-xl font-black text-[9px] uppercase tracking-widest text-white/70 outline-none focus:border-[#FFC300] [&>option]:bg-[#001D3D] [&>option]:text-white">
+                    <option value="All Assemblies">All Assemblies</option>
+                    {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto max-h-[600px] custom-scrollbar">
+                <table className="w-full text-left whitespace-nowrap">
+                  <thead className="sticky top-0 bg-[#001D3D] z-10 text-[9px] font-black tracking-widest text-[#FFC300] uppercase border-b border-[#003566]">
+                    <tr>
+                      <th className="p-5">Officer Identity</th>
+                      <th className="p-5">Assembly & Contact</th>
+                      <th className="p-5 text-center">Last Visit Logged</th>
+                      <th className="p-5 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#003566]">
+                    {filteredOfficers.map(officer => {
+                      const lastVisitDate = getLastVisitDate(officer.id);
+                      return (
+                        <tr key={officer.id} className="hover:bg-[#001D3D]/50 transition-colors">
+                          <td className="p-5">
+                            <div className="font-black text-white text-xs mb-1">{officer.name}</div>
+                            <span className="text-[8px] font-black uppercase text-[#FFC300] bg-[#003566] px-2 py-0.5 rounded border border-[#FFC300]/30">{officer.churchRole}</span>
+                          </td>
+                          <td className="p-5">
+                            <div className="font-bold text-[10px] text-white/70 uppercase tracking-widest mb-1">{officer.localAssembly}</div>
+                            <div className="font-mono text-[#FFC300] font-bold text-xs">{officer.phone || 'No Contact'}</div>
+                          </td>
+                          <td className="p-5 text-center">
+                            {lastVisitDate ? (
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[9px] font-black uppercase tracking-widest">
+                                <CheckCircle2 size={12} /> {new Date(lastVisitDate).toLocaleDateString()}
+                              </div>
+                            ) : (
+                              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-red-500/10 text-red-400 border border-red-500/30 text-[9px] font-black uppercase tracking-widest">
+                                <AlertCircle size={12} /> Never Visited
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-5 text-center">
+                            <div className="flex justify-center gap-2">
+                              {officer.phone && (
+                                <button onClick={() => triggerSMS(officer)} className="p-2 bg-blue-500/10 border border-blue-500/30 text-blue-400 rounded-lg hover:bg-blue-500/20 transition-all shadow-sm" title="Send Official SMS">
+                                  <MessageSquare size={14} />
+                                </button>
+                              )}
+                              <button onClick={() => jumpToLogVisit(officer)} className="px-4 py-1.5 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black uppercase tracking-widest text-[9px] rounded-lg shadow-md transition-all flex items-center gap-1">
+                                <Plus size={12} /> Log Visit
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filteredOfficers.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-white/50 font-bold italic text-xs">No officers found matching filters.</td></tr>}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -400,7 +601,7 @@ export default function VisitationTracker() {
                 </div>
                 <div className="flex items-center gap-2 bg-[#000814] px-3 py-1.5 rounded-xl border border-[#003566]">
                   <Filter size={12} className="text-[#FFC300] shrink-0" />
-                  <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none [&>option]:text-[#000814]">
+                  <select value={fAssembly} onChange={e => setFAssembly(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 outline-none [&>option]:bg-[#001D3D] [&>option]:text-white">
                     <option value="All Assemblies">All Assemblies</option>
                     {assemblies.map(a => <option key={a} value={a}>{a}</option>)}
                   </select>
@@ -444,7 +645,7 @@ export default function VisitationTracker() {
                            )}
                         </td>
                         <td className="p-5 text-center">
-                          <button onClick={() => handleDelete(visit.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
+                          <button onClick={() => triggerDelete(visit.id)} className="p-2 text-white/30 hover:text-red-400 hover:bg-red-500/20 rounded-lg transition-colors"><Trash2 size={14}/></button>
                         </td>
                       </tr>
                     ))}

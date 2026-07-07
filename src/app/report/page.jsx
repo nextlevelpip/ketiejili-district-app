@@ -247,7 +247,8 @@ export default function HQReports() {
     return current - prev;
   };
 
-  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const inputStyle = "w-full px-4 py-3 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
   const cellInputStyle = "w-12 md:w-16 p-2 bg-[#000814] border border-[#003566] rounded-lg text-center font-mono text-xs text-white focus:border-[#FFC300] outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed";
 
   return (

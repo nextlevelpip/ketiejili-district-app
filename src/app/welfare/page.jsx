@@ -16,6 +16,9 @@ export default function SocialInterventions() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
 
+  // --- CUSTOM MODAL STATE ---
+  const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, name: '', cat: '' });
+
   // --- LOG FORM STATES ---
   const [beneficiary, setBeneficiary] = useState('');
   const [amount, setAmount] = useState('');
@@ -118,15 +121,20 @@ export default function SocialInterventions() {
     }
   };
 
-  const handleDelete = async (id, name, cat) => {
+  // --- CUSTOM DELETE MODAL LOGIC ---
+  const triggerDelete = (id, name, cat) => {
     if (!isTier1) return showNotification('error', 'Restricted Command: Requires Tier 1 Clearance.');
-    if (window.confirm(`Delete this ${cat} record for ${name}? This alters financial history permanently.`)) {
-      try {
-        await deleteDoc(doc(db, 'welfare_logs', id));
-        showNotification('success', isOffline ? 'Purge queued in Offline Vault.' : 'Financial log deleted.');
-      } catch (err) { 
-        showNotification('error', 'Purge Failed.'); 
-      }
+    setDeleteModal({ isOpen: true, id, name, cat });
+  };
+
+  const confirmDelete = async () => {
+    try {
+      await deleteDoc(doc(db, 'welfare_logs', deleteModal.id));
+      showNotification('success', isOffline ? 'Purge queued in Offline Vault.' : 'Financial log deleted.');
+    } catch (err) { 
+      showNotification('error', 'Purge Failed.'); 
+    } finally {
+      setDeleteModal({ isOpen: false, id: null, name: '', cat: '' });
     }
   };
 
@@ -153,8 +161,8 @@ export default function SocialInterventions() {
     return matchesSearch && matchesAssem && matchesGender && matchesMarital && matchesOccupation;
   });
 
-  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec)
-  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:text-[#000814] [&>optgroup>option]:text-[#000814]";
+  // PREMIUM SOLID INPUT STYLE (Navy & Gold spec) WITH DROPDOWN FIX
+  const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl focus:border-[#FFC300] outline-none transition-all text-xs text-white font-bold placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white [&>optgroup>option]:bg-[#001D3D] [&>optgroup>option]:text-white";
   const labelStyle = "text-[9px] font-black text-white/50 uppercase ml-1 mb-2 block tracking-widest";
 
   if (isLoading) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
@@ -163,6 +171,37 @@ export default function SocialInterventions() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative">
         
+        {/* CUSTOM DELETE MODAL OVERLAY */}
+        {deleteModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                  <AlertCircle size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">System Purge</h3>
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  Delete this {deleteModal.cat} record for <span className="text-white">{deleteModal.name}</span>? This alters financial history permanently.
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setDeleteModal({ isOpen: false, id: null, name: '', cat: '' })}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={confirmDelete}
+                  className="flex-1 py-4 text-[10px] font-black text-red-400 uppercase tracking-widest hover:bg-red-500/10 transition-colors"
+                >
+                  Confirm Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="relative z-10 max-w-7xl mx-auto space-y-6 animate-fade-in">
           
           {notification.message && (
@@ -304,7 +343,7 @@ export default function SocialInterventions() {
                   <Filter size={14} className="text-[#FFC300] shrink-0" />
                   <select 
                     value={fCategory} onChange={e => setFCategory(e.target.value)} 
-                    className="w-full bg-transparent font-black text-[10px] uppercase tracking-widest text-white focus:outline-none cursor-pointer [&>option]:text-[#000814]"
+                    className="w-full bg-transparent font-black text-[10px] uppercase tracking-widest text-white focus:outline-none cursor-pointer [&>option]:bg-[#001D3D] [&>option]:text-white"
                   >
                     <option value="All Categories">All Categories Overview</option>
                     {welfareCategories.map(c => <option key={c} value={c}>{c}</option>)}
@@ -347,7 +386,7 @@ export default function SocialInterventions() {
                           </td>
                           {isTier1 && (
                             <td className="p-5 text-center">
-                              <button onClick={() => handleDelete(log.id, log.beneficiary, log.category)} className="p-1.5 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors">
+                              <button onClick={() => triggerDelete(log.id, log.beneficiary, log.category)} className="p-1.5 text-white/30 hover:bg-red-500/20 hover:text-red-400 rounded-lg transition-colors">
                                 <Trash2 size={14}/>
                               </button>
                             </td>
@@ -395,12 +434,12 @@ export default function SocialInterventions() {
                   />
                 </div>
                 
-                <select value={demoAssembly} onChange={e => setDemoAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:text-[#000814]">
+                <select value={demoAssembly} onChange={e => setDemoAssembly(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:bg-[#001D3D] [&>option]:text-white">
                   <option value="All Assemblies">All Assemblies</option>
                   {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
                 
-                <select value={demoGender} onChange={e => setDemoGender(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:text-[#000814]">
+                <select value={demoGender} onChange={e => setDemoGender(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:bg-[#001D3D] [&>option]:text-white">
                   <option value="All Genders">All Genders</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -408,16 +447,17 @@ export default function SocialInterventions() {
 
                 {/* DYNAMIC 4TH FILTER COLUMN */}
                 {demoSubTab === 'occupations' ? (
-                  <select value={demoOccupation} onChange={e => setDemoOccupation(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:text-[#000814]">
+                  <select value={demoOccupation} onChange={e => setDemoOccupation(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:bg-[#001D3D] [&>option]:text-white">
                     <option value="All Occupations">All Occupations</option>
                     {uniqueOccupations.map(occ => <option key={occ} value={occ}>{occ}</option>)}
                   </select>
                 ) : (
-                  <select value={demoMarital} onChange={e => setDemoMarital(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:text-[#000814]">
+                  <select value={demoMarital} onChange={e => setDemoMarital(e.target.value)} className="p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-[10px] uppercase tracking-widest outline-none focus:border-[#FFC300] text-white [&>option]:bg-[#001D3D] [&>option]:text-white">
                     <option value="All Statuses">All Marital Statuses</option>
                     <option value="Single">Single</option>
                     <option value="Married">Married</option>
                     <option value="Widowed">Widowed</option>
+                    <option value="Divorced">Divorced</option>
                   </select>
                 )}
               </div>
@@ -458,7 +498,7 @@ export default function SocialInterventions() {
                             <>
                               <td className="p-5 font-black text-white">{m.maritalStatus || '-'}</td>
                               <td className="p-5">
-                                {(m.maritalStatus === 'Married' || m.maritalStatus === 'Widowed') ? (
+                                {(m.maritalStatus === 'Married' || m.maritalStatus === 'Widowed' || m.maritalStatus === 'Divorced') ? (
                                   <span className={`font-black text-[10px] uppercase tracking-widest px-3 py-1 rounded-md border ${m.childrenCount > 3 ? 'bg-rose-500/10 text-rose-400 border-rose-500/30' : 'bg-[#003566] text-[#FFC300] border-[#FFC300]/30'}`}>
                                     {m.childrenCount || 0} Children
                                   </span>
