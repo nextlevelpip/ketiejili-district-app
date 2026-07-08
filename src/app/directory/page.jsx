@@ -1,9 +1,9 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter, Send, Mic, UploadCloud } from 'lucide-react';
+import { Users, UserPlus, Search, Trash2, CheckCircle2, AlertCircle, Loader2, Edit, Save, Flame, PhoneCall, MessageSquare, MessageCircle, Shield, WifiOff, FileBadge, FileText, X, Filter, Send, Mic, UploadCloud, DownloadCloud, Database } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, doc, deleteDoc, updateDoc, query, orderBy, writeBatch } from 'firebase/firestore';
 
 export default function Directory() {
   const [members, setMembers] = useState([]);
@@ -20,6 +20,12 @@ export default function Directory() {
   // --- CUSTOM MODAL STATES ---
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, id: null, name: '', type: '' });
   const [smsModal, setSmsModal] = useState({ isOpen: false, member: null, message: '', mode: 'text', audioFile: null });
+  
+  // --- BULK UPLOAD STATES ---
+  const [uploadModal, setUploadModal] = useState(false);
+  const [uploadFile, setUploadFile] = useState(null);
+  const [uploadErrors, setUploadErrors] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   // --- FORM STATES ---
   const [editingId, setEditingId] = useState(null);
@@ -55,7 +61,7 @@ export default function Directory() {
   const [fDemo, setFDemo] = useState('All Ages');
 
   const churchRoles = ["New Convert", "Member", "Leader", "Local Secretary", "Deacon", "Deaconess", "Elder", "Presiding Brother", "Presiding Deacon", "Presiding Elder", "District Minister", "District Minister's Wife"];
-  const filterRolesOptions = ["All Roles", "Officers", "Presiding", ...churchRoles]; // Includes Macro-Categories
+  const filterRolesOptions = ["All Roles", "Officers", "Presiding", ...churchRoles];
   const statuses = ["Active Member", "MFS", "Backslidden", "Transferred", "Deceased", "Pending"];
   const certTypes = ["Baptism Certificate", "Child Dedication Certificate", "Marriage Certificate"];
   const disabilityTypes = ["Visually Impaired", "Deaf/Hard of Hearing", "Speech Impairment", "Physical/Mobility Impaired", "Autism Spectrum", "Albinism", "Epilepsy", "Cerebral Palsy", "Mental Health Condition", "Multiple Disabilities", "Other"];
@@ -319,6 +325,117 @@ export default function Directory() {
     finally { setIsSubmitting(false); }
   };
 
+  // --- BULK UPLOAD ENGINE ---
+  const handleDownloadTemplate = () => {
+    const headers = ["Full Name", "Phone Number (10 digits)", "DOB (YYYY-MM-DD)", "Gender (Male/Female)", "Local Assembly", "Church Role", "Marital Status"];
+    const example1 = ["John Doe", "0241234567", "1990-05-15", "Male", "Central", "Member", "Married"];
+    const example2 = ["Jane Smith", "", "1995-10-20", "Female", "Central", "New Convert", "Single"];
+    const csvContent = headers.join(",") + "\n" + example1.join(",") + "\n" + example2.join(",");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "District_Bulk_Registration_Template.csv";
+    link.click();
+  };
+
+  const parseCSV = (text) => {
+    const lines = text.split('\n').filter(line => line.trim() !== '');
+    if (lines.length < 2) return { error: "File is empty or missing data rows." };
+    const rows = lines.slice(1).map(line => line.split(',').map(val => val.trim().replace(/^"|"$/g, '')));
+    return { rows };
+  };
+
+  const executeBulkUpload = async () => {
+    if (!uploadFile) return setUploadErrors(["Please select a CSV file to upload."]);
+    setIsUploading(true);
+    setUploadErrors([]);
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target.result;
+      const parsed = parseCSV(text);
+      if (parsed.error) {
+         setUploadErrors([parsed.error]);
+         setIsUploading(false);
+         return;
+      }
+
+      const { rows } = parsed;
+      const errors = [];
+      const validDataToUpload = [];
+
+      for (let i = 0; i < rows.length; i++) {
+         const row = rows[i];
+         const rowNum = i + 2; 
+
+         const name = row[0];
+         let phone = row[1] || '';
+         const dob = row[2];
+         const gender = row[3];
+         const assembly = row[4];
+         const role = row[5] || 'Member';
+         const marital = row[6] || 'Single';
+
+         if (!name) errors.push(`Row ${rowNum}: Full Name is required.`);
+         if (phone) {
+           phone = phone.replace(/\D/g, '');
+           if (phone.length > 0 && phone[0] !== '0') phone = '0' + phone;
+           phone = phone.slice(0, 10);
+           if (phone.length !== 10) errors.push(`Row ${rowNum}: Phone must be exactly 10 digits.`);
+         }
+         if (!dob || isNaN(new Date(dob).getTime())) errors.push(`Row ${rowNum}: Invalid DOB format. Use YYYY-MM-DD.`);
+         if (!['Male', 'Female'].includes(gender)) errors.push(`Row ${rowNum}: Gender must be strictly 'Male' or 'Female'.`);
+         if (!assembly) errors.push(`Row ${rowNum}: Local Assembly is required.`);
+
+         // Duplicate Check
+         const isDuplicate = members.some(m =>
+           String(m.name || '').toLowerCase().trim() === String(name || '').toLowerCase().trim() &&
+           m.phone === phone && m.dob === dob && m.gender === gender
+         );
+
+         if (isDuplicate) {
+           errors.push(`Row ${rowNum}: ${name} is a duplicate of an existing member.`);
+         }
+
+         if (errors.length === 0) {
+           validDataToUpload.push({
+             name, phone, dob, gender, localAssembly: assembly,
+             churchRole: role, maritalStatus: marital,
+             membershipStatus: 'Active Member', homeCell: 'None', bibleStudy: 'None',
+             occupation: '', childrenCount: '0', holySpiritBaptism: 'No', spiritGift: '',
+             waterBaptismStatus: 'No', waterBaptismDate: '', baptizedBy: '',
+             isDedicated: 'No', dateDedicated: '', dedicatedBy: '', hometown: '',
+             emergencyContact: '', remarks: 'System Bulk Upload', disability: 'None', disabilityType: '',
+             ageGroup: getAgeDemographic(dob), timestamp: new Date().toISOString(), dateAdded: new Date().toISOString()
+           });
+         }
+      }
+
+      if (errors.length > 0) {
+         setUploadErrors(errors);
+         setIsUploading(false);
+         return;
+      }
+
+      try {
+         const batch = writeBatch(db);
+         validDataToUpload.forEach(data => {
+            const newDocRef = doc(collection(db, 'members'));
+            batch.set(newDocRef, data);
+         });
+         await batch.commit();
+         showNotification('success', `Validation Passed! Successfully registered ${validDataToUpload.length} members.`);
+         setUploadModal(false);
+         setUploadFile(null);
+      } catch (err) {
+         setUploadErrors(["Database Injection Error: Failed to execute batch upload."]);
+      } finally {
+         setIsUploading(false);
+      }
+    };
+    reader.readAsText(uploadFile);
+  };
+
   // --- SMART HIERARCHICAL FILTER ENGINE ---
   const filtered = members.filter(m => {
     const age = calculateAge(m.dob);
@@ -389,6 +506,80 @@ export default function Directory() {
           </div>
         )}
 
+        {/* BULK UPLOAD MODAL OVERLAY */}
+        {uploadModal && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden scale-100 animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+              <div className="p-6 border-b border-[#003566] flex justify-between items-center bg-[#000814]">
+                <div>
+                  <h3 className="text-sm font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-2">
+                    <UploadCloud size={16}/> Bulk Registration Engine
+                  </h3>
+                  <p className="text-[9px] font-bold text-white/50 uppercase tracking-widest mt-1">Inject multiple members into the database instantly.</p>
+                </div>
+              </div>
+              
+              <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+                
+                {/* Step 1: Download Template */}
+                <div className="bg-[#000814] border border-[#003566] p-5 rounded-xl text-center">
+                  <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Step 1: The Gold Standard Template</h4>
+                  <p className="text-[9px] font-bold text-white/50 mb-4 leading-relaxed">The database requires a strict format. Download this CSV template, open it in Excel, fill in your members, and save it back as a CSV.</p>
+                  <button 
+                    onClick={handleDownloadTemplate}
+                    className="px-6 py-2.5 bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors flex items-center gap-2 mx-auto"
+                  >
+                    <DownloadCloud size={14} /> Download CSV Template
+                  </button>
+                </div>
+
+                {/* Step 2: Upload */}
+                <div className="bg-[#000814] border border-[#003566] p-5 rounded-xl text-center">
+                  <h4 className="text-[10px] font-black text-white uppercase tracking-widest mb-2">Step 2: Scan & Inject</h4>
+                  <p className="text-[9px] font-bold text-white/50 mb-4 leading-relaxed">Upload your completed CSV file. The Validation Engine will check for errors and duplicates before injecting.</p>
+                  
+                  <div className="flex flex-col items-center justify-center border border-[#003566] border-dashed p-6 rounded-xl relative group hover:border-[#FFC300]/50 transition-colors bg-[#001D3D]">
+                    <UploadCloud size={24} className={`${uploadFile ? 'text-[#FFC300]' : 'text-white/20'} mb-2`} />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-white mb-1">
+                      {uploadFile ? 'Data File Locked In' : 'Select CSV File'}
+                    </h4>
+                    <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest text-center">
+                      {uploadFile ? uploadFile.name : 'Strictly .csv format only'}
+                    </p>
+                    <input type="file" accept=".csv" onChange={(e) => {setUploadFile(e.target.files[0]); setUploadErrors([]);}} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                  </div>
+                </div>
+
+                {/* Error Console */}
+                {uploadErrors.length > 0 && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+                    <h4 className="text-[9px] font-black text-red-400 uppercase tracking-widest mb-2 flex items-center gap-1.5"><AlertCircle size={12}/> Validation Failed</h4>
+                    <ul className="list-disc pl-4 text-[9px] font-bold text-white/70 space-y-1">
+                      {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex border-t border-[#003566] bg-[#000814] shrink-0">
+                <button 
+                  onClick={() => { setUploadModal(false); setUploadFile(null); setUploadErrors([]); }}
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#001D3D] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={executeBulkUpload}
+                  disabled={isUploading || !uploadFile}
+                  className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center justify-center gap-2 ${isUploading || !uploadFile ? 'bg-[#001D3D] text-white/30 cursor-not-allowed' : 'bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814]'}`}
+                >
+                  {isUploading ? <><Loader2 size={14} className="animate-spin" /> Processing Data...</> : <><Database size={14} /> Execute Injection</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* CUSTOM OMNI-CHANNEL BROADCAST MODAL OVERLAY */}
         {smsModal.isOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
@@ -432,7 +623,11 @@ export default function Directory() {
                     <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest text-center">
                       {smsModal.audioFile ? smsModal.audioFile.name : 'MP3 or WAV files only (Max 5MB)'}
                     </p>
-                    <input type="file" accept="audio/mp3, audio/wav" onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    <input type="file" accept="audio/mp3, audio/wav" onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file && file.size > 5000000) return showNotification('error', 'File must be under 5MB.');
+                      setSmsModal({...smsModal, audioFile: file});
+                    }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                   </div>
                 )}
               </div>
@@ -487,19 +682,27 @@ export default function Directory() {
                 </div>
               </div>
               
-              <button 
-                onClick={() => { 
-                  if (activeTab === 'register') {
-                    setActiveTab('directory');
-                  } else {
-                    resetForm();
-                    setActiveTab('register');
-                  }
-                }} 
-                className={`px-4 md:px-6 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[10px] border shadow-lg flex items-center gap-2 ${activeTab === 'register' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-[#FFC300] text-[#000814] border-[#FFC300] hover:bg-[#FFD60A]'}`}
-              >
-                {activeTab === 'register' ? <><X size={14} /> <span className="hidden sm:inline">Cancel</span></> : <><UserPlus size={14} /> <span className="hidden sm:inline">{editingId ? 'Edit Record' : 'Register Member'}</span><span className="sm:hidden">Add</span></>}
-              </button>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setUploadModal(true)}
+                  className="px-4 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[10px] bg-[#000814] text-emerald-400 border border-[#003566] hover:bg-[#003566] hover:text-white shadow-lg flex items-center gap-2"
+                >
+                  <UploadCloud size={14} /> <span className="hidden sm:inline">Bulk Upload</span>
+                </button>
+                <button 
+                  onClick={() => { 
+                    if (activeTab === 'register') {
+                      setActiveTab('directory');
+                    } else {
+                      resetForm();
+                      setActiveTab('register');
+                    }
+                  }} 
+                  className={`px-4 md:px-6 py-2.5 rounded-xl font-black uppercase tracking-widest transition-all text-[10px] border shadow-lg flex items-center gap-2 ${activeTab === 'register' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-[#FFC300] text-[#000814] border-[#FFC300] hover:bg-[#FFD60A]'}`}
+                >
+                  {activeTab === 'register' ? <><X size={14} /> <span className="hidden sm:inline">Cancel</span></> : <><UserPlus size={14} /> <span className="hidden sm:inline">{editingId ? 'Edit Record' : 'Register Member'}</span><span className="sm:hidden">Add</span></>}
+                </button>
+              </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
