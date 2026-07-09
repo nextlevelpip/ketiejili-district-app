@@ -9,7 +9,7 @@ import { doc, onSnapshot, collection, query, where, getDocs, addDoc } from 'fire
 import { 
   LayoutDashboard, Users, ClipboardCheck, Target, Flame, 
   Shield, MessageSquare, BookOpen, Download, UserCog, 
-  Settings, LogOut, Menu, Cloud, Lock,
+  Settings, LogOut, Menu, Cloud, Lock, DollarSign,
   Heart, HeartHandshake, FileSpreadsheet, Mic
 } from 'lucide-react';
 
@@ -193,6 +193,7 @@ export default function DashboardLayout({ children }) {
     { name: 'Welfare & Social', href: '/welfare', icon: HeartHandshake },
     { name: 'Presbytery', href: '/presbytery', icon: Shield },
     { name: 'HQ Statistical Reports', href: '/report', icon: FileSpreadsheet },
+    { name: 'Finance', href: '/finance', icon: DollarSign},
     { name: 'District Communications Hub', href: '/sms', icon: MessageSquare },
     { name: 'District Heritage', href: '/heritage', icon: BookOpen },
     { name: 'Data Export', href: '/export', icon: Download },
