@@ -57,8 +57,12 @@ export default function EvangelismAndSouls() {
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [processingId, setProcessingId] = useState(null);
   
-  // Broadcast Success Modal State
+  // NEW: SENDER ID MEMORY STATE
+  const [senderId, setSenderId] = useState("Ketiejili");
+
+  // Broadcast & Soul Success Modal State
   const [broadcastSuccessModal, setBroadcastSuccessModal] = useState({ isOpen: false, count: 0 });
+  const [soulSuccessModal, setSoulSuccessModal] = useState(false);
 
   // --- NEW: SOUL REGISTRATION STATES ---
   const [availableLanguages, setAvailableLanguages] = useState(["English", "Twi", "Konkomba", "Ga", "Ewe"]);
@@ -81,12 +85,18 @@ export default function EvangelismAndSouls() {
 
   // --- INITIALIZATION ---
   useEffect(() => {
+    // 1. Pull User Data
     const userStr = localStorage.getItem('ketiejili_user');
     if (userStr) {
       const parsedUser = JSON.parse(userStr);
       setCurrentUser(parsedUser);
-      // Auto-fill Soul Winner's Name
       setSoulData(prev => ({ ...prev, counselorName: parsedUser.fullName || parsedUser.name || 'District Minister' }));
+    }
+
+    // 2. Pull Saved Sender ID from Memory
+    const savedSenderId = localStorage.getItem('mnotify_sender_id');
+    if (savedSenderId) {
+      setSenderId(savedSenderId);
     }
 
     const fetchSettings = async () => {
@@ -226,18 +236,29 @@ export default function EvangelismAndSouls() {
   const handleAudioUpload = (e) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type === "audio/mpeg" || file.name.toLowerCase().endsWith(".mp3")) {
+      if (file.name.toLowerCase().endsWith(".mp3")) {
         setAudioFile(file);
       } else {
-        showNotification("error", "Invalid File. Please upload an .mp3 file.");
+        showNotification("error", "Strict Requirement: Only .mp3 files are permitted.");
+        if (audioUploadRef.current) audioUploadRef.current.value = '';
       }
     }
   };
 
+  // --- BROADCAST HANDLER ---
   const handleSendBroadcast = async (e) => {
     e.preventDefault();
     if (selectedIds.length === 0) return;
-    if (messageType === "sms" && !smsMessage) return;
+    
+    // Require Sender ID check
+    if (messageType === "sms") {
+      if (!smsMessage) return;
+      if (!senderId || senderId.trim().length === 0) {
+        showNotification("error", "Please enter an approved Sender ID.");
+        return;
+      }
+    }
+    
     if (messageType === "voice" && !audioFile) return;
 
     setIsSendingBroadcast(true);
@@ -245,26 +266,49 @@ export default function EvangelismAndSouls() {
 
     try {
       if (messageType === "sms") {
-        const formData = new FormData();
-        formData.append("type", "sms");
-        formData.append("recipients", JSON.stringify(recipients));
-        formData.append("message", smsMessage);
-        formData.append("senderId", "COP-KETIEJI"); 
-        await fetch("/api/mnotify", { method: "POST", body: formData });
+        // Send JSON with the newly saved Sender ID
+        const response = await fetch("/api/send-sms", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            message: smsMessage,
+            recipients: recipients,
+            senderId: senderId.trim()
+          })
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Server rejected the transmission.');
+        }
+
       } else {
+        // --- NEW: FORWARD TO VOICE API ---
         const voiceData = new FormData();
-        voiceData.append("type", "voice");
         voiceData.append("recipients", JSON.stringify(recipients));
         voiceData.append("file", audioFile);
-        await fetch("/api/mnotify", { method: "POST", body: voiceData });
 
+        const response = await fetch("/api/send-voice", {
+          method: 'POST',
+          body: voiceData
+        });
+
+        const data = await response.json();
+        
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'Server rejected the voice transmission.');
+        }
+
+        // Send the optional follow-up SMS if Pastor provided one
         if (followUpSms.trim() !== "") {
-          const smsData = new FormData();
-          smsData.append("type", "sms");
-          smsData.append("recipients", JSON.stringify(recipients));
-          smsData.append("message", followUpSms);
-          smsData.append("senderId", "COP-KETIEJI"); 
-          await fetch("/api/mnotify", { method: "POST", body: smsData });
+           await fetch("/api/send-sms", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: followUpSms, recipients: recipients, senderId: senderId.trim() })
+          });
         }
       }
 
@@ -272,7 +316,7 @@ export default function EvangelismAndSouls() {
       setBroadcastSuccessModal({ isOpen: true, count: recipients.length });
       setSmsMessage(""); setAudioFile(null); setSelectedIds([]);
     } catch (error) {
-      showNotification("error", "Network Error during broadcast.");
+      showNotification("error", error.message || "Network Error during broadcast.");
     } finally {
       setIsSendingBroadcast(false);
     }
@@ -283,6 +327,11 @@ export default function EvangelismAndSouls() {
     const { error } = await supabase.from("souls").update({ follow_up_status: status }).eq("id", id);
     if (!error) setAltarSouls(altarSouls.map(soul => soul.id === id ? { ...soul, follow_up_status: status } : soul));
     setProcessingId(null);
+  };
+
+  const triggerDelete = (e, id) => {
+    e.stopPropagation();
+    setDeleteConfirmId(id);
   };
 
   const confirmDeleteSoul = async () => {
@@ -375,11 +424,9 @@ export default function EvangelismAndSouls() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    let cleanPhone = soulData.phone.replace(/\D/g, ''); 
-    if (cleanPhone.length > 0 && cleanPhone[0] !== '0') cleanPhone = '0' + cleanPhone;
-
-    if (cleanPhone.length !== 10) {
-      showNotification('error', 'Phone number must be exactly 10 digits.');
+    const cleanPhone = soulData.phone;
+    if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
+      showNotification('error', 'Phone number must be exactly 10 digits starting with 0.');
       setIsSubmitting(false);
       return;
     }
@@ -409,10 +456,9 @@ export default function EvangelismAndSouls() {
 
       if (error) throw error;
 
-      showNotification('success', 'Soul successfully registered to AltarConnect Engine!');
+      setSoulSuccessModal(true);
       setSoulData({ counselorName: currentUser?.fullName || 'District Minister', fullName: '', phone: '', gender: '', language: '', category: 'General Prayer', customPrayer: '', customLanguage: '' });
       await fetchHarvest();
-      setActiveTab('souls');
     } catch (err) {
       showNotification('error', 'Submission failure. Check network connection.');
     } finally {
@@ -430,6 +476,20 @@ export default function EvangelismAndSouls() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
+        {/* ========================================================= */}
+        {/* ESCAPED GLOBAL NOTIFICATION (Now truly on top of everything) */}
+        {/* ========================================================= */}
+        {notification.message && (
+          <div className={`fixed top-10 right-10 z-[99999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
+            notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 
+            notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 
+            'bg-red-500 text-white'
+          }`}>
+            {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+            {notification.message}
+          </div>
+        )}
+
         {/* ========================================================= */}
         {/* GLOBAL MODALS (Fixed Z-Index & Styling)                   */}
         {/* ========================================================= */}
@@ -490,6 +550,28 @@ export default function EvangelismAndSouls() {
           </div>
         )}
 
+        {/* NEW SOUL SUCCESS MODAL */}
+        {soulSuccessModal && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100">
+              <div className="p-8 text-center">
+                <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-emerald-400">
+                  <CheckCircle2 size={28} />
+                </div>
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">Soul Registered!</h3>
+                <p className="text-[10px] font-bold text-[#8ECAE6] leading-relaxed uppercase tracking-widest">
+                  The soul has been securely added to the AltarConnect Engine.
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button onClick={() => { setSoulSuccessModal(false); setActiveTab('souls'); }} className="w-full py-4 text-[10px] font-black text-[#FFC300] uppercase tracking-widest hover:bg-[#000814] transition-colors">
+                  View Registry
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* PASTORAL NOTES MODAL */}
         {selectedSoul && (
           <div className="fixed inset-0 bg-[#000814]/80 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
@@ -542,7 +624,24 @@ export default function EvangelismAndSouls() {
                   {messageType === "sms" ? (
                     <div className="space-y-4 animate-fade-in">
                       <div>
-                        <label className={labelStyle}>Text Message</label>
+                        <label className={labelStyle}>Approved Sender ID (Max 11 Chars) *</label>
+                        <input 
+                          required 
+                          type="text" 
+                          maxLength={11}
+                          placeholder="e.g. Ketiejili" 
+                          value={senderId} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSenderId(val);
+                            localStorage.setItem('mnotify_sender_id', val);
+                          }} 
+                          className={inputStyle} 
+                        />
+                        <p className="text-[8px] font-bold text-[#8ECAE6]/70 uppercase tracking-widest mt-1.5">This ID must be pre-approved in your MNotify Dashboard.</p>
+                      </div>
+                      <div>
+                        <label className={labelStyle}>Text Message *</label>
                         <textarea required rows={5} placeholder="Type your pastoral message here..." value={smsMessage} onChange={(e) => setSmsMessage(e.target.value)} className={`${inputStyle} resize-none leading-relaxed`} />
                       </div>
                     </div>
@@ -587,13 +686,6 @@ export default function EvangelismAndSouls() {
 
         <div className="relative z-10 max-w-[1400px] mx-auto space-y-6 animate-fade-in">
           
-          {notification.message && (
-            <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
-              {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
-              {notification.message}
-            </div>
-          )}
-
           {/* ========================================================= */}
           {/* STICKY HEADER & TABS                                      */}
           {/* ========================================================= */}
@@ -611,7 +703,7 @@ export default function EvangelismAndSouls() {
                 { id: 'log', label: 'Log Outreach', icon: Megaphone },
                 { id: 'history', label: `Reports (${logs.length})`, icon: FileSpreadsheet },
                 { id: 'souls', label: `Harvested Souls (${altarSouls.length})`, icon: Users },
-                { id: 'register', label: 'Register Soul', icon: UserPlus } // NEW TAB
+                { id: 'register', label: 'Register Soul', icon: UserPlus } 
               ].map(tab => {
                 const Icon = tab.icon;
                 return (
@@ -771,6 +863,7 @@ export default function EvangelismAndSouls() {
                 </div>
               </div>
 
+              {/* UPDATED UI FIX: Clean Grid for Mobile Button Wrapping */}
               <div className="flex flex-col xl:flex-row justify-between items-center bg-[#000814] p-5 rounded-2xl shadow-xl border border-[#003566] gap-5">
                 <div className="flex flex-col sm:flex-row w-full xl:w-1/2 gap-4">
                   <div className="relative w-full">
@@ -786,126 +879,134 @@ export default function EvangelismAndSouls() {
                   </select>
                 </div>
                 
-                <div className="flex flex-wrap justify-center xl:justify-end gap-3 w-full xl:w-auto">
-                  <button 
-                    onClick={() => {
-                      if (selectedIds.length === 0) showNotification("info", "Please select at least one soul using the checkboxes.");
-                      else setIsBroadcastModalOpen(true);
-                    }}
-                    className={`flex items-center gap-2 font-black py-3 px-5 rounded-xl transition-all shadow-lg text-[10px] uppercase tracking-widest w-full sm:w-auto justify-center ${selectedIds.length > 0 ? 'bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] animate-pulse' : 'bg-[#001D3D] text-white/30 border border-[#003566]'}`}
-                  >
-                    <Send size={14} /> BROADCAST {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
-                  </button>
+                <div className="flex flex-col w-full xl:w-auto gap-3 mt-2 xl:mt-0">
                   <input type="file" accept=".csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                   
-                  <div className="flex gap-2 w-full sm:w-auto">
-                    <button onClick={downloadTemplate} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
+                  {/* Top Row: Broadcast + Template */}
+                  <div className="flex gap-3 w-full">
+                    <button 
+                      onClick={() => {
+                        if (selectedIds.length === 0) showNotification("info", "Please select at least one soul using the checkboxes.");
+                        else setIsBroadcastModalOpen(true);
+                      }}
+                      className={`flex-grow flex items-center justify-center gap-2 font-black py-3 px-5 rounded-xl transition-all shadow-lg text-[10px] uppercase tracking-widest ${selectedIds.length > 0 ? 'bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] animate-pulse' : 'bg-[#001D3D] text-white/30 border border-[#003566]'}`}
+                    >
+                      <Send size={14} /> BROADCAST {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+                    </button>
+                    
+                    <button onClick={downloadTemplate} className="flex-none flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
                       <FileText size={14} /> Template
                     </button>
-                    <button onClick={() => fileInputRef.current?.click()} disabled={isSubmitting} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
-                      <Upload size={14} /> Import
+                  </div>
+
+                  {/* Bottom Row: Import + Export */}
+                  <div className="flex gap-3 w-full">
+                    <button onClick={() => fileInputRef.current?.click()} disabled={isSubmitting} className="flex-1 flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
+                      <Upload size={14} /> Import Data
                     </button>
-                    <button onClick={exportRegistry} className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
-                      <Download size={14} /> Export
+                    <button onClick={exportRegistry} className="flex-1 flex justify-center items-center gap-2 bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] font-black py-3 px-4 rounded-xl transition-colors text-[9px] uppercase tracking-widest border border-[#003566]">
+                      <Download size={14} /> Export CSV
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-[#000814] rounded-2xl shadow-2xl border border-[#003566] overflow-hidden overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left text-xs whitespace-nowrap min-w-[1000px]">
-                  <thead className="bg-[#001D3D] border-b border-[#003566] font-black text-[#FFC300] uppercase tracking-widest text-[9px]">
-                    <tr>
-                      <th className="p-5 w-12 text-center">
-                        <input type="checkbox" className="w-4 h-4 cursor-pointer accent-[#FFC300] rounded" onChange={toggleSelectAll} checked={selectedIds.length > 0 && selectedIds.length === filteredSouls.length} />
-                      </th>
-                      <th className="p-5">Name & Soulwinner</th>
-                      <th className="p-5">Direct Contact</th>
-                      <th className="p-5">Spiritual Need</th>
-                      <th className="p-5 text-center">Day</th>
-                      <th className="p-5 text-center">Status</th>
-                      <th className="p-5 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#003566]">
-                    {filteredSouls.map((soul) => (
-                      <tr key={soul.id} className={`transition-colors ${selectedIds.includes(soul.id) ? 'bg-[#FFC300]/10' : 'hover:bg-[#001D3D]/50'}`}>
-                        <td className="p-5 text-center">
-                          <input type="checkbox" className="w-4 h-4 cursor-pointer accent-[#FFC300] rounded" checked={selectedIds.includes(soul.id)} onChange={() => toggleSelectSoul(soul.id)} />
-                        </td>
-                        <td className="p-5 cursor-pointer" onClick={() => { setSelectedSoul(soul); setNoteText(soul.pastoral_notes || ""); }}>
-                          <div className="flex flex-col">
-                            <div className="font-black text-white flex items-center gap-2 text-sm">
-                              {soul.full_name} 
-                              {soul.pastoral_notes && <Edit3 size={12} className="text-[#8ECAE6]" />}
-                            </div>
-                            {soul.counselor_name && <span className="text-[9px] text-white/50 font-bold uppercase tracking-widest mt-1">Won by: {soul.counselor_name}</span>}
-                          </div>
-                        </td>
-                        
-                        <td className="p-5">
-                          <span className="font-mono font-bold text-[#8ECAE6] block mb-2">{soul.phone_number}</span>
-                          <div className="flex gap-2">
-                            <a href={`tel:${soul.phone_number}`} className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors border border-blue-500/30" title="Initiate Call Link">
-                              <Phone size={12} />
-                            </a>
-                            <a href={getWhatsAppLink(soul.phone_number)} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors border border-emerald-500/30" title="Open WhatsApp Window">
-                              <MessageCircle size={12} />
-                            </a>
-                          </div>
-                        </td>
-
-                        <td className="p-5">
-                          <span className="text-[9px] font-black text-[#FFC300] bg-[#003566] px-2.5 py-1 rounded-lg border border-[#FFC300]/30 uppercase tracking-widest whitespace-nowrap">
-                            {soul.spiritual_need || "General Prayer"}
-                          </span>
-                        </td>
-                        <td className="p-5 text-center">
-                          <span className="bg-[#001D3D] text-[#8ECAE6] px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-[#003566]">Day {calculateDay(soul.created_at)}</span>
-                        </td>
-                        <td className="p-5 text-center">
-                          <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
-                            soul.follow_up_status === 'active' ? 'bg-[#FFC300]/10 text-[#FFC300] border-[#FFC300]/30' : 
-                            soul.follow_up_status === 'thinking' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 
-                            soul.follow_up_status === 'visitation_needed' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                          }`}>
-                            {soul.follow_up_status === 'active' ? 'Grounding' : 
-                             soul.follow_up_status === 'thinking' ? 'Thinking' : 
-                             soul.follow_up_status === 'visitation_needed' ? 'Needs Visit' : 'Ready'}
-                          </span>
-                        </td>
-                        <td className="p-5">
-                          <div className="flex items-center justify-center gap-2">
-                            {soul.follow_up_status === 'active' || soul.follow_up_status === 'thinking' ? (
-                              <div className="flex gap-1.5">
-                                {soul.follow_up_status === 'active' && (
-                                  <button onClick={(e) => updateStatus(e, soul.id, 'thinking')} disabled={processingId === soul.id} className="bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 border border-purple-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Think</button>
-                                )}
-                                {soul.follow_up_status === 'thinking' && (
-                                  <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="bg-[#FFC300]/20 hover:bg-[#FFC300]/40 text-[#FFC300] border border-[#FFC300]/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Active</button>
-                                )}
-                                <button onClick={(e) => updateStatus(e, soul.id, 'visitation_needed')} disabled={processingId === soul.id} className="bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Visit</button>
-                                <button onClick={(e) => updateStatus(e, soul.id, 'ready_for_main_system')} disabled={processingId === soul.id} className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Admit</button>
-                              </div>
-                            ) : soul.follow_up_status === 'visitation_needed' ? (
-                              <div className="flex gap-1.5">
-                                <button onClick={(e) => updateStatus(e, soul.id, 'ready_for_main_system')} disabled={processingId === soul.id} className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors">Admit</button>
-                                <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] border border-[#003566] p-1.5 rounded-lg transition-colors"><RotateCcw size={14} /></button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">Church System</span>
-                                <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="text-[#8ECAE6] hover:text-white transition-colors bg-[#001D3D] p-1.5 rounded-lg border border-[#003566]"><RotateCcw size={14} /></button>
-                              </div>
-                            )}
-                            <button onClick={(e) => triggerDelete(e, soul.id)} disabled={processingId === soul.id} className="ml-1 text-red-400 hover:text-white hover:bg-red-500/20 p-1.5 rounded-lg transition-colors"><Trash2 size={14} /></button>
-                          </div>
-                        </td>
+              <div className="w-full overflow-x-auto pb-4">
+                <div className="min-w-[1000px] bg-[#000814] rounded-2xl shadow-2xl border border-[#003566] overflow-hidden">
+                  <table className="w-full text-left text-xs whitespace-nowrap">
+                    <thead className="bg-[#001D3D] border-b border-[#003566] font-black text-[#FFC300] uppercase tracking-widest text-[9px]">
+                      <tr>
+                        <th className="p-5 w-12 text-center">
+                          <input type="checkbox" className="w-4 h-4 cursor-pointer accent-[#FFC300] rounded" onChange={toggleSelectAll} checked={selectedIds.length > 0 && selectedIds.length === filteredSouls.length} />
+                        </th>
+                        <th className="p-5">Name & Soulwinner</th>
+                        <th className="p-5">Direct Contact</th>
+                        <th className="p-5">Spiritual Need</th>
+                        <th className="p-5 text-center">Day</th>
+                        <th className="p-5 text-center">Status</th>
+                        <th className="p-5 text-center">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {filteredSouls.length === 0 && <div className="p-10 text-center text-[#8ECAE6]/50 text-xs font-bold uppercase tracking-widest">No souls match your current search.</div>}
+                    </thead>
+                    <tbody className="divide-y divide-[#003566]">
+                      {filteredSouls.map((soul) => (
+                        <tr key={soul.id} className={`transition-colors ${selectedIds.includes(soul.id) ? 'bg-[#FFC300]/10' : 'hover:bg-[#001D3D]/50'}`}>
+                          <td className="p-5 text-center">
+                            <input type="checkbox" className="w-4 h-4 cursor-pointer accent-[#FFC300] rounded" checked={selectedIds.includes(soul.id)} onChange={() => toggleSelectSoul(soul.id)} />
+                          </td>
+                          <td className="p-5 cursor-pointer" onClick={() => { setSelectedSoul(soul); setNoteText(soul.pastoral_notes || ""); }}>
+                            <div className="flex flex-col">
+                              <div className="font-black text-white flex items-center gap-2 text-sm">
+                                {soul.full_name} 
+                                {soul.pastoral_notes && <Edit3 size={12} className="text-[#8ECAE6]" />}
+                              </div>
+                              {soul.counselor_name && <span className="text-[9px] text-white/50 font-bold uppercase tracking-widest mt-1">Won by: {soul.counselor_name}</span>}
+                            </div>
+                          </td>
+                          
+                          <td className="p-5">
+                            <span className="font-mono font-bold text-[#8ECAE6] block mb-2">{soul.phone_number}</span>
+                            <div className="flex gap-2">
+                              <a href={`tel:${soul.phone_number}`} className="p-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg transition-colors border border-blue-500/30" title="Initiate Call Link">
+                                <Phone size={12} />
+                              </a>
+                              <a href={getWhatsAppLink(soul.phone_number)} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 rounded-lg transition-colors border border-emerald-500/30" title="Open WhatsApp Window">
+                                <MessageCircle size={12} />
+                              </a>
+                            </div>
+                          </td>
+
+                          <td className="p-5">
+                            <span className="text-[9px] font-black text-[#FFC300] bg-[#003566] px-2.5 py-1 rounded-lg border border-[#FFC300]/30 uppercase tracking-widest whitespace-nowrap">
+                              {soul.spiritual_need || "General Prayer"}
+                            </span>
+                          </td>
+                          <td className="p-5 text-center">
+                            <span className="bg-[#001D3D] text-[#8ECAE6] px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border border-[#003566]">Day {calculateDay(soul.created_at)}</span>
+                          </td>
+                          <td className="p-5 text-center">
+                            <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border whitespace-nowrap ${
+                              soul.follow_up_status === 'active' ? 'bg-[#FFC300]/10 text-[#FFC300] border-[#FFC300]/30' : 
+                              soul.follow_up_status === 'thinking' ? 'bg-purple-500/10 text-purple-400 border-purple-500/30' : 
+                              soul.follow_up_status === 'visitation_needed' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                            }`}>
+                              {soul.follow_up_status === 'active' ? 'Grounding' : 
+                               soul.follow_up_status === 'thinking' ? 'Thinking' : 
+                               soul.follow_up_status === 'visitation_needed' ? 'Needs Visit' : 'Ready'}
+                            </span>
+                          </td>
+                          <td className="p-5">
+                            <div className="flex items-center justify-center gap-2">
+                              {soul.follow_up_status === 'active' || soul.follow_up_status === 'thinking' ? (
+                                <div className="flex gap-1.5">
+                                  {soul.follow_up_status === 'active' && (
+                                    <button onClick={(e) => updateStatus(e, soul.id, 'thinking')} disabled={processingId === soul.id} className="bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 border border-purple-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Think</button>
+                                  )}
+                                  {soul.follow_up_status === 'thinking' && (
+                                    <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="bg-[#FFC300]/20 hover:bg-[#FFC300]/40 text-[#FFC300] border border-[#FFC300]/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Active</button>
+                                  )}
+                                  <button onClick={(e) => updateStatus(e, soul.id, 'visitation_needed')} disabled={processingId === soul.id} className="bg-red-500/20 hover:bg-red-500/40 text-red-400 border border-red-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Visit</button>
+                                  <button onClick={(e) => updateStatus(e, soul.id, 'ready_for_main_system')} disabled={processingId === soul.id} className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 px-2 py-1.5 rounded-lg text-[9px] uppercase tracking-widest font-black transition-colors">Admit</button>
+                                </div>
+                              ) : soul.follow_up_status === 'visitation_needed' ? (
+                                <div className="flex gap-1.5">
+                                  <button onClick={(e) => updateStatus(e, soul.id, 'ready_for_main_system')} disabled={processingId === soul.id} className="bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 border border-emerald-500/30 px-2 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-colors">Admit</button>
+                                  <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="bg-[#001D3D] hover:bg-[#003566] text-[#8ECAE6] border border-[#003566] p-1.5 rounded-lg transition-colors"><RotateCcw size={14} /></button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-white/30 text-[9px] font-black uppercase tracking-widest">Church System</span>
+                                  <button onClick={(e) => updateStatus(e, soul.id, 'active')} disabled={processingId === soul.id} className="text-[#8ECAE6] hover:text-white transition-colors bg-[#001D3D] p-1.5 rounded-lg border border-[#003566]"><RotateCcw size={14} /></button>
+                                </div>
+                              )}
+                              <button onClick={(e) => triggerDelete(e, soul.id)} disabled={processingId === soul.id} className="ml-1 text-red-400 hover:text-white hover:bg-red-500/20 p-1.5 rounded-lg transition-colors"><Trash2 size={14} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {filteredSouls.length === 0 && <div className="p-10 text-center text-[#8ECAE6]/50 text-xs font-bold uppercase tracking-widest">No souls match your current search.</div>}
+                </div>
               </div>
             </div>
           )}
@@ -939,7 +1040,17 @@ export default function EvangelismAndSouls() {
                   <div className="relative">
                     <label className={labelStyle}>Phone Number</label>
                     <Phone className="absolute left-4 top-10 h-4 w-4 text-[#FFC300]" />
-                    <input required type="tel" placeholder="024XXXXXXX" value={soulData.phone} onChange={e => setSoulData({...soulData, phone: e.target.value})} className={`${inputStyle} pl-12 tracking-widest`} />
+                    <input 
+                      required 
+                      type="tel" 
+                      placeholder="024XXXXXXX" 
+                      value={soulData.phone} 
+                      onChange={e => {
+                        const val = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setSoulData({...soulData, phone: val});
+                      }} 
+                      className={`${inputStyle} pl-12 tracking-widest`} 
+                    />
                   </div>
                   <div className="relative">
                     <label className={labelStyle}>Gender</label>

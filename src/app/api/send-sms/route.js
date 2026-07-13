@@ -3,20 +3,18 @@ import { NextResponse } from 'next/server';
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { message, recipients } = body;
+    // NOW ACCEPTING THE SENDER ID FROM THE FRONTEND
+    const { message, recipients, senderId } = body;
 
-    // Pull the secret key from your Vercel vault
     const apiKey = process.env.SMS_API_KEY;
     
-    // IMPORTANT: Your Sender ID MUST be registered and approved in your BMS dashboard
-    // It must be exactly 11 characters or less.
-    const senderId = 'Ketiejili'; 
+    // Fallback to 'COP-Ketieji' just in case the frontend fails to send one
+    const finalSenderId = senderId || 'COP-Ketieji'; 
 
     if (!apiKey) {
       throw new Error('SERVER FAULT: SMS API Key is missing from Vercel environment variables.');
     }
 
-    // Connect to the mNotify Quick SMS Endpoint as shown in the documentation
     const mNotifyUrl = `https://api.mnotify.com/api/sms/quick?key=${apiKey}`;
 
     const response = await fetch(mNotifyUrl, {
@@ -26,8 +24,8 @@ export async function POST(request) {
         'Accept': 'application/json'
       },
       body: JSON.stringify({
-        recipient: recipients, // Array of phone numbers
-        sender: senderId,
+        recipient: recipients,
+        sender: finalSenderId,
         message: message,
         is_schedule: false,
         schedule_date: ""
@@ -36,7 +34,6 @@ export async function POST(request) {
 
     const data = await response.json();
 
-    // Check the specific mNotify status code (they use "success" or code "2000")
     if (data.status !== "success") {
       throw new Error(data.message || 'mNotify rejected the transmission.');
     }

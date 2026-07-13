@@ -144,11 +144,15 @@ export default function PublicGateway() {
 
       {/* Notifications */}
       {notification.message && (
-        <div className={`fixed top-20 right-6 z-50 px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-fade-in text-xs uppercase tracking-widest ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
-          {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
-          {notification.message}
-        </div>
-      )}
+            <div className={`fixed top-10 right-10 z-[999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
+              notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 
+              notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 
+              'bg-red-500 text-white'
+            }`}>
+              {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+              {notification.message}
+            </div>
+          )}
 
       {/* PASTORAL SUCCESS MODAL */}
       {successPopup && (
