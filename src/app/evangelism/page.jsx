@@ -7,10 +7,10 @@ import { collection, onSnapshot, addDoc, doc, deleteDoc, query, orderBy, getDoc 
 import { createClient } from "@supabase/supabase-js";
 
 // --- SUPABASE CONNECTION FOR ALTARCONNECT ---
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'PASTE_URL_HERE',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'PASTE_KEY_HERE'
-);
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function EvangelismAndSouls() {
   const [activeTab, setActiveTab] = useState('log'); 
