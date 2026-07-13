@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import BirthdayTicker from './BirthdayTicker'; 
 import { db, auth } from '../app/firebase'; 
@@ -14,12 +14,13 @@ import {
 } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
+  const router = useRouter();
+  const pathname = usePathname();
+
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false); 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
 
   const [isLocked, setIsLocked] = useState(false);
   const [unlockPin, setUnlockPin] = useState('');
@@ -68,7 +69,8 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push('/login'); 
+        // If no Firebase session, return to Landing Page
+        router.push('/'); 
       } else {
         const deviceId = localStorage.getItem('ketiejili_device_id');
         if (deviceId) {
@@ -102,8 +104,10 @@ export default function DashboardLayout({ children }) {
             }
 
           } else {
+            // Unauthorized device -> Sever connection and return to Landing Page
             signOut(auth);
-            router.push('/login');
+            localStorage.removeItem('ketiejili_user');
+            router.push('/');
           }
         }
       }
@@ -172,11 +176,18 @@ export default function DashboardLayout({ children }) {
     setIsProfileMenuOpen(false);
   };
 
+  // --- THE MASTER LOGOUT PROTOCOL ---
   const confirmLogout = async () => {
     try {
+      // 1. Shred the security badge and session logs
+      localStorage.removeItem('ketiejili_user');
       sessionStorage.removeItem('session_logged'); 
+      
+      // 2. Sever the database connection
       await signOut(auth);
-      router.push('/login');
+      
+      // 3. Eject to the Public Landing Page
+      router.push('/');
     } catch (error) {
       alert("Failed to securely disconnect. Check your connection.");
     }
@@ -184,7 +195,7 @@ export default function DashboardLayout({ children }) {
 
   const navItems = [
     { name: 'Connection Inbox', href: '/inbox', icon: MessageSquare },
-    { name: 'Analytics Dashboard', href: '/', icon: LayoutDashboard },
+    { name: 'Analytics Dashboard', href: '/dashboard', icon: LayoutDashboard }, // Ensured this points to /dashboard correctly based on typical Next.js roots
     { name: 'Directory & Certificates', href: '/directory', icon: Users }, 
     { name: 'Attendance', href: '/attendance', icon: ClipboardCheck },
     { name: 'Discipleship Tracker', href: '/discipleship', icon: Target },
@@ -322,6 +333,20 @@ export default function DashboardLayout({ children }) {
         {/* DASHBOARD HEADER WITH LIVE MNOTIFY COUNTERS               */}
         {/* ========================================================= */}
         <div className="px-4 py-5 border-b border-[#003566] bg-[#000814] flex flex-col gap-3 shrink-0">
+          
+          {/* SECURE APP BRANDING */}
+          <div className="flex items-center gap-2 mb-1">
+            <img 
+              src="/altarconnect-logo.png" 
+              alt="AltarConnect Engine" 
+              className="w-7 h-7 object-contain drop-shadow-[0_0_8px_rgba(255,195,0,0.2)]"
+            />
+            <div>
+              <h2 className="text-xs font-black text-white uppercase tracking-widest leading-none">AltarConnect</h2>
+              <p className="text-[8px] font-bold text-[#FFC300] uppercase tracking-widest mt-0.5">Kingdom Portal</p>
+            </div>
+          </div>
+
           <div className="bg-[#001D3D] border border-[#003566] rounded-lg p-2 flex items-center justify-center gap-2 w-full">
             <div className="w-2 h-2 rounded-full bg-[#FFC300] animate-pulse shadow-[0_0_8px_rgba(255,195,0,0.8)]"></div>
             <span className="text-[10px] font-black text-[#FFC300] uppercase tracking-widest">System Active</span>

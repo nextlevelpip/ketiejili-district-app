@@ -1,10 +1,10 @@
 "use client";
 import { useState, useEffect } from 'react';
-import DashboardLayout from "../components/DashboardLayout";
-import PastorScheduleWidget from '../components/PastorScheduleWidget'; 
+import DashboardLayout from "../../components/DashboardLayout";
+import PastorScheduleWidget from '../../components/PastorScheduleWidget'; 
 import { Users, Flame, Wind, TrendingUp, Shield, Heart, Trophy, Activity, Target, Droplet } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { db, auth } from './firebase';
+import { db, auth } from '../firebase';
 import { collection, onSnapshot, query, where, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
