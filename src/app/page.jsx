@@ -1,13 +1,19 @@
 "use client";
+import { createClient } from "@supabase/supabase-js";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { db } from './firebase'; 
-import { collection, addDoc, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
 import { Flame, UserCheck, Loader2, CheckCircle2, AlertCircle, Sparkles, Phone, MapPin, Heart, Globe, Users, X, User, Shield, ArrowLeft } from 'lucide-react';
 
 export default function PublicGateway() {
   const router = useRouter();
-  
+ 
+  // --- SUPABASE ENGINE CONNECTION ---
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder_key';
+  const supabase = createClient(supabaseUrl, supabaseKey);  
+ 
   // --- SYSTEM STATES ---
   const [activeForm, setActiveForm] = useState(null); // 'soul' | null
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -64,12 +70,15 @@ export default function PublicGateway() {
     return val.slice(0, 10);
   };
 
-  // --- SUBMIT ALTARCONNECT SOUL ---
+  // --- SUBMIT ALTARCONNECT SOUL (SUPABASE LINKED) ---
   const handleSoulSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
-    if (soulData.phone.length !== 10) {
-      showNotification('error', 'Phone number must be exactly 10 digits.');
+    
+    // Strict Phone Validation
+    const cleanPhone = soulData.phone;
+    if (cleanPhone.length !== 10 || !cleanPhone.startsWith('0')) {
+      showNotification('error', 'Phone number must be exactly 10 digits starting with 0.');
       setIsSubmitting(false);
       return;
     }
@@ -77,22 +86,25 @@ export default function PublicGateway() {
     const finalSpiritualNeed = soulData.category === "Other" ? soulData.customPrayer : soulData.category;
 
     try {
-      await addDoc(collection(db, 'altarconnect_souls'), {
-        counselor_name: soulData.counselorName,
+      // Secure transmission directly to the Supabase Engine
+      const { error } = await supabase.from('souls').insert([{
+        counselor_name: soulData.counselorName || "Digital Gateway",
         full_name: soulData.fullName,
-        phone_number: soulData.phone,
+        phone_number: cleanPhone,
         gender: soulData.gender,
         language: soulData.language || "English",
         spiritual_need: finalSpiritualNeed,
         current_day: 1,
-        follow_up_status: "active",
-        timestamp: new Date().toISOString()
-      });
+        follow_up_status: "active"
+      }]);
+
+      if (error) throw error;
       
       setSoulData({ counselorName: '', fullName: '', phone: '', gender: '', language: '', category: 'General Prayer', customPrayer: '' });
       setActiveForm(null);
       setSuccessPopup(true); 
     } catch (err) {
+      console.error("Submission Error: ", err);
       showNotification('error', 'Submission failure. Check network connection.');
     } finally {
       setIsSubmitting(false);
@@ -142,17 +154,17 @@ export default function PublicGateway() {
       <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-[#FFC300]/10 blur-[150px] rounded-full pointer-events-none"></div>
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/10 blur-[150px] rounded-full pointer-events-none"></div>
 
-      {/* Notifications */}
+      {/* GLOBAL NOTIFICATIONS (Escaped Z-Index) */}
       {notification.message && (
-            <div className={`fixed top-10 right-10 z-[999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
-              notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 
-              notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 
-              'bg-red-500 text-white'
-            }`}>
-              {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
-              {notification.message}
-            </div>
-          )}
+        <div className={`fixed top-28 right-10 z-[99999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
+          notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 
+          notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 
+          'bg-red-500 text-white'
+        }`}>
+          {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+          {notification.message}
+        </div>
+      )}
 
       {/* PASTORAL SUCCESS MODAL */}
       {successPopup && (
