@@ -174,7 +174,7 @@ export default function UserAccounts() {
   const triggerSMS = (user) => setSmsModal({ isOpen: true, user });
   const confirmSendSetupSMS = async () => {
     const user = smsModal.user;
-    const message = `Praise the Lord ${String(user.name).split(' ')[0]}! You have been granted access to the Ketiejili Command Centre. Your Setup Code is: ${user.setupCode}. Go to https://tinyurl.com/kddapp to secure your account.`;
+    const message = `Praise the Lord ${String(user.name).split(' ')[0]}! You have been granted access to the AltarConnect Command Centre. Your Setup Code is: ${user.setupCode}. Go to https://bit.ly/AltarConnect to secure your account.`;
     
     setSmsModal({ isOpen: false, user: null });
 

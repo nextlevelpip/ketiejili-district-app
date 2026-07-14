@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Inbox, CheckCircle2, XCircle, AlertCircle, Loader2, UserPlus, Phone, MapPin, Heart } from 'lucide-react';
+import { Inbox, CheckCircle2, XCircle, AlertCircle, Loader2, UserPlus, Phone, MapPin, Heart, AlertTriangle } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, deleteDoc, writeBatch, collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
 
@@ -9,6 +9,9 @@ export default function ConnectionInbox() {
   const [pendingRequests, setPendingRequests] = useState([]);
   const [isProcessing, setIsProcessing] = useState(null);
   const [notification, setNotification] = useState({ type: '', message: '' });
+  
+  // NEW: Custom Master Modal State
+  const [modalState, setModalState] = useState({ isOpen: false, type: '', req: null });
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'pending_connections'), (snapshot) => {
@@ -37,10 +40,9 @@ export default function ConnectionInbox() {
     return "Adult";
   };
 
-  const handleApprove = async (req) => {
-    if (!window.confirm(`Admit ${req.name} to the Directory?`)) return;
+  // --- REFACTORED: Database Execution Functions ---
+  const executeApprove = async (req) => {
     setIsProcessing(req.id);
-
     try {
       const batch = writeBatch(db);
       const q = query(collection(db, 'members'), where('phone', '==', req.phone));
@@ -93,10 +95,8 @@ export default function ConnectionInbox() {
     setIsProcessing(null);
   };
 
-  const handleArchive = async (req) => {
-    if (!window.confirm(`Mark ${req.name}'s request as Prayed For?`)) return;
+  const executeArchive = async (req) => {
     setIsProcessing(req.id);
-
     try {
       const batch = writeBatch(db);
       const q = query(collection(db, 'members'), where('phone', '==', req.phone));
@@ -133,17 +133,26 @@ export default function ConnectionInbox() {
     setIsProcessing(null);
   };
 
-  const handleDismiss = async (id, name) => {
-    if (!window.confirm(`Are you sure you want to dismiss ${name}'s request? This cannot be undone.`)) return;
-    setIsProcessing(id);
+  const executeDismiss = async (req) => {
+    setIsProcessing(req.id);
     try {
-      await deleteDoc(doc(db, 'pending_connections', id));
+      await deleteDoc(doc(db, 'pending_connections', req.id));
       showNotification('success', 'Request dismissed and deleted.');
     } catch (error) {
       showNotification('error', 'Failed to dismiss request.');
     } finally {
       setIsProcessing(null);
     }
+  };
+
+  // --- NEW: Master Modal Router ---
+  const handleConfirmAction = () => {
+    const { type, req } = modalState;
+    setModalState({ isOpen: false, type: '', req: null });
+    
+    if (type === 'approve') executeApprove(req);
+    if (type === 'archive') executeArchive(req);
+    if (type === 'dismiss') executeDismiss(req);
   };
 
   return (
@@ -155,17 +164,76 @@ export default function ConnectionInbox() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 blur-[120px] rounded-full pointer-events-none"></div>
 
-        <div className="max-w-5xl mx-auto space-y-6 animate-fade-in relative z-10">
-          
-          {notification.message && (
-            <div className={`fixed top-10 right-10 z-50 px-6 py-4 rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-bounce ${notification.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-              {notification.type === 'success' ? <CheckCircle2 size={24}/> : <AlertCircle size={24}/>}
-              {notification.message}
+        {/* ========================================================= */}
+        {/* ESCAPED GLOBAL NOTIFICATION (Top-28 Fix)                  */}
+        {/* ========================================================= */}
+        {notification.message && (
+          <div className={`fixed top-28 right-10 z-[99999] px-6 py-4 rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${notification.type === 'success' ? 'bg-emerald-500 text-white' : notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 'bg-red-500 text-white'}`}>
+            {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
+            {notification.message}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* CUSTOM CONFIRMATION MODAL                                 */}
+        {/* ========================================================= */}
+        {modalState.isOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+              <div className="p-8 text-center">
+                
+                {modalState.type === 'dismiss' && (
+                  <div className="w-16 h-16 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-red-400">
+                    <AlertTriangle size={28} />
+                  </div>
+                )}
+                {modalState.type === 'archive' && (
+                  <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-purple-400">
+                    <Heart size={28} />
+                  </div>
+                )}
+                {modalState.type === 'approve' && (
+                  <div className="w-16 h-16 bg-blue-500/10 border border-blue-500/30 rounded-full flex items-center justify-center mx-auto mb-5 text-blue-400">
+                    <UserPlus size={28} />
+                  </div>
+                )}
+
+                <h3 className="text-base font-black text-white uppercase tracking-widest mb-2">
+                  {modalState.type === 'dismiss' ? 'Dismiss Request?' : modalState.type === 'archive' ? 'Mark as Prayed?' : 'Admit to Directory?'}
+                </h3>
+                
+                <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest">
+                  {modalState.type === 'dismiss' ? `Are you sure you want to completely remove ${modalState.req?.name}'s request? Action cannot be undone.` :
+                   modalState.type === 'archive' ? `Archive ${modalState.req?.name}'s request as prayed for and sync their data?` :
+                   `Officially admit ${modalState.req?.name} into the Master Directory?`}
+                </p>
+              </div>
+              <div className="flex border-t border-[#003566]">
+                <button 
+                  onClick={() => setModalState({ isOpen: false, type: '', req: null })} 
+                  className="flex-1 py-4 text-[10px] font-black text-white/50 uppercase tracking-widest hover:bg-[#000814] transition-colors border-r border-[#003566]"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={handleConfirmAction} 
+                  className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-colors ${
+                    modalState.type === 'dismiss' ? 'text-red-400 hover:bg-red-500/10' :
+                    modalState.type === 'archive' ? 'text-purple-400 hover:bg-purple-500/10' :
+                    'text-blue-400 hover:bg-blue-500/10'
+                  }`}
+                >
+                  Confirm
+                </button>
+              </div>
             </div>
-          )}
+          </div>
+        )}
+
+        <div className="max-w-5xl mx-auto space-y-6 animate-fade-in relative z-10">
 
           {/* HEADER */}
-          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6">
+          <div className="flex items-center gap-4 mb-8 border-b border-white/10 pb-6 mt-4">
             <div className="bg-white/10 p-4 rounded-2xl text-white shadow-lg relative backdrop-blur-md border border-white/20">
               <Inbox size={32} />
               {pendingRequests.length > 0 && (
@@ -176,7 +244,7 @@ export default function ConnectionInbox() {
             </div>
             <div>
               <h1 className="text-3xl font-black text-white uppercase tracking-tight drop-shadow-md">Connection Inbox</h1>
-              <p className="font-bold text-indigo-200">Approve public submissions into the Master Directory.</p>
+              <p className="font-bold text-indigo-200 text-xs mt-1 uppercase tracking-widest">Approve public submissions into the Master Directory.</p>
             </div>
           </div>
 
@@ -219,7 +287,7 @@ export default function ConnectionInbox() {
 
                   <div className="flex flex-col sm:flex-row gap-3 shrink-0">
                     <button 
-                      onClick={() => handleDismiss(req.id, req.name)} 
+                      onClick={() => setModalState({ isOpen: true, type: 'dismiss', req })} 
                       disabled={isProcessing !== null}
                       className="px-4 py-3 bg-red-500/20 border border-red-500/30 text-red-300 font-black rounded-xl hover:bg-red-500/40 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                       title="Dismiss completely"
@@ -228,7 +296,7 @@ export default function ConnectionInbox() {
                     </button>
 
                     <button 
-                      onClick={() => handleArchive(req)}
+                      onClick={() => setModalState({ isOpen: true, type: 'archive', req })}
                       disabled={isProcessing !== null}
                       className="px-6 py-3 bg-purple-500/20 border border-purple-500/30 text-purple-300 font-black rounded-xl hover:bg-purple-500/40 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                     >
@@ -236,7 +304,7 @@ export default function ConnectionInbox() {
                     </button>
 
                     <button 
-                      onClick={() => handleApprove(req)} 
+                      onClick={() => setModalState({ isOpen: true, type: 'approve', req })} 
                       disabled={isProcessing !== null}
                       className="px-6 py-3 bg-blue-600 border border-blue-500/50 text-white font-black rounded-xl hover:bg-blue-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-900/40 disabled:opacity-50"
                     >

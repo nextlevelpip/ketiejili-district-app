@@ -1,12 +1,12 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Settings, Save, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Target, Loader2, UploadCloud, Building2, Edit2, Check, X, Filter, BookOpen, Home, Mic, Globe, FileAudio, MessageSquare } from 'lucide-react';
+import { Settings, Save, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Target, Loader2, UploadCloud, Building2, Edit2, Check, X, Filter, BookOpen, Home, Mic, Globe, FileAudio, MessageSquare, Phone, Lock } from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { createClient } from "@supabase/supabase-js";
 
-// --- SUPABASE CONNECTION FOR ALTARCONNECT STUDIO ---
+// --- SUPABASE CONNECTION FOR ALTARCONNECT STUDIO & VAULT ---
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL || 'PASTE_URL_HERE',
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'PASTE_KEY_HERE'
@@ -23,6 +23,10 @@ export default function SystemSettings() {
   const [districtName, setDistrictName] = useState('KETIEJILI');
   const [districtSlogan, setDistrictSlogan] = useState('District Command');
   const [logoPreview, setLogoPreview] = useState('/logo.jpg');
+
+  // --- OPERATIONAL VAULT STATES ---
+  const [senderId, setSenderId] = useState('COP-KETIEJI');
+  const [pastorContact, setPastorContact] = useState('+233541437815');
 
   // --- ALTARCONNECT STUDIO STATES ---
   const [audioBlob, setAudioBlob] = useState(null);
@@ -59,6 +63,7 @@ export default function SystemSettings() {
 
     const fetchSettings = async () => {
       try {
+        // 1. Fetch Frontend Branding from Firebase
         const settingsDoc = await getDoc(doc(db, 'system_settings', 'general'));
         if (settingsDoc.exists()) {
           const data = settingsDoc.data();
@@ -66,6 +71,18 @@ export default function SystemSettings() {
           if (data.districtName) setDistrictName(data.districtName);
           if (data.districtSlogan) setDistrictSlogan(data.districtSlogan);
           if (data.logoBase64) setLogoPreview(data.logoBase64);
+        }
+
+        // 2. Fetch Operational Vault from Supabase (for backend Edge Functions)
+        const { data: vaultData, error: vaultError } = await supabase
+          .from('district_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (vaultData) {
+          if (vaultData.sender_id) setSenderId(vaultData.sender_id);
+          if (vaultData.pastor_contact) setPastorContact(vaultData.pastor_contact);
         }
       } catch (error) {
         console.error("Error fetching settings:", error);
@@ -292,15 +309,31 @@ export default function SystemSettings() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
+      // 1. Sync Frontend Settings to Firebase
       await setDoc(doc(db, 'system_settings', 'general'), {
         areaName, 
         districtName,
         districtSlogan,
         logoBase64: logoPreview,
+        pastorContact, // Keep synchronized for public kiosk components
         lastUpdated: new Date().toISOString()
       }, { merge: true });
-      showNotification('success', 'Branding configurations locked in globally.');
+
+      // 2. Sync Operational Vault to Supabase (for Edge Functions)
+      const { error: vaultError } = await supabase
+        .from('district_settings')
+        .upsert({
+          id: 1, // Locks to single row
+          sender_id: senderId.trim(),
+          pastor_contact: pastorContact.trim(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (vaultError) throw vaultError;
+
+      showNotification('success', 'Branding & Vault configurations locked in globally.');
     } catch (error) {
+      console.error(error);
       showNotification('error', 'Configuration save script failed.');
     } finally {
       setIsSubmitting(false);
@@ -561,6 +594,8 @@ export default function SystemSettings() {
           {/* ROW 2: GLOBAL SYSTEM BRANDING TRINITY      */}
           {/* ========================================== */}
           <form onSubmit={handleSaveSettings} className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl space-y-6">
+            
+            {/* FRONTEND BRANDING */}
             <div className="flex items-center gap-2 pb-3 border-b border-[#003566]">
               <Building2 className="text-[#FFC300]" size={18} />
               <h2 className="text-sm font-black text-white uppercase tracking-widest">Global System Branding</h2>
@@ -611,9 +646,42 @@ export default function SystemSettings() {
               </div>
             </div>
 
+            {/* NEW: OPERATIONAL VAULT */}
+            <div className="pt-6 border-t border-[#003566]">
+              <div className="flex items-center gap-2 pb-3 mb-5">
+                <Lock className="text-[#FFC300]" size={16} />
+                <h2 className="text-sm font-black text-[#8ECAE6] uppercase tracking-widest">Operational Vault (Backend Automations)</h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className={labelStyle}>Approved Sender ID (MNotify)</label>
+                  <input 
+                    type="text" required maxLength={11} value={senderId} 
+                    onChange={(e) => setSenderId(e.target.value)} 
+                    className={inputStyle} 
+                    placeholder="e.g. Ketiejili"
+                  />
+                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Must exactly match MNotify dashboard.</p>
+                </div>
+                <div>
+                  <label className={labelStyle}>District Minister Contact</label>
+                  <div className="relative">
+                    <Phone className="absolute left-4 top-3.5 h-4 w-4 text-white/30" />
+                    <input 
+                      type="text" required value={pastorContact} 
+                      onChange={(e) => setPastorContact(e.target.value)} 
+                      className={`${inputStyle} pl-10`} 
+                      placeholder="e.g. +233 24 000 0000"
+                    />
+                  </div>
+                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Included in automated morning SMS.</p>
+                </div>
+              </div>
+            </div>
+
             <div className="pt-5 border-t border-[#003566] flex justify-end">
               <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 text-[#000814] text-[10px] uppercase tracking-widest w-full sm:w-auto border border-[#FFC300] ${isSubmitting ? 'bg-[#003566] text-white/50 cursor-not-allowed border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A]'}`}>
-                {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Committing...</> : <><Save size={14} /> Save Branding</>}
+                {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Committing...</> : <><Save size={14} /> Secure Vault & Branding</>}
               </button>
             </div>
           </form>

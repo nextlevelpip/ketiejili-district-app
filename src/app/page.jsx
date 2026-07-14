@@ -239,7 +239,7 @@ export default function PublicGateway() {
                   <Flame size={30} className="fill-current" />
                 </div>
                 <h3 className="text-sm font-black uppercase tracking-widest text-white mb-3">Register a Soul</h3>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-relaxed">Log new converts into the AltarConnect Engine to trigger automated daily discipleship follow-ups.</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-relaxed">Log the new convert you just want for proper discipleship follow-ups.</p>
               </div>
 
               {/* ROUTED DIRECTLY TO /connect */}
@@ -248,7 +248,7 @@ export default function PublicGateway() {
                   <UserCheck size={30} />
                 </div>
                 <h3 className="text-sm font-black uppercase tracking-widest text-white mb-3">Update Member Info</h3>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-relaxed">Submit changes or connect with us. Held securely in the Command Queue for Secretary approval.</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-relaxed">Submit your details as a member or changes or just request a talk counsellor or prayer.</p>
               </div>
 
             </div>
