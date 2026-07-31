@@ -399,11 +399,11 @@ export default function PublicGateway() {
 
           {languageMode === 'EN' ? (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
-              The Church Unleashed to <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">Transform Society</span> through the <span className="text-[#FFC300]">Gospel</span> and the Power of the <span className="text-[#FFC300]">Holy Spirit</span>
+              The Church Unleashed to <span className="text-[#FFC300]">Transform Society</span> through the <span className="text-[#FFC300]">Gospel</span> and the Power of the <span className="text-[#FFC300]">Holy Spirit</span>
             </h1>
           ) : (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
-              Asafo a Apue Namyɛ so de <span className="text-[#FFC300]">Asɛmpa</span> no ne <span className="text-[#FFC300]">Honhom Kronkron</span> tumi ahoɔden <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">resakra wiase</span>
+              Asafo a Apue Namyɛ so de <span className="text-[#FFC300]">Asɛmpa</span> no ne <span className="text-[#FFC300]">Honhom Kronkron</span> tumi ahoɔden <span className="text-[#FFC300]">resakra wiase</span>
             </h1>
           )}
 
