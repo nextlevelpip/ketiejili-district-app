@@ -7,7 +7,7 @@ import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { 
   Flame, UserCheck, Loader2, CheckCircle2, AlertCircle, Sparkles, 
   Phone, MapPin, Heart, Globe, Users, User, Shield, 
-  ArrowLeft, Calendar, BookOpen, Clock, ChevronRight
+  ArrowLeft, Calendar, BookOpen, Clock, ChevronRight, Zap
 } from 'lucide-react';
 
 export default function PublicGateway() {
@@ -24,10 +24,11 @@ export default function PublicGateway() {
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [successPopup, setSuccessPopup] = useState(false);
   const [assemblies, setAssemblies] = useState([]);
+  const [languageMode, setLanguageMode] = useState('EN');
   
   // --- DYNAMIC SETTINGS & ACTIVITIES STATES ---
   const [areaName, setAreaName] = useState('Kete-Krachi Area'); 
-  const [districtName, setDistrictName] = useState('Ketiejili District');
+  const [districtName, setDistrictName] = useState('Katiejeli District');
   const [districtSlogan, setDistrictSlogan] = useState('Possessing the Nations: Transforming our World.');
   const [pastorContact, setPastorContact] = useState('+233 54 143 7815 / +233 20 409 2129');
   const [logoBase64, setLogoBase64] = useState('/logo.jpg');
@@ -50,9 +51,6 @@ export default function PublicGateway() {
     { num: "07", title: "The Godly Home", desc: "Raising God-Fearing Families to Strengthen the Church." },
     { num: "08", title: "Prayer and Fasting", desc: "Engaging Divine Power for National Transformation." }
   ];
-
-  const pillarsLeft = thematicTopics.slice(0, 4);
-  const pillarsRight = thematicTopics.slice(4, 8);
 
   useEffect(() => {
     const unsubSettings = onSnapshot(
@@ -157,16 +155,20 @@ export default function PublicGateway() {
     }
   };
 
-  const inputStyle = "w-full pl-11 pr-4 py-3 bg-[#001D3D]/80 border border-white/10 rounded-xl font-medium text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
-  const labelStyle = "text-[10px] font-bold text-[#FFC300] uppercase ml-1 mb-1.5 block tracking-wider";
-  const iconStyle = "absolute left-3.5 top-3.5 h-4 w-4 text-[#FFC300]";
+  const inputStyle = "w-full pl-11 pr-4 py-3.5 bg-[#0A0D18] border border-white/10 rounded-xl font-medium text-xs text-white outline-none focus:border-[#FF8E00] transition-all placeholder:text-white/30";
+  const labelStyle = "text-[10px] font-bold text-[#FF8E00] uppercase ml-1 mb-1.5 block tracking-wider";
+  const iconStyle = "absolute left-3.5 top-3.5 h-4 w-4 text-[#FF8E00]";
 
   return (
-    <div className="min-h-screen bg-[#000814] flex flex-col relative overflow-x-hidden text-white font-sans">
+    <div className="min-h-screen bg-[#03060D] flex flex-col relative overflow-x-hidden text-white font-sans selection:bg-[#FF8E00] selection:text-black">
       
-      {/* EXECUTIVE PASTORAL MARQUEE */}
-      <div className="bg-[#FFC300] text-[#000814] py-1.5 overflow-hidden shadow-md z-50 shrink-0">
-        <div className="whitespace-nowrap animate-marquee flex items-center gap-12 text-[10px] font-black uppercase tracking-widest">
+      {/* AMBIENT GLOW LIGHTS IN THE BACKGROUND */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[450px] bg-gradient-to-tr from-[#FF8E00]/20 via-[#FF5E00]/10 to-transparent blur-[140px] rounded-full pointer-events-none"></div>
+      <div className="absolute top-1/3 right-0 w-[500px] h-[500px] bg-blue-600/10 blur-[150px] rounded-full pointer-events-none"></div>
+
+      {/* PASTORAL MARQUEE BAR */}
+      <div className="bg-gradient-to-r from-[#FF8E00] to-[#FFB800] text-[#03060D] py-1.5 overflow-hidden z-50 shrink-0 font-extrabold shadow-md">
+        <div className="whitespace-nowrap animate-marquee flex items-center gap-12 text-[10px] uppercase tracking-widest">
           <span><Phone size={11} className="inline mr-1.5 -mt-0.5"/> For Prayers & Counseling, Contact the District Minister: {pastorContact}</span>
           <span><Sparkles size={11} className="inline mr-1.5 -mt-0.5"/> God richly bless you for visiting the District Portal</span>
           <span><Phone size={11} className="inline mr-1.5 -mt-0.5"/> For Prayers & Counseling, Contact the District Minister: {pastorContact}</span>
@@ -174,51 +176,81 @@ export default function PublicGateway() {
         </div>
       </div>
 
-      {/* REFINED NAVIGATION BAR */}
-      <header className="px-8 py-4 flex flex-wrap justify-between items-center z-40 bg-[#000814]/90 backdrop-blur-md border-b border-white/10 gap-4">
-        <div className="flex items-center gap-3">
+      {/* SLEEK SAAS NAVIGATION HEADER WITH LARGE CENTERED LOGO & DISTRICT IDENTITY */}
+      <header className="px-4 md:px-10 py-3 flex items-center justify-between z-40 bg-[#03060D]/80 backdrop-blur-xl border-b border-white/10 sticky top-0 gap-2">
+        
+        {/* LEFT: MINIMIZED ALTARCONNECT BRANDING */}
+        <div className="flex items-center gap-2 shrink-0">
           <img 
             src="/altarconnect-logo.png" 
             alt="AltarConnect Engine" 
-            className="w-8 h-8 object-contain"
-            onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=COP&background=001D3D&color=FFC300'; }}
+            className="w-6 h-6 sm:w-7 sm:h-7 object-contain drop-shadow-[0_0_12px_rgba(255,142,0,0.4)]"
+            onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=COP&background=03060D&color=FF8E00'; }}
           />
-          <div>
-            <h2 className="text-xs font-black text-white uppercase tracking-widest">AltarConnect</h2>
-            <p className="text-[9px] font-bold text-[#FFC300] uppercase tracking-widest mt-0.5">Kingdom Portal</p>
+          <div className="hidden md:block">
+            <h2 className="text-xs font-black text-white uppercase tracking-widest leading-none">AltarConnect</h2>
+            <p className="text-[8px] font-bold text-[#FF8E00] uppercase tracking-widest mt-0.5">Kingdom Portal</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 flex-wrap">
+        {/* MIDDLE: PROMINENT LARGE CHURCH LOGO & DISTRICT HEADER BADGE */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5 px-3 sm:px-5 py-1.5 sm:py-2 bg-white/[0.04] border border-white/15 rounded-2xl shadow-[0_0_25px_rgba(255,142,0,0.18)] hover:border-[#FF8E00]/50 transition-all">
+          <img 
+            src={logoBase64} 
+            alt="Church of Pentecost Logo" 
+            className="w-9 h-9 sm:w-11 sm:h-11 rounded-full border-2 border-[#FF8E00] shadow-[0_0_15px_rgba(255,142,0,0.5)] object-cover bg-[#03060D] shrink-0"
+            onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=COP&background=03060D&color=FF8E00'; }}
+          />
+          <div className="flex flex-col items-start justify-center text-left">
+            <h1 className="text-sm sm:text-base md:text-lg font-black uppercase tracking-wider text-white drop-shadow-md leading-none">
+              {districtName}
+            </h1>
+            <div className="inline-flex items-center gap-1.5 text-[9px] sm:text-[11px] font-bold text-[#FF8E00] uppercase tracking-widest mt-1">
+              <span>The Church of Pentecost</span>
+              <span className="text-white/40 hidden sm:inline">•</span>
+              <MapPin size={11} className="text-[#FF8E00] shrink-0" /> 
+              <span className="text-white/70 hidden sm:inline">11 Local Assemblies</span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT: COMPACT / MINIMIZED ACTION BUTTONS FOR MOBILE */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
           <button 
             onClick={() => setActiveForm('soul')}
-            className="flex items-center gap-2 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg hover:scale-105"
+            className="flex items-center gap-1.5 bg-gradient-to-r from-[#FF8E00] to-[#FF6A00] text-black px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(255,142,0,0.3)] hover:scale-105"
+            title="Register a Soul"
           >
-            <Flame size={14} className="fill-current" /> Register a Soul
+            <Flame size={13} className="fill-current" />
+            <span className="hidden lg:inline">Register Soul</span>
           </button>
 
           <button 
             onClick={() => router.push('/connect')} 
-            className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-4 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all"
+            className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all"
+            title="Update Member Info"
           >
-            <UserCheck size={14} className="text-[#8ECAE6]" /> Update Member Info
+            <UserCheck size={13} className="text-[#8ECAE6]" />
+            <span className="hidden xl:inline">Update Info</span>
           </button>
 
           <button 
             onClick={() => router.push('/login')} 
-            className="flex items-center gap-2 bg-[#001D3D] hover:bg-[#002855] border border-[#FFC300]/40 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+            className="flex items-center gap-1.5 bg-[#0A0E1A] hover:bg-[#11172A] border border-[#FF8E00]/40 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-lg"
+            title="Sign In"
           >
-            <Shield size={13} className="text-[#FFC300]" /> Sign In
+            <Shield size={13} className="text-[#FF8E00]" />
+            <span className="hidden sm:inline">Sign In</span>
           </button>
         </div>
       </header>
 
       {/* GLOBAL NOTIFICATIONS */}
       {notification.message && (
-        <div className={`fixed top-24 right-6 z-[99999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
-          notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 
-          notification.type === 'info' ? 'bg-[#8ECAE6] text-[#000814]' : 
-          'bg-red-500 text-white'
+        <div className={`fixed top-20 right-6 z-[99999] px-6 py-4 rounded-xl shadow-2xl font-black flex items-center gap-3 animate-bounce text-xs uppercase tracking-widest ${
+          notification.type === 'success' ? 'bg-[#FF8E00] text-black' : 
+          notification.type === 'info' ? 'bg-[#8ECAE6] text-black' : 
+          'bg-red-600 text-white'
         }`}>
           {notification.type === 'success' ? <CheckCircle2 size={18}/> : <AlertCircle size={18}/>}
           {notification.message}
@@ -228,23 +260,23 @@ export default function PublicGateway() {
       {/* SUCCESS MODAL */}
       {successPopup && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fade-in">
-          <div className="bg-[#001D3D] rounded-[2rem] shadow-2xl w-full max-w-md border border-white/10 text-center p-8">
-            <div className="w-16 h-16 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FFC300]">
+          <div className="bg-[#0A0E1A] rounded-3xl shadow-2xl w-full max-w-md border border-white/10 text-center p-8">
+            <div className="w-16 h-16 bg-[#FF8E00]/10 border border-[#FF8E00]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FF8E00]">
               <CheckCircle2 size={36} />
             </div>
-            <h2 className="text-lg font-black text-white uppercase tracking-widest mb-2">Soul Registered</h2>
+            <h2 className="text-xl font-black text-white uppercase tracking-widest mb-2">Soul Registered</h2>
             <p className="text-xs font-medium text-white/80 leading-relaxed mb-6">
-              The soul has been securely logged into the AltarConnect Engine for discipleship follow-up.
+              The soul has been securely logged into the AltarConnect Engine for automated discipleship follow-up.
             </p>
-            <div className="bg-[#000814] p-4 rounded-xl border border-white/10 mb-6">
-              <p className="text-[10px] font-bold text-[#FFC300] uppercase tracking-widest mb-2">Pastoral Office Contact</p>
+            <div className="bg-[#03060D] p-5 rounded-2xl border border-white/10 mb-6">
+              <p className="text-[10px] font-bold text-[#FF8E00] uppercase tracking-widest mb-2">Pastoral Office Contact</p>
               <div className="flex items-center justify-center gap-2 text-base font-black text-white font-mono">
-                <Phone size={16} className="text-[#FFC300]" /> {pastorContact}
+                <Phone size={16} className="text-[#FF8E00]" /> {pastorContact}
               </div>
             </div>
             <button 
               onClick={() => setSuccessPopup(false)}
-              className="w-full bg-[#FFC300] text-[#000814] font-black uppercase tracking-widest text-xs py-3.5 rounded-xl transition-all"
+              className="w-full bg-gradient-to-r from-[#FF8E00] to-[#FF6A00] text-black font-black uppercase tracking-widest text-xs py-4 rounded-xl transition-all"
             >
               Close Window
             </button>
@@ -255,17 +287,17 @@ export default function PublicGateway() {
       {/* SOUL REGISTRATION MODAL */}
       {activeForm === 'soul' && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-[90] animate-fade-in overflow-y-auto">
-          <div className="bg-[#001D3D] border border-white/10 p-8 rounded-2xl max-w-xl w-full text-left shadow-2xl relative my-auto">
+          <div className="bg-[#0A0E1A] border border-white/10 p-8 md:p-10 rounded-3xl max-w-xl w-full text-left shadow-2xl relative my-auto">
             <button 
               onClick={() => setActiveForm(null)}
-              className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-[#8ECAE6] hover:text-[#FFC300] transition-colors mb-6"
+              className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-widest text-[#8ECAE6] hover:text-[#FF8E00] transition-colors mb-6"
             >
-              <ArrowLeft size={14} /> Close Registration
+              <ArrowLeft size={15} /> Close Registration
             </button>
 
             <div className="mb-6 border-b border-white/10 pb-4">
-              <h3 className="text-sm font-black uppercase tracking-widest text-[#FFC300] flex items-center gap-2"><Flame size={18}/> AltarConnect Engine</h3>
-              <p className="text-[10px] font-medium text-white/60 mt-1">Register new convert for automated discipleship</p>
+              <h3 className="text-base font-black uppercase tracking-widest text-[#FF8E00] flex items-center gap-2"><Flame size={20}/> AltarConnect Engine</h3>
+              <p className="text-xs font-medium text-white/70 mt-1">Register new convert for automated discipleship</p>
             </div>
 
             <form onSubmit={handleSoulSubmit} className="space-y-4">
@@ -326,9 +358,9 @@ export default function PublicGateway() {
                 </div>
               )}
 
-              <div className="pt-3 border-t border-white/10 mt-4">
-                <button type="submit" disabled={isSubmitting} className="w-full py-3.5 bg-[#FFC300] text-[#000814] text-xs font-black uppercase tracking-widest rounded-xl shadow-lg hover:bg-[#FFD60A] transition-all flex justify-center items-center gap-2">
-                  {isSubmitting ? <Loader2 className="animate-spin" size={16}/> : 'Register Soul & Deploy Automation'}
+              <div className="pt-4 border-t border-white/10 mt-6">
+                <button type="submit" disabled={isSubmitting} className="w-full py-4 bg-gradient-to-r from-[#FF8E00] to-[#FF6A00] text-black text-xs font-black uppercase tracking-widest rounded-xl shadow-lg hover:scale-[1.02] transition-all flex justify-center items-center gap-2">
+                  {isSubmitting ? <Loader2 className="animate-spin" size={18}/> : 'Register Soul & Deploy Automation'}
                 </button>
               </div>
             </form>
@@ -336,260 +368,305 @@ export default function PublicGateway() {
         </div>
       )}
 
-      {/* ZONE 1: UNIFIED, EDGE-TO-EDGE SUPREME COMMAND HEADER */}
-      <section className="w-full bg-gradient-to-r from-[#001D3D] via-[#002855] to-[#001D3D] border-b border-white/10 p-6 md:p-10 relative overflow-hidden">
-        <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-[#FFC300]/10 rounded-full blur-[100px] pointer-events-none"></div>
-        <div className="absolute -left-20 -top-20 w-80 h-80 bg-blue-500/10 rounded-full blur-[100px] pointer-events-none"></div>
+      {/* EXECUTIVE GLOW HERO SECTION WITH REPLICATED WORD EMPHASIS */}
+      <section className="w-full max-w-6xl mx-auto pt-16 pb-12 px-6 text-center space-y-8 relative z-10">
         
-        <div className="w-full max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
-          
-          {/* LEFT: ENGLISH 2026 THEME (4 SPANS) */}
-          <div className="lg:col-span-4 space-y-3 text-left">
-            <span className="inline-block px-2.5 py-1 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded shadow">
-              2026 THEME
-            </span>
-            <h2 className="text-base md:text-lg font-black uppercase tracking-tight text-white leading-snug">
-              The Church Unleashed to Transform Society through the Gospel and the Power of the Holy Spirit
-            </h2>
-            <p className="text-xs font-bold text-[#FFC300] font-mono">
-              Acts 8:4-8, Acts 13:1-3, Colossians 1:4-6
-            </p>
-            <p className="text-xs font-medium text-white/70 italic border-l-2 border-[#8ECAE6] pl-3">
-              "Possessing the Nations: I am an Agent of Transformation. Possessing the Nations: Transforming my World."
-            </p>
+        {/* Language Toggle Pill Switch */}
+        <div className="inline-flex items-center gap-1 p-1.5 bg-white/5 border border-white/10 rounded-full backdrop-blur-lg">
+          <button 
+            onClick={() => setLanguageMode('EN')}
+            className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+              languageMode === 'EN' ? 'bg-[#FF8E00] text-black shadow-md' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            English
+          </button>
+          <button 
+            onClick={() => setLanguageMode('TWI')}
+            className={`px-5 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all ${
+              languageMode === 'TWI' ? 'bg-[#FF8E00] text-black shadow-md' : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Twi
+          </button>
+        </div>
+
+        {/* Replicated Official Word Emphasis Typography */}
+        <div className="space-y-4 max-w-4xl mx-auto">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#FF8E00]/10 border border-[#FF8E00]/30 rounded-full text-[#FF8E00] text-[10px] font-bold uppercase tracking-widest">
+            <Zap size={13} /> {languageMode === 'EN' ? '2026 KINGDOM THEME' : 'AFE 2026 BOTAEƐ'}
           </div>
 
-          {/* CENTER: DISTRICT WELCOME & OFFICIAL SEAL (4 SPANS) */}
-          <div className="lg:col-span-4 text-center space-y-3 lg:border-x border-white/10 px-4 py-2">
-            <img 
-              src={logoBase64} 
-              alt="District Official Seal" 
-              className="w-20 h-20 md:w-24 md:h-24 rounded-full mx-auto border-2 border-[#FFC300] shadow-[0_0_25px_rgba(255,195,0,0.3)] object-cover bg-[#001D3D]"
-              onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=COP&background=001D3D&color=FFC300'; }}
-            />
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black uppercase tracking-tight text-white">
-              Welcome to <span className="text-[#FFC300]">{districtName}</span>
+          {languageMode === 'EN' ? (
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
+              The Church Unleashed to <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">Transform Society</span> through the <span className="text-[#FFC300]">Gospel</span> and the Power of the <span className="text-[#FFC300]">Holy Spirit</span>
             </h1>
-            <p className="text-xs font-bold uppercase tracking-widest text-[#8ECAE6]">
-              Under {areaName}
-            </p>
-            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-black/40 border border-white/10 rounded-full text-[10px] font-medium text-white/70 uppercase">
-              <MapPin size={11} className="text-[#FFC300]" /> A Ministry of The Church of Pentecost with {assemblies.length > 0 ? assemblies.length : '11'} Locals
+          ) : (
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
+              Asafo a Apue Namyɛ so de <span className="text-[#FFC300]">Asɛmpa</span> no ne <span className="text-[#FFC300]">Honhom Kronkron</span> tumi ahoɔden <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">resakra wiase</span>
+            </h1>
+          )}
+
+          <p className="text-xs md:text-sm font-bold text-white/70 max-w-2xl mx-auto">
+            {languageMode === 'EN' 
+              ? 'Acts 8:4-8, Acts 13:1-3, Colossians 1:4-6'
+              : 'Asomafoɔ 8:4-8, Asomafoɔ 13:1-3, Kolosefoɔ 1:4-6'
+            }
+          </p>
+        </div>
+
+        {/* INTERACTIVE COMMAND OPERATIONS CENTER (NO DUPLICATE HEADER) */}
+        <div className="w-full max-w-5xl mx-auto mt-12 p-1 md:p-2 rounded-3xl bg-gradient-to-b from-white/15 via-white/5 to-transparent border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+          <div className="bg-[#0A0E1A]/90 backdrop-blur-2xl rounded-[1.3rem] p-6 md:p-10 text-left border border-white/10 space-y-8">
+            
+            {/* Top Bar of Operations Center */}
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
+                <div>
+                  <h3 className="text-sm md:text-base font-black uppercase tracking-widest text-white">
+                    Live Operations Command
+                  </h3>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest">
+                    {areaName} Network
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold">
+                  <span className="text-[#FF8E00]">11</span> Assemblies Active
+                </div>
+                <a 
+                  href={`tel:${(pastorContact || '+233000000000').split('/')[0].trim()}`}
+                  className="px-5 py-2.5 rounded-xl bg-[#FF8E00] text-black font-black text-xs uppercase tracking-widest hover:bg-[#FFA32A] transition-all inline-flex items-center gap-1.5"
+                >
+                  <Phone size={13} /> Call District Minister
+                </a>
+              </div>
             </div>
-            <p className="text-xs font-semibold text-white/60 max-w-sm mx-auto pt-1">
-              {districtSlogan}
-            </p>
-          </div>
 
-          {/* RIGHT: TWI 2026 THEME (4 SPANS) */}
-          <div className="lg:col-span-4 space-y-3 text-left lg:text-right">
-            <span className="inline-block px-2.5 py-1 bg-[#FFC300] text-[#000814] text-[10px] font-black uppercase tracking-widest rounded shadow lg:ml-auto">
-              AFE 2026 BOTAEƐ
-            </span>
-            <h2 className="text-base md:text-lg font-black uppercase tracking-tight text-white leading-snug">
-              Asafo a Apue Namyɛ so de Asɛmpa no ne Honhom Kronkron tumi ahoɔden resakra wiase
-            </h2>
-            <p className="text-xs font-bold text-[#FFC300] font-mono">
-              Asomafoɔ 8:4-8, Asomafoɔ 13:1-3, Kolosefoɔ 1:4-6
-            </p>
-            <p className="text-xs font-medium text-white/70 italic lg:border-r-2 lg:border-l-0 border-l-2 border-[#8ECAE6] lg:pr-3 pl-3 lg:pl-0">
-              "Yɛrefa Aman: Meyɛ Nsakyeraeɛ Bɔfoɔ. Yɛrefa Aman: Meresakyera Me Wiase."
-            </p>
-          </div>
+            {/* Dashboard Inner Grid: Schedule of the Day & Live Notice */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-2 bg-black/40 border border-white/5 rounded-2xl p-6 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-bold text-[#FF8E00] uppercase tracking-widest">
+                    Featured Service Today
+                  </span>
+                  <span className="text-[10px] font-mono text-[#8ECAE6]">8:00 AM - 10:30 AM</span>
+                </div>
+                <h4 className="text-lg font-bold text-white">Divine Encounter Worship Service</h4>
+                <p className="text-xs text-white/60">
+                  Anointed worship, intense prayer, and discipleship across all 11 local assemblies in the district.
+                </p>
+              </div>
 
+              <div className="bg-gradient-to-br from-[#FF8E00]/15 to-transparent border border-[#FF8E00]/30 rounded-2xl p-6 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold text-[#FF8E00] uppercase tracking-widest">Pastoral Care</span>
+                  <h4 className="text-sm font-bold text-white mt-1">Need Prayer or Counseling?</h4>
+                </div>
+                <a 
+                  href={`tel:${(pastorContact || '+233000000000').split('/')[0].trim()}`} 
+                  className="mt-4 block text-center w-full py-2 bg-white/10 hover:bg-white/20 border border-white/10 text-white font-bold text-xs uppercase rounded-xl transition-all"
+                >
+                  Call District Minister
+                </a>
+              </div>
+            </div>
+
+            {/* Slogan Banner Bottom */}
+            <div className="pt-2 text-center">
+              <p className="text-xs text-white/50 italic font-medium">
+                "{languageMode === 'EN' 
+                  ? 'Possessing the Nations: I am an Agent of Transformation. Possessing the Nations: Transforming my World.'
+                  : 'Yɛrefa Aman: Meyɛ Nsakyeraeɛ Bɔfoɔ. Yɛrefa Aman: Meresakyera Me Wiase.'
+                }"
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+      </section>
+
+      {/* 8 THEMATIC PILLARS (SLEEK SAAS GRID) */}
+      <section className="w-full max-w-6xl mx-auto py-16 px-6 border-t border-white/10">
+        <div className="text-center space-y-2 mb-12">
+          <span className="text-[10px] font-black text-[#FF8E00] uppercase tracking-widest bg-[#FF8E00]/10 px-3 py-1 rounded-full border border-[#FF8E00]/20">
+            2026 Strategic Focus
+          </span>
+          <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tight text-white">
+            8 Key Thematic Pillars
+          </h2>
+          <p className="text-xs text-white/60 max-w-xl mx-auto">
+            Our local assemblies are united around eight core transformational areas to possess our nations for Christ.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {thematicTopics.map((topic) => (
+            <div 
+              key={topic.num} 
+              className="bg-[#0A0E1A]/60 border border-white/10 hover:border-[#FF8E00]/50 p-6 rounded-2xl transition-all group flex flex-col justify-between space-y-4 hover:bg-[#0A0E1A]"
+            >
+              <div className="space-y-3">
+                <span className="inline-block text-[10px] font-black text-[#FF8E00] bg-[#FF8E00]/10 px-2.5 py-1 rounded border border-[#FF8E00]/20">
+                  PILLAR {topic.num}
+                </span>
+                <h4 className="text-sm font-bold text-white group-hover:text-[#FF8E00] transition-colors leading-snug">
+                  {topic.title}
+                </h4>
+              </div>
+              <p className="text-xs text-white/60 leading-relaxed pt-3 border-t border-white/10">
+                {topic.desc}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* LOWER SECTION: SYMMETRICAL 3-COLUMN DASHBOARD GRID */}
-      <main className="w-full flex-1 flex flex-col p-6 lg:p-10 max-w-[1600px] mx-auto gap-8">
-        
-        {/* ROW 1: THEMATIC PILLARS ON SIDES & CENTER SCHEDULE OF THE DAY */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* FOOTER CALL TO ACTION */}
+      <section className="w-full max-w-4xl mx-auto my-12 px-6">
+        <div className="bg-gradient-to-r from-[#FF8E00] via-[#FF6A00] to-[#FF8E00] rounded-3xl p-8 md:p-12 text-center text-black space-y-6 shadow-[0_0_50px_rgba(255,142,0,0.25)]">
+          <h2 className="text-2xl md:text-4xl font-black uppercase tracking-tight">
+            Ready to Surrender to Christ?
+          </h2>
+          <p className="text-xs md:text-sm font-bold max-w-lg mx-auto opacity-90">
+            "Lord Jesus, wash me with Your precious blood. I accept You today as my Lord and personal Savior. Amen."
+          </p>
+          <button 
+            onClick={() => setActiveForm('soul')}
+            className="px-8 py-4 bg-black text-white hover:bg-black/80 font-black text-xs uppercase tracking-widest rounded-full shadow-2xl transition-all inline-flex items-center gap-2"
+          >
+            <Flame size={16} className="text-[#FF8E00]" /> Surrender & Register Your Soul
+          </button>
+        </div>
+      </section>
+
+      {/* SLEEK EXECUTIVE SAAS FOOTER */}
+      <footer className="w-full bg-[#020408] border-t border-white/10 pt-16 pb-12 px-6 md:px-12 text-white/70 font-sans relative z-10">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10 pb-12 border-b border-white/10">
           
-          {/* LEFT: THEMATIC PILLARS 01 - 04 (4 SPANS) */}
-          <div className="lg:col-span-4 bg-[#001D3D]/30 border border-white/10 rounded-2xl p-6 space-y-4">
-            <h3 className="text-xs font-bold text-[#8ECAE6] uppercase tracking-widest flex items-center gap-2 border-b border-white/10 pb-3">
-              <BookOpen size={15} /> Thematic Pillars (01 - 04)
-            </h3>
-            <div className="space-y-3">
-              {pillarsLeft.map((pillar) => (
-                <div key={pillar.num} className="p-3 rounded-xl bg-black/30 border border-white/5 flex items-start gap-3 hover:border-white/15 transition-all">
-                  <span className="text-xs font-black text-[#FFC300] bg-[#001D3D] px-2 py-0.5 rounded">
-                    {pillar.num}
-                  </span>
-                  <div>
-                    <h4 className="text-xs font-bold text-white leading-tight">{pillar.title}</h4>
-                    <p className="text-[11px] text-white/60 leading-relaxed mt-1">{pillar.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* CENTER: SCHEDULE OF THE DAY COMMAND CONSOLE (4 SPANS) */}
-          <div className="lg:col-span-4 bg-gradient-to-b from-[#1B5E20]/40 to-[#266210]/10 border border-[#FFC300]/30 rounded-2xl p-6 space-y-5 shadow-xl">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <span className="text-xs font-black uppercase tracking-widest text-[#FFC300] flex items-center gap-2">
-                <Clock size={24} /> Schedule of the Day
-              </span>
-              <span className="text-[9px] font-black bg-[#FFC300]/10 text-[#FFC300] px-2 py-0.5 rounded uppercase">
-                Today's Focus
+          {/* COL 1: BRANDING & VISION */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/altarconnect-logo.png" 
+                alt="AltarConnect Seal" 
+                className="w-8 h-8 object-contain"
+                onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=COP&background=03060D&color=FF8E00'; }}
+              />
+              <span className="text-sm font-black uppercase tracking-widest text-white">
+                AltarConnect
               </span>
             </div>
-
-            <div className="bg-[#1B4EF5]/90 border border-white/10 rounded-xl p-5 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-[#8ECAE6]">
-                Sunday Worship Encounter
-              </p>
-              <h3 className="text-base font-bold text-white">
-                Divine Encounter Worship Service
-              </h3>
-              <p className="text-xs text-white/70 font-mono">
-                8:00 AM - 10:30 AM across all local assemblies
-              </p>
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[11px]">
-                <span className="text-white/50">Next Midweek Service:</span>
-                <span className="text-white font-semibold">Tuesday @ 6:30 PM</span>
-              </div>
-            </div>
-
-            <p className="text-xs text-center text-white/60 italic font-medium">
-              "{districtSlogan}"
+            <p className="text-xs leading-relaxed text-white/60">
+              The unified digital command portal for {districtName}. Built to streamline soul registration, member updates, and pastoral discipleship across all 11 local assemblies.
             </p>
-          </div>
-
-          {/* RIGHT: THEMATIC PILLARS 05 - 08 (4 SPANS) */}
-          <div className="lg:col-span-4 bg-[#001D3D]/30 border border-white/10 rounded-2xl p-6 space-y-4">
-            <h3 className="text-xs font-bold text-[#8ECAE6] uppercase tracking-widest flex items-center gap-2 border-b border-white/10 pb-3">
-              <BookOpen size={15} /> Thematic Pillars (05 - 08)
-            </h3>
-            <div className="space-y-3">
-              {pillarsRight.map((pillar) => (
-                <div key={pillar.num} className="p-3 rounded-xl bg-black/30 border border-white/5 flex items-start gap-3 hover:border-white/15 transition-all">
-                  <span className="text-xs font-black text-[#FFC300] bg-[#001D3D] px-2 py-0.5 rounded">
-                    {pillar.num}
-                  </span>
-                  <div>
-                    <h4 className="text-xs font-bold text-white leading-tight">{pillar.title}</h4>
-                    <p className="text-[11px] text-white/60 leading-relaxed mt-1">{pillar.desc}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="pt-2 text-[10px] font-bold uppercase tracking-widest text-[#FF8E00]">
+              Under {areaName}
             </div>
           </div>
 
-        </section>
+          {/* COL 2: QUICK KINGDOM ACTIONS */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-widest text-white">
+              Quick Operations
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <button 
+                  onClick={() => setActiveForm('soul')} 
+                  className="hover:text-[#FF8E00] transition-colors"
+                >
+                  Register a Soul
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => router.push('/connect')} 
+                  className="hover:text-[#FF8E00] transition-colors"
+                >
+                  Update Member Information
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => router.push('/login')} 
+                  className="hover:text-[#FF8E00] transition-colors"
+                >
+                  Officer & Minister Sign In
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => router.push('/connect')} 
+                  className="hover:text-[#FF8E00] transition-colors"
+                >
+                  Find Local Assembly Directory
+                </button>
+              </li>
+            </ul>
+          </div>
 
-        {/* ROW 2: EVANGELISM, COMPLETE WEEKLY DIRECTORY & PASTORAL DESK */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* LEFT: EVANGELISTIC INVITATION (4 SPANS) */}
-          <div className="lg:col-span-4 bg-[#001D3D]/20 border border-white/10 rounded-2xl p-6 space-y-5">
-            <div className="flex items-center gap-2 text-[#FFC300] font-bold text-xs uppercase tracking-widest border-b border-white/10 pb-3">
-              <Flame size={16} /> Evangelistic Invitation
-            </div>
-            
-            <h3 className="text-sm font-bold text-white">
-              Jesus Christ is Calling You Today
-            </h3>
-            
-            <p className="text-xs text-white/70 leading-relaxed">
-              Jesus Christ is the same yesterday, today, and forever. No matter your past, His blood has the power to wash you clean and transform your destiny. Come to Him as you are.
+          {/* COL 3: STRATEGIC FOCUS AREAS */}
+          <div className="space-y-3">
+            <h4 className="text-xs font-black uppercase tracking-widest text-white">
+              2026 Focus Areas
+            </h4>
+            <ul className="space-y-2 text-xs">
+              <li>Spiritual Living in a Secular World</li>
+              <li>Kingdom Assignment in Public Sphere</li>
+              <li>Raising Spirit-Filled Disciples</li>
+              <li>Infilling of the Holy Spirit</li>
+              <li>National Transformation via Prayer</li>
+            </ul>
+          </div>
+
+          {/* COL 4: PASTORAL DESK & COUNSELING */}
+          <div className="space-y-4">
+            <h4 className="text-xs font-black uppercase tracking-widest text-white">
+              Pastoral Help Desk
+            </h4>
+            <p className="text-xs text-white/60">
+              For immediate prayer support, counseling appointments, or child dedications:
             </p>
-
-            <div className="bg-black/40 p-4 rounded-xl border border-white/5 space-y-2">
-              <h4 className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest flex items-center gap-1">
-                <Heart size={12} /> The Sinner's Prayer
-              </h4>
-              <p className="text-xs text-white/80 italic leading-relaxed border-l-2 border-[#FFC300] pl-3">
-                "Lord Jesus, I confess that I am a sinner. I believe You died for me and rose again. Wash me with Your precious blood. I accept You today as my Lord and personal Savior. Amen."
-              </p>
-            </div>
-
-            <button 
-              onClick={() => setActiveForm('soul')}
-              className="w-full py-3.5 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black text-xs uppercase tracking-widest rounded-xl shadow transition-all flex items-center justify-center gap-2"
-            >
-              <Flame size={14} className="fill-current" /> Surrender & Register Soul
-            </button>
-          </div>
-
-          {/* CENTER: COMPLETE WEEKLY SCHEDULE (4 SPANS) */}
-          <div className="lg:col-span-4 bg-[#001D3D]/20 border border-white/10 rounded-2xl p-6 space-y-5">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <div className="flex items-center gap-2 text-[#FFC300] font-bold text-xs uppercase tracking-widest">
-                <Calendar size={16} /> Complete Weekly Schedule
-              </div>
-              <span className="text-[9px] font-bold bg-white/10 text-white/70 px-2 py-0.5 rounded">
-                Live Directory
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[#8ECAE6]">
+                Direct Ministerial Lines
               </span>
-            </div>
-
-            <div className="space-y-3">
-              {schedules.map((item) => (
-                <div key={item.id} className="bg-black/30 border border-white/5 p-3.5 rounded-xl space-y-1 hover:border-[#8ECAE6]/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-[#FFC300] uppercase tracking-wider">
-                      {item.day}
-                    </span>
-                    <span className="text-[10px] font-mono text-[#8ECAE6]">
-                      {item.time}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-semibold text-white">
-                    {item.event}
-                  </h4>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* RIGHT: PASTORAL DESK & LOCAL ASSEMBLY DIRECTORY (4 SPANS) */}
-          <div className="lg:col-span-4 bg-[#001D3D]/20 border border-white/10 rounded-2xl p-6 space-y-5">
-            <div className="flex items-center gap-2 text-[#FFC300] font-bold text-xs uppercase tracking-widest border-b border-white/10 pb-3">
-              <Phone size={16} /> Pastoral Counseling & Help Desk
-            </div>
-
-            <p className="text-xs text-white/70 leading-relaxed">
-              Our District Pastoral team is available for spiritual counseling, prayer support, child dedications, and pastoral care.
-            </p>
-
-            <div className="bg-gradient-to-br from-[#001D3D] to-black/60 p-5 rounded-xl border border-white/10 space-y-3">
-              <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest">
-                Direct Pastoral Lines
-              </span>
-              <div className="text-sm font-bold text-white font-mono">
+              <div className="text-xs font-black text-white font-mono">
                 {pastorContact}
               </div>
               <a 
                 href={`tel:${(pastorContact || '+233000000000').split('/')[0].trim()}`} 
-                className="block text-center w-full py-2.5 bg-[#8ECAE6] hover:bg-white text-[#000814] text-[10px] font-black uppercase tracking-widest rounded-lg transition-all"
+                className="block text-center w-full py-2 bg-[#FF8E00] hover:bg-[#FFA32A] text-black font-black text-[10px] uppercase tracking-widest rounded-lg transition-all"
               >
                 Call District Minister
               </a>
             </div>
-
-            <div className="pt-3 border-t border-white/10 text-center space-y-2">
-              <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest">
-                Looking for your nearest assembly?
-              </p>
-              <button 
-                onClick={() => router.push('/connect')} 
-                className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold text-xs uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
-              >
-                <span>Find Assembly Address</span> <ChevronRight size={14}/>
-              </button>
-            </div>
           </div>
 
-        </section>
+        </div>
 
-      </main>
+        {/* BOTTOM COPYRIGHT & INSTITUTIONAL ATTRIBUTION */}
+        <div className="max-w-7xl mx-auto pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/50">
+          <p>
+            © {new Date().getFullYear()} {districtName} • A Ministry of The Church of Pentecost.
+          </p>
+          <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-widest">
+            <span>Possessing the Nations</span>
+            <span>•</span>
+            <span>Transforming Society</span>
+          </div>
+        </div>
+      </footer>
 
-      {/* MARQUEE INLINE STYLE */}
+      {/* FOOTER MARQUEE STYLES */}
       <style>{`
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-        .animate-marquee { animation: marquee 20s linear infinite; }
+        .animate-marquee { animation: marquee 25s linear infinite; }
       `}</style>
     </div>
   );
