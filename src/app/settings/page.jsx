@@ -1,7 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import DashboardLayout from "../../components/DashboardLayout";
-import { Settings, Save, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Target, Loader2, UploadCloud, Building2, Edit2, Check, X, Filter, BookOpen, Home, Mic, Globe, FileAudio, MessageSquare, Phone, Lock } from 'lucide-react';
+import { 
+  Settings, Save, CheckCircle2, AlertCircle, MapPin, Plus, Trash2, Target, 
+  Loader2, UploadCloud, Building2, Edit2, Check, X, Filter, BookOpen, 
+  Home, Mic, Globe, FileAudio, MessageSquare, Phone, Lock, BookOpenCheck, 
+  Send, ExternalLink, Layers
+} from 'lucide-react';
 import { db } from '../firebase';
 import { doc, getDoc, setDoc, collection, addDoc, deleteDoc, updateDoc, onSnapshot, query, orderBy, where, getDocs } from 'firebase/firestore';
 import { createClient } from "@supabase/supabase-js";
@@ -13,14 +19,19 @@ const supabase = createClient(
 );
 
 export default function SystemSettings() {
+  const router = useRouter();
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // --- EXECUTIVE DASHBOARD TAB SWITCHER ---
+  // Options: 'network' | 'branding' | 'devotions' | 'studio'
+  const [activeTab, setActiveTab] = useState('devotions'); 
+
   // --- BRANDING STATES ---
   const [areaName, setAreaName] = useState(''); 
-  const [districtName, setDistrictName] = useState('KETIEJILI');
+  const [districtName, setDistrictName] = useState('KATIEJELI');
   const [districtSlogan, setDistrictSlogan] = useState('District Command');
   const [logoPreview, setLogoPreview] = useState('/logo.jpg');
 
@@ -56,6 +67,24 @@ export default function SystemSettings() {
 
   const [groupCardFilter, setGroupCardFilter] = useState('All Assemblies');
 
+  // ==========================================
+  // NEW: DEVOTION PUBLISHER STATES
+  // ==========================================
+  const [devotionSeriesTitle, setDevotionSeriesTitle] = useState("THE TWO SONS | MATTHEW 21:31");
+  const [devotionThemePrayer, setDevotionThemePrayer] = useState("Lord Jesus, I repent of my religious lip service. Wash my heart with Your holy blood. Give me the grace to execute Your will through daily action. Be my Lord and Savior. Amen.");
+  const [editingDayIndex, setEditingDayIndex] = useState(0); // 0 = Sun, 6 = Sat
+  const [isPublishingDevotion, setIsPublishingDevotion] = useState(false);
+
+  const [devotionDays, setDevotionDays] = useState([
+    { dayName: "Sun", title: "WEEKLY ANNOUNCEMENT & CHARGE", dateText: "Sunday, August 2, 2026", hook: "Are you honoring God with your lips while your hands refuse to work in His field?", message: "Polite religious promises will not save your soul. Jesus demands your wholehearted obedience. Surrender to Him today.", lesson: "Jesus told a sharp story to religious leaders who loved polite speech. A father commanded two sons to work in his vineyard. The first son said no, but repented and worked. The second son answered politely, 'I go, sir,' but never went. This week, we are destroying religious lip service and demanding genuine action." },
+    { dayName: "Mon", title: "THE HONEST REBEL", dateText: "Monday, August 3, 2026", hook: "Is your past rebellion keeping you from believing that God can use your hands today?", message: "Your past rebellion is no match for the cleansing blood of Jesus. Turn around and enter His vineyard today.", lesson: "Jesus said, 'A man had two sons. And he went to the first and said, Son, go and work in the vineyard today.' He answered, 'I will not,' but afterward he changed his mind and went. How you finish is far more important than how you start." },
+    { dayName: "Tue", title: "THE POLITE HYPOCRITE", dateText: "Tuesday, August 4, 2026", hook: "Are you hiding your disobedience behind polite religious vocabulary?", message: "Saying 'Lord, Lord' will not open the gates of heaven. You must do the will of the Father. Surrender today.", lesson: "The second son answered politely, 'I go, sir,' yet his feet never moved toward the vineyard. He was a master of polite disobedience. God is not impressed by polite titles or religious etiquette." },
+    { dayName: "Wed", title: "THE FRUIT OF REPENTANCE", dateText: "Wednesday, August 5, 2026", hook: "What visible proof exists in your community that your heart has truly changed?", message: "A changed heart always produces a changed lifestyle. Trust Jesus today and let His love transform your actions.", lesson: "The first son proved his repentance by walking into the field and working the soil. His repentance produced visible, agricultural fruit. When your heart truly turns to God, your hands will automatically begin to serve." },
+    { dayName: "Thu", title: "THE SHOCKING QUEUE", dateText: "Thursday, August 6, 2026", hook: "Why are despised outcasts entering the Kingdom of God ahead of religious leaders?", message: "No sin is too dark for the blood of Jesus. Drop your pride, believe His Word, and enter His Kingdom today.", lesson: "When the outcasts heard the call to repent, they believed and changed their lives. Humility opens the door that religious pride locks." },
+    { dayName: "Fri", title: "THE FATHER'S VINEYARD", dateText: "Friday, August 7, 2026", hook: "Where is the vineyard God is commanding you to cultivate today?", message: "You were created to serve the King of Glory. Leave your selfish pursuits and work in His harvest field today.", lesson: "Your rural community is the Father's vineyard. Your local church, your family, and your marketplace are the rows of vines where God has planted you. The vineyard needs workers, not spectators." },
+    { dayName: "Sat", title: "CONCLUSION: OBEY WITH ACTION", dateText: "Saturday, August 8, 2026", hook: "My brethren, will your life be remembered for polite speech or faithful labor?", message: "You cannot satisfy God with polite vocabulary. Unfulfilled religious promises are empty hypocrisy. God honors the repentant rebel who goes to work.", lesson: "In our communities, we must stop judging people by their polished speech or their past mistakes. God looks at who is working in His vineyard today. Drop your empty excuses. Step into your community with humble, hardworking obedience." }
+  ]);
+
   // --- FIREBASE & SUPABASE CONNECTION ---
   useEffect(() => {
     const userStr = localStorage.getItem('ketiejili_user');
@@ -73,8 +102,8 @@ export default function SystemSettings() {
           if (data.logoBase64) setLogoPreview(data.logoBase64);
         }
 
-        // 2. Fetch Operational Vault from Supabase (for backend Edge Functions)
-        const { data: vaultData, error: vaultError } = await supabase
+        // 2. Fetch Operational Vault from Supabase
+        const { data: vaultData } = await supabase
           .from('district_settings')
           .select('*')
           .eq('id', 1)
@@ -83,6 +112,15 @@ export default function SystemSettings() {
         if (vaultData) {
           if (vaultData.sender_id) setSenderId(vaultData.sender_id);
           if (vaultData.pastor_contact) setPastorContact(vaultData.pastor_contact);
+        }
+
+        // 3. Fetch Existing Weekly Devotion from Firebase
+        const devotionDoc = await getDoc(doc(db, 'devotions', 'current_week'));
+        if (devotionDoc.exists()) {
+          const devData = devotionDoc.data();
+          if (devData.seriesTitle) setDevotionSeriesTitle(devData.seriesTitle);
+          if (devData.themePrayer) setDevotionThemePrayer(devData.themePrayer);
+          if (devData.days && Array.isArray(devData.days)) setDevotionDays(devData.days);
         }
       } catch (error) {
         console.error("Error fetching settings:", error);
@@ -106,11 +144,11 @@ export default function SystemSettings() {
 
     const qAssem = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubAssem = onSnapshot(qAssem, (snapshot) => {
-      setAssemblies(snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name })));
+      setAssemblies(snapshot.docs.map(docSnap => ({ id: docSnap.id, name: docSnap.data().name })));
     });
 
     const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
-      setMembers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setMembers(snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() })));
     });
 
     return () => { unsubAssem(); unsubMembers(); };
@@ -134,7 +172,6 @@ export default function SystemSettings() {
           console.error("Error fetching existing template:", error);
         }
         
-        // Reset staged audio upload when switching slots
         setAudioBlob(null);
         setAudioUrl(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -151,6 +188,34 @@ export default function SystemSettings() {
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification({ type: '', message: '' }), 4000);
+  };
+
+  // ==========================================
+  // DEVOTION PUBLISHER LOGIC
+  // ==========================================
+  const handleDevotionDayChange = (field, value) => {
+    const updated = [...devotionDays];
+    updated[editingDayIndex][field] = value;
+    setDevotionDays(updated);
+  };
+
+  const handlePublishDevotion = async (e) => {
+    e.preventDefault();
+    setIsPublishingDevotion(true);
+    try {
+      await setDoc(doc(db, "devotions", "current_week"), {
+        seriesTitle: devotionSeriesTitle,
+        themePrayer: devotionThemePrayer,
+        days: devotionDays,
+        updatedAt: new Date().toISOString()
+      });
+      showNotification("success", "Weekly Devotion successfully deployed to public landing page!");
+    } catch (error) {
+      console.error(error);
+      showNotification("error", "Failed to publish devotion to Firestore.");
+    } finally {
+      setIsPublishingDevotion(false);
+    }
   };
 
   // ==========================================
@@ -309,28 +374,25 @@ export default function SystemSettings() {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      // 1. Sync Frontend Settings to Firebase
       await setDoc(doc(db, 'system_settings', 'general'), {
         areaName, 
         districtName,
         districtSlogan,
         logoBase64: logoPreview,
-        pastorContact, // Keep synchronized for public kiosk components
+        pastorContact,
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
-      // 2. Sync Operational Vault to Supabase (for Edge Functions)
       const { error: vaultError } = await supabase
         .from('district_settings')
         .upsert({
-          id: 1, // Locks to single row
+          id: 1,
           sender_id: senderId.trim(),
           pastor_contact: pastorContact.trim(),
           updated_at: new Date().toISOString()
         });
 
       if (vaultError) throw vaultError;
-
       showNotification('success', 'Branding & Vault configurations locked in globally.');
     } catch (error) {
       console.error(error);
@@ -367,7 +429,6 @@ export default function SystemSettings() {
     const fileName = `${dayNumber}_${safeLanguage}.mp3`;
 
     try {
-      // 1. Save Audio to Supabase if provided
       if (audioBlob) {
         const { error: storageError } = await supabase.storage
           .from('voice_messages')
@@ -375,7 +436,6 @@ export default function SystemSettings() {
         if (storageError) throw storageError;
       }
 
-      // 2. Save SMS template to Firebase
       const smsDocRef = doc(db, 'altarconnect_sms_templates', `${dayNumber}_${safeLanguage}`);
       await setDoc(smsDocRef, {
         daySequence: dayNumber,
@@ -384,7 +444,6 @@ export default function SystemSettings() {
         lastUpdated: new Date().toISOString()
       });
 
-      // 3. Register custom language if new
       if (language === "Other" && customLanguage.trim() !== "") {
         const { data: existing } = await supabase.from("languages").select("name").ilike("name", safeLanguage);
         if (!existing || existing.length === 0) {
@@ -399,7 +458,6 @@ export default function SystemSettings() {
       if (fileInputRef.current) fileInputRef.current.value = "";
       if (language === "Other") setLanguage(safeLanguage);
       setCustomLanguage("");
-      // We intentionally do not clear setAutomatedSms so the user can verify their saved text.
 
     } catch (error) {
       showNotification("error", "Upload Failed. Check Supabase/Firebase connection.");
@@ -408,7 +466,6 @@ export default function SystemSettings() {
     }
   };
 
-  // NAVY & GOLD SOLID INPUT STYLE
   const inputStyle = "w-full p-3.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs text-white outline-none focus:border-[#FFC300] transition-all placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white shadow-inner";
   const labelStyle = "block text-[9px] font-black text-[#FFC300] uppercase tracking-widest mb-2 ml-1";
 
@@ -428,376 +485,556 @@ export default function SystemSettings() {
           )}
 
           {/* ========================================================= */}
-          {/* STICKY HEADER (Locks to top when scrolling down)          */}
+          {/* STICKY EXECUTIVE HEADER WITH PORTAL LAUNCH & TABS         */}
           {/* ========================================================= */}
-          <div className="sticky top-0 z-30 bg-[#001D3D] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block">
-                <Settings size={24} />
-              </div>
-              <div>
-                <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">System Settings</h1>
-                <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">Configure network parameters, branding, and automation infrastructure.</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
-            
-            {/* ========================================== */}
-            {/* COLUMN 1: LOCAL ASSEMBLIES CARD            */}
-            {/* ========================================== */}
-            <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#003566]">
-                <MapPin className="text-[#FFC300]" size={16} />
-                <h2 className="text-xs font-black text-white uppercase tracking-widest">Local Assemblies</h2>
-              </div>
-
-              <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
-                <input 
-                  type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
-                  placeholder="Type Local Name (e.g. Central)"
-                  className="flex-1 px-4 py-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs focus:outline-none focus:border-[#FFC300] text-white placeholder:text-white/30 transition-all"
-                  required
-                />
-                <button type="submit" disabled={isSubmitting} className="px-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40 border border-[#FFC300]">
-                  <Plus size={14} />
-                </button>
-              </form>
-
-              <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-                {assemblies.map((assem) => (
-                  <div key={assem.id} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
-                    {editingAssemblyId === assem.id ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <input 
-                          type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)}
-                          className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none"
-                          autoFocus
-                        />
-                        <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
-                        <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="font-black text-white text-xs uppercase tracking-widest">{assem.name}</span>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteAssembly(assem.id, assem.name)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-                {assemblies.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No locals found.</p>}
-              </div>
-            </div>
-
-            {/* ========================================== */}
-            {/* COLUMN 2: HOME CELLS RADAR                 */}
-            {/* ========================================== */}
-            <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#003566]">
-                <div className="flex items-center gap-2">
-                  <Home className="text-[#FFC300]" size={16} />
-                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Home Cells</h2>
+          <div className="sticky top-0 z-30 bg-[#001D3D]/95 backdrop-blur-md pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6 space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block">
+                  <Settings size={24} />
                 </div>
-                
-                <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
-                  <Filter size={10} className="text-[#FFC300] shrink-0" />
-                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
-                    <option value="All Assemblies">All Assemblies</option>
-                    {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-                {displayedCells.map((cell) => (
-                  <div key={cell.key} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
-                    {editingCellKey === cell.key ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <input type="text" value={editingCellName} onChange={e => setEditingCellName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
-                        <div className="flex gap-1">
-                          <button onClick={() => handleUpdateCell(cell.name, cell.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
-                          <button onClick={() => setEditingCellKey(null)} className="p-1.5 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-col">
-                          <span className="font-black text-white text-xs uppercase tracking-widest">{cell.name}</span>
-                          <span className="text-[9px] font-black text-[#FFC300] uppercase mt-0.5 tracking-widest">{cell.assemblyName}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingCellKey(cell.key); setEditingCellName(cell.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteCell(cell.name, cell.assemblyName)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-                {displayedCells.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No Home Cells detected.</p>}
-              </div>
-            </div>
-
-            {/* ========================================== */}
-            {/* COLUMN 3: BIBLE STUDY GROUPS RADAR         */}
-            {/* ========================================== */}
-            <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#003566]">
-                <div className="flex items-center gap-2">
-                  <BookOpen className="text-[#FFC300]" size={16} />
-                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Bible Studies</h2>
-                </div>
-                
-                <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
-                  <Filter size={10} className="text-[#FFC300] shrink-0" />
-                  <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
-                    <option value="All Assemblies">All Assemblies</option>
-                    {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
-                {displayedStudies.map((study) => (
-                  <div key={study.key} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
-                    {editingStudyKey === study.key ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <input type="text" value={editingStudyName} onChange={e => setEditingStudyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
-                        <div className="flex gap-1">
-                          <button onClick={() => handleUpdateStudy(study.name, study.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
-                          <button onClick={() => setEditingStudyKey(null)} className="p-1.5 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="flex flex-col">
-                          <span className="font-black text-white text-xs uppercase tracking-widest">{study.name}</span>
-                          <span className="text-[9px] font-black text-[#FFC300] uppercase mt-0.5 tracking-widest">{study.assemblyName}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => { setEditingStudyKey(study.key); setEditingStudyName(study.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
-                          {isTier1 && <button onClick={() => handleDeleteStudy(study.name, study.assemblyName)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
-                        </div>
-                      </>
-                    )}
-                  </div>
-                ))}
-                {displayedStudies.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No Bible Study groups detected.</p>}
-              </div>
-            </div>
-          </div>
-
-          {/* ========================================== */}
-          {/* ROW 2: GLOBAL SYSTEM BRANDING TRINITY      */}
-          {/* ========================================== */}
-          <form onSubmit={handleSaveSettings} className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl space-y-6">
-            
-            {/* FRONTEND BRANDING */}
-            <div className="flex items-center gap-2 pb-3 border-b border-[#003566]">
-              <Building2 className="text-[#FFC300]" size={18} />
-              <h2 className="text-sm font-black text-white uppercase tracking-widest">Global System Branding</h2>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
-              <div className="flex flex-col items-center justify-center bg-[#001D3D] border border-[#003566] p-5 rounded-2xl">
-                <label className={labelStyle}>Official Logo Icon</label>
-                <div className="w-24 h-24 rounded-full border-[3px] border-[#FFC300] shadow-lg flex items-center justify-center bg-[#000814] overflow-hidden relative group mb-3">
-                  <img src={logoPreview} alt="District Branding Asset" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-[#000814]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
-                    <UploadCloud size={16} className="text-[#FFC300] mb-1" />
-                    <span className="text-[9px] font-black text-white uppercase tracking-widest">Upload</span>
-                    <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  </div>
-                </div>
-                <p className="text-[8px] font-black text-white/50 text-center uppercase tracking-widest">PNG or JPG up to 1MB max</p>
-              </div>
-
-              <div>
-                <label className={labelStyle}>Area Identity Name</label>
-                <input 
-                  type="text" value={areaName} 
-                  onChange={(e) => setAreaName(e.target.value.toUpperCase())} 
-                  className={inputStyle} 
-                  placeholder="e.g. KOFORIDUA AREA"
-                />
-              </div>
-
-              <div>
-                <label className={labelStyle}>District Identity Name</label>
-                <input 
-                  type="text" required value={districtName} 
-                  onChange={(e) => setDistrictName(e.target.value.toUpperCase())} 
-                  className={inputStyle} 
-                  placeholder="e.g. KETIEJILI"
-                />
-              </div>
-
-              <div>
-                <label className={labelStyle}>System Slogan / Subtitle Text</label>
-                <input 
-                  type="text" required value={districtSlogan} 
-                  onChange={(e) => setDistrictSlogan(e.target.value)} 
-                  className={inputStyle} 
-                  placeholder="e.g. District Command Center"
-                />
-              </div>
-            </div>
-
-            {/* NEW: OPERATIONAL VAULT */}
-            <div className="pt-6 border-t border-[#003566]">
-              <div className="flex items-center gap-2 pb-3 mb-5">
-                <Lock className="text-[#FFC300]" size={16} />
-                <h2 className="text-sm font-black text-[#8ECAE6] uppercase tracking-widest">Operational Vault (Backend Automations)</h2>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className={labelStyle}>Approved Sender ID (MNotify)</label>
+                  <h1 className="text-sm md:text-base font-black text-white uppercase tracking-widest">System Settings & Publisher</h1>
+                  <p className="font-bold text-white/50 text-[10px] uppercase tracking-widest mt-1">Configure network parameters, branding, and weekly devotions.</p>
+                </div>
+              </div>
+
+              {/* QUICK RETURN TO PUBLIC PORTAL BUTTON */}
+              <button
+                onClick={() => router.push('/')}
+                className="px-5 py-2.5 bg-[#FFC300]/10 hover:bg-[#FFC300]/20 text-[#FFC300] border border-[#FFC300]/40 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
+              >
+                <span>Open Public Portal</span>
+                <ExternalLink size={14} />
+              </button>
+            </div>
+
+            {/* TAB SWITCHER PILLS (PREVENTS LONG TIDIOUS SCROLLING) */}
+            <div className="flex items-center gap-2 bg-[#000814] p-1.5 rounded-2xl border border-[#003566] overflow-x-auto max-w-full">
+              <button
+                onClick={() => setActiveTab('devotions')}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'devotions' ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <BookOpenCheck size={14} /> 1. Devotion Publisher
+              </button>
+
+              <button
+                onClick={() => setActiveTab('network')}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'network' ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Layers size={14} /> 2. Network Assemblies
+              </button>
+
+              <button
+                onClick={() => setActiveTab('branding')}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'branding' ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Building2 size={14} /> 3. Branding & Vault
+              </button>
+
+              <button
+                onClick={() => setActiveTab('studio')}
+                className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap flex items-center gap-2 ${
+                  activeTab === 'studio' ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Mic size={14} /> 4. Automation Studio
+              </button>
+            </div>
+          </div>
+
+          {/* ========================================================= */}
+          {/* TAB 1: WEEKLY DEVOTION PUBLISHER (SUN TO SAT CYCLE)       */}
+          {/* ========================================================= */}
+          {activeTab === 'devotions' && (
+            <form onSubmit={handlePublishDevotion} className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl space-y-8 animate-fade-in">
+              <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-[#003566]">
+                <div className="flex items-center gap-2">
+                  <BookOpenCheck className="text-[#FFC300]" size={18} />
+                  <h2 className="text-sm font-black text-white uppercase tracking-widest">Weekly Devotional Publisher</h2>
+                </div>
+                <span className="text-[10px] font-bold text-[#8ECAE6] uppercase">Syncs Direct to Landing Page</span>
+              </div>
+
+              {/* SERIES & THEME PRAYER */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#001D3D] p-6 rounded-2xl border border-[#003566]">
+                <div>
+                  <label className={labelStyle}>Weekly Series Title & Reference</label>
                   <input 
-                    type="text" required maxLength={11} value={senderId} 
-                    onChange={(e) => setSenderId(e.target.value)} 
+                    type="text" 
+                    value={devotionSeriesTitle} 
+                    onChange={(e) => setDevotionSeriesTitle(e.target.value)} 
                     className={inputStyle} 
-                    placeholder="e.g. Ketiejili"
+                    required 
                   />
-                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Must exactly match MNotify dashboard.</p>
                 </div>
                 <div>
-                  <label className={labelStyle}>District Minister Contact</label>
-                  <div className="relative">
-                    <Phone className="absolute left-4 top-3.5 h-4 w-4 text-white/30" />
+                  <label className={labelStyle}>Theme-Specific Sinner's Prayer</label>
+                  <textarea 
+                    rows={2} 
+                    value={devotionThemePrayer} 
+                    onChange={(e) => setDevotionThemePrayer(e.target.value)} 
+                    className={inputStyle} 
+                    required 
+                  />
+                </div>
+              </div>
+
+              {/* SUNDAY TO SATURDAY ONE-DAY-AT-A-TIME EDITOR */}
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#003566] pb-3">
+                  <span className="text-xs font-black text-[#FFC300] uppercase tracking-widest">
+                    Edit Daily Lesson (Sun - Sat)
+                  </span>
+
+                  {/* PILL SWITCHER SO YOU ONLY EDIT 1 DAY AT A TIME (NOT TIDIOUS) */}
+                  <div className="flex items-center gap-1 bg-[#001D3D] p-1 rounded-xl border border-[#003566] overflow-x-auto">
+                    {devotionDays.map((dayItem, idx) => (
+                      <button
+                        type="button"
+                        key={dayItem.dayName}
+                        onClick={() => setEditingDayIndex(idx)}
+                        className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap ${
+                          editingDayIndex === idx ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
+                        }`}
+                      >
+                        {dayItem.dayName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CURRENT SELECTED DAY EDITOR CARD */}
+                <div className="bg-[#001D3D]/60 border border-[#003566] p-6 rounded-2xl space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#003566] pb-3">
+                    <span className="px-3 py-1 bg-[#FFC300] text-[#000814] font-black text-[10px] uppercase rounded">
+                      Day {editingDayIndex + 1}: {devotionDays[editingDayIndex].dayName}
+                    </span>
                     <input 
-                      type="text" required value={pastorContact} 
-                      onChange={(e) => setPastorContact(e.target.value)} 
-                      className={`${inputStyle} pl-10`} 
-                      placeholder="e.g. +233 24 000 0000"
+                      type="text" 
+                      value={devotionDays[editingDayIndex].dateText} 
+                      onChange={(e) => handleDevotionDayChange("dateText", e.target.value)}
+                      className="bg-transparent border-b border-[#003566] text-right text-xs text-white/80 focus:outline-none focus:border-[#FFC300]" 
                     />
                   </div>
-                  <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Included in automated morning SMS.</p>
-                </div>
-              </div>
-            </div>
 
-            <div className="pt-5 border-t border-[#003566] flex justify-end">
-              <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 text-[#000814] text-[10px] uppercase tracking-widest w-full sm:w-auto border border-[#FFC300] ${isSubmitting ? 'bg-[#003566] text-white/50 cursor-not-allowed border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A]'}`}>
-                {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Committing...</> : <><Save size={14} /> Secure Vault & Branding</>}
-              </button>
-            </div>
-          </form>
-
-          {/* ========================================== */}
-          {/* ROW 3: ALTARCONNECT AUTOMATION STUDIO      */}
-          {/* ========================================== */}
-          <div className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFC300] to-[#FC8500]"></div>
-            
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-6 border-b border-[#003566] mt-1">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-lg text-[#FFC300]">
-                  <Mic size={18} />
-                </div>
-                <div>
-                  <h2 className="text-sm font-black text-white uppercase tracking-widest">AltarConnect Studio</h2>
-                  <p className="text-[9px] font-bold text-[#8ECAE6] uppercase tracking-widest mt-1">Configure automated discipleship files</p>
-                </div>
-              </div>
-
-              {/* DYNAMIC TARGET SLOT BADGE */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-lg shadow-sm">
-                <span className="text-[9px] font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-1.5">
-                  <Target size={12} className="animate-pulse" /> Target Slot: {dayNumber.replace('_', ' ')} • {language === 'Other' ? (customLanguage || 'New Language') : language}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div>
-                <label className={labelStyle}>Automated Sequence Day</label>
-                <select value={dayNumber} onChange={e => setDayNumber(e.target.value)} className={inputStyle}>
-                  <option value="Welcome">Initial Welcome Message</option>
-                  {[2, 3, 4, 5, 6, 7].map(day => <option key={day} value={`Day_${day}`}>Grounding Day {day}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelStyle}>Message Dialect / Language</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} className={inputStyle}>
-                  <option value="" disabled>- Select Language -</option>
-                  {availableLanguages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
-                  <option value="Other" className="text-[#FFC300]">Other (Add new language)</option>
-                </select>
-
-                {language === "Other" && (
-                  <div className="mt-4 animate-fade-in relative">
-                    <Globe className="absolute left-4 top-3.5 h-4 w-4 text-[#FFC300]" />
-                    <input type="text" placeholder="Type new language..." value={customLanguage} onChange={e => setCustomLanguage(e.target.value)} className={inputStyle} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className={labelStyle}>Daily Title</label>
+                      <input 
+                        type="text" 
+                        value={devotionDays[editingDayIndex].title} 
+                        onChange={(e) => handleDevotionDayChange("title", e.target.value)} 
+                        className={inputStyle} 
+                      />
+                    </div>
+                    <div>
+                      <label className={labelStyle}>6-Second Evangelical Message</label>
+                      <input 
+                        type="text" 
+                        value={devotionDays[editingDayIndex].message} 
+                        onChange={(e) => handleDevotionDayChange("message", e.target.value)} 
+                        className={inputStyle} 
+                      />
+                    </div>
                   </div>
-                )}
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div>
+                    <label className={labelStyle}>Daily Hook / Question</label>
+                    <input 
+                      type="text" 
+                      value={devotionDays[editingDayIndex].hook} 
+                      onChange={(e) => handleDevotionDayChange("hook", e.target.value)} 
+                      className={inputStyle} 
+                    />
+                  </div>
+
+                  <div>
+                    <label className={labelStyle}>Full Multi-Paragraph Lesson Teaching</label>
+                    <textarea 
+                      rows={6} 
+                      value={devotionDays[editingDayIndex].lesson} 
+                      onChange={(e) => handleDevotionDayChange("lesson", e.target.value)} 
+                      className={inputStyle} 
+                      placeholder="Paste the full teaching for this day..."
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-[#003566] flex justify-end">
+                <button 
+                  type="submit" 
+                  disabled={isPublishingDevotion}
+                  className="px-10 py-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg flex items-center gap-2"
+                >
+                  {isPublishingDevotion ? <><Loader2 className="animate-spin" size={16} /> Deploying Devotion...</> : <><Send size={16} /> Deploy Devotional to Landing Page</>}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 2: NETWORK ASSEMBLIES, CELLS & BIBLE STUDIES          */}
+          {/* ========================================================= */}
+          {activeTab === 'network' && (
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-fade-in">
               
-              {/* Voice Upload Column */}
-              <div className="bg-[#001D3D] rounded-2xl p-6 text-center border-2 border-dashed border-[#003566] hover:border-[#FFC300]/50 transition-colors relative flex flex-col justify-center min-h-[280px]">
-                {!audioUrl && (
-                  <div className="flex flex-col items-center gap-3 relative z-10">
-                    <div className="p-4 bg-[#FFC300]/10 text-[#FFC300] rounded-full border border-[#FFC300]/30 mb-2 shadow-inner">
-                      <UploadCloud size={32} />
-                    </div>
-                    <p className="font-black text-white text-sm uppercase tracking-widest">Upload Pre-Recorded MP3 Voice</p>
-                    <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Required format for Twilio broadcast compatibility.</p>
-                    <input type="file" accept="audio/mpeg, .mp3" ref={fileInputRef} onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                  </div>
-                )}
+              {/* COLUMN 1: LOCAL ASSEMBLIES CARD */}
+              <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
+                <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#003566]">
+                  <MapPin className="text-[#FFC300]" size={16} />
+                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Local Assemblies</h2>
+                </div>
 
-                {audioUrl && (
-                  <div className="flex flex-col items-center gap-4 relative z-10 w-full">
-                    <div className="w-full bg-[#000814] p-4 rounded-xl shadow-inner border border-[#003566]">
-                      <p className="text-[10px] font-black text-[#FFC300] uppercase tracking-widest mb-3 text-left flex items-center gap-2">
-                        <FileAudio size={14} /> MP3 Ready for Deployment
-                      </p>
-                      <audio src={audioUrl} controls className="w-full rounded-md" />
+                <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
+                  <input 
+                    type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
+                    placeholder="Type Local Name (e.g. Central)"
+                    className="flex-1 px-4 py-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs focus:outline-none focus:border-[#FFC300] text-white placeholder:text-white/30 transition-all"
+                    required
+                  />
+                  <button type="submit" disabled={isSubmitting} className="px-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40 border border-[#FFC300]">
+                    <Plus size={14} />
+                  </button>
+                </form>
+
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                  {assemblies.map((assem) => (
+                    <div key={assem.id} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
+                      {editingAssemblyId === assem.id ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <input 
+                            type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)}
+                            className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none"
+                            autoFocus
+                          />
+                          <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                          <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
+                        </div>
+                      ) : (
+                        <>
+                          <span className="font-black text-white text-xs uppercase tracking-widest">{assem.name}</span>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setEditingAssemblyId(assem.id); setEditingAssemblyName(assem.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                            {isTier1 && <button onClick={() => handleDeleteAssembly(assem.id, assem.name)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
+                          </div>
+                        </>
+                      )}
                     </div>
-                    <button onClick={() => { setAudioUrl(null); setAudioBlob(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest text-white/50 bg-[#000814] hover:bg-[#003566] hover:text-white border border-[#003566] transition-colors w-full">
-                      Remove / Change File
-                    </button>
-                  </div>
-                )}
+                  ))}
+                  {assemblies.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No locals found.</p>}
+                </div>
               </div>
 
-              {/* Automated SMS Column */}
-              <div className="bg-[#001D3D] rounded-2xl p-6 border border-[#003566] flex flex-col min-h-[280px]">
-                <div className="flex items-center justify-between mb-3">
+              {/* COLUMN 2: HOME CELLS RADAR */}
+              <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#003566]">
                   <div className="flex items-center gap-2">
-                    <MessageSquare size={16} className="text-[#FFC300]"/>
-                    <label className="text-[10px] font-black text-white uppercase tracking-widest">Automated SMS Template</label>
+                    <Home className="text-[#FFC300]" size={16} />
+                    <h2 className="text-xs font-black text-white uppercase tracking-widest">Home Cells</h2>
                   </div>
-                  {automatedSms.trim() !== '' && (
-                    <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded uppercase tracking-widest">
-                      Currently Saved
-                    </span>
+                  
+                  <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
+                    <Filter size={10} className="text-[#FFC300] shrink-0" />
+                    <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
+                      <option value="All Assemblies">All Assemblies</option>
+                      {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                  {displayedCells.map((cell) => (
+                    <div key={cell.key} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
+                      {editingCellKey === cell.key ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <input type="text" value={editingCellName} onChange={e => setEditingCellName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
+                          <div className="flex gap-1">
+                            <button onClick={() => handleUpdateCell(cell.name, cell.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                            <button onClick={() => setEditingCellKey(null)} className="p-1.5 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-col">
+                            <span className="font-black text-white text-xs uppercase tracking-widest">{cell.name}</span>
+                            <span className="text-[9px] font-black text-[#FFC300] uppercase mt-0.5 tracking-widest">{cell.assemblyName}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setEditingCellKey(cell.key); setEditingCellName(cell.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                            {isTier1 && <button onClick={() => handleDeleteCell(cell.name, cell.assemblyName)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {displayedCells.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No Home Cells detected.</p>}
+                </div>
+              </div>
+
+              {/* COLUMN 3: BIBLE STUDY GROUPS RADAR */}
+              <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4 pb-2 border-b border-[#003566]">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="text-[#FFC300]" size={16} />
+                    <h2 className="text-xs font-black text-white uppercase tracking-widest">Bible Studies</h2>
+                  </div>
+                  
+                  <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
+                    <Filter size={10} className="text-[#FFC300] shrink-0" />
+                    <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
+                      <option value="All Assemblies">All Assemblies</option>
+                      {assemblies.map(a => <option key={a.id} value={a.name}>{a.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+                  {displayedStudies.map((study) => (
+                    <div key={study.key} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
+                      {editingStudyKey === study.key ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <input type="text" value={editingStudyName} onChange={e => setEditingStudyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
+                          <div className="flex gap-1">
+                            <button onClick={() => handleUpdateStudy(study.name, study.assemblyName)} disabled={isSubmitting} className="p-1.5 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
+                            <button onClick={() => setEditingStudyKey(null)} className="p-1.5 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-col">
+                            <span className="font-black text-white text-xs uppercase tracking-widest">{study.name}</span>
+                            <span className="text-[9px] font-black text-[#FFC300] uppercase mt-0.5 tracking-widest">{study.assemblyName}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { setEditingStudyKey(study.key); setEditingStudyName(study.name); }} className="p-1.5 text-white/40 hover:bg-[#003566] hover:text-white rounded-md transition-colors"><Edit2 size={12} /></button>
+                            {isTier1 && <button onClick={() => handleDeleteStudy(study.name, study.assemblyName)} className="p-1.5 text-white/40 hover:bg-red-500/20 hover:text-red-400 rounded-md transition-colors"><Trash2 size={12} /></button>}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                  {displayedStudies.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No Bible Study groups detected.</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 3: GLOBAL SYSTEM BRANDING & OPERATIONAL VAULT         */}
+          {/* ========================================================= */}
+          {activeTab === 'branding' && (
+            <form onSubmit={handleSaveSettings} className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl space-y-6 animate-fade-in">
+              <div className="flex items-center gap-2 pb-3 border-b border-[#003566]">
+                <Building2 className="text-[#FFC300]" size={18} />
+                <h2 className="text-sm font-black text-white uppercase tracking-widest">Global System Branding</h2>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-end">
+                <div className="flex flex-col items-center justify-center bg-[#001D3D] border border-[#003566] p-5 rounded-2xl">
+                  <label className={labelStyle}>Official Logo Icon</label>
+                  <div className="w-24 h-24 rounded-full border-[3px] border-[#FFC300] shadow-lg flex items-center justify-center bg-[#000814] overflow-hidden relative group mb-3">
+                    <img src={logoPreview} alt="District Branding Asset" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-[#000814]/80 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                      <UploadCloud size={16} className="text-[#FFC300] mb-1" />
+                      <span className="text-[9px] font-black text-white uppercase tracking-widest">Upload</span>
+                      <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+                    </div>
+                  </div>
+                  <p className="text-[8px] font-black text-white/50 text-center uppercase tracking-widest">PNG or JPG up to 1MB max</p>
+                </div>
+
+                <div>
+                  <label className={labelStyle}>Area Identity Name</label>
+                  <input 
+                    type="text" value={areaName} 
+                    onChange={(e) => setAreaName(e.target.value.toUpperCase())} 
+                    className={inputStyle} 
+                    placeholder="e.g. KOFORIDUA AREA"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelStyle}>District Identity Name</label>
+                  <input 
+                    type="text" required value={districtName} 
+                    onChange={(e) => setDistrictName(e.target.value.toUpperCase())} 
+                    className={inputStyle} 
+                    placeholder="e.g. KETIEJILI"
+                  />
+                </div>
+
+                <div>
+                  <label className={labelStyle}>System Slogan / Subtitle Text</label>
+                  <input 
+                    type="text" required value={districtSlogan} 
+                    onChange={(e) => setDistrictSlogan(e.target.value)} 
+                    className={inputStyle} 
+                    placeholder="e.g. District Command Center"
+                  />
+                </div>
+              </div>
+
+              {/* OPERATIONAL VAULT */}
+              <div className="pt-6 border-t border-[#003566]">
+                <div className="flex items-center gap-2 pb-3 mb-5">
+                  <Lock className="text-[#FFC300]" size={16} />
+                  <h2 className="text-sm font-black text-[#8ECAE6] uppercase tracking-widest">Operational Vault (Backend Automations)</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className={labelStyle}>Approved Sender ID (MNotify)</label>
+                    <input 
+                      type="text" required maxLength={11} value={senderId} 
+                      onChange={(e) => setSenderId(e.target.value)} 
+                      className={inputStyle} 
+                      placeholder="e.g. Ketiejili"
+                    />
+                    <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Must exactly match MNotify dashboard.</p>
+                  </div>
+                  <div>
+                    <label className={labelStyle}>District Minister Contact</label>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-3.5 h-4 w-4 text-white/30" />
+                      <input 
+                        type="text" required value={pastorContact} 
+                        onChange={(e) => setPastorContact(e.target.value)} 
+                        className={`${inputStyle} pl-10`} 
+                        placeholder="e.g. +233 24 000 0000"
+                      />
+                    </div>
+                    <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-1.5 ml-1">Included in automated morning SMS.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-5 border-t border-[#003566] flex justify-end">
+                <button type="submit" disabled={isSubmitting} className={`px-8 py-3.5 rounded-xl font-black transition-all shadow-md flex items-center justify-center gap-2 text-[#000814] text-[10px] uppercase tracking-widest w-full sm:w-auto border border-[#FFC300] ${isSubmitting ? 'bg-[#003566] text-white/50 cursor-not-allowed border-[#003566]' : 'bg-[#FFC300] hover:bg-[#FFD60A]'}`}>
+                  {isSubmitting ? <><Loader2 size={14} className="animate-spin" /> Committing...</> : <><Save size={14} /> Secure Vault & Branding</>}
+                </button>
+              </div>
+            </form>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 4: ALTARCONNECT AUTOMATION STUDIO                     */}
+          {/* ========================================================= */}
+          {activeTab === 'studio' && (
+            <div className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl relative overflow-hidden animate-fade-in">
+              <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFC300] to-[#FC8500]"></div>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 mb-6 border-b border-[#003566] mt-1">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-lg text-[#FFC300]">
+                    <Mic size={18} />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-black text-white uppercase tracking-widest">AltarConnect Studio</h2>
+                    <p className="text-[9px] font-bold text-[#8ECAE6] uppercase tracking-widest mt-1">Configure automated discipleship files</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-lg shadow-sm">
+                  <span className="text-[9px] font-black text-[#FFC300] uppercase tracking-widest flex items-center gap-1.5">
+                    <Target size={12} className="animate-pulse" /> Target Slot: {dayNumber.replace('_', ' ')} • {language === 'Other' ? (customLanguage || 'New Language') : language}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <label className={labelStyle}>Automated Sequence Day</label>
+                  <select value={dayNumber} onChange={e => setDayNumber(e.target.value)} className={inputStyle}>
+                    <option value="Welcome">Initial Welcome Message</option>
+                    {[2, 3, 4, 5, 6, 7].map(day => <option key={day} value={`Day_${day}`}>Grounding Day {day}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className={labelStyle}>Message Dialect / Language</label>
+                  <select value={language} onChange={e => setLanguage(e.target.value)} className={inputStyle}>
+                    <option value="" disabled>- Select Language -</option>
+                    {availableLanguages.map(lang => <option key={lang} value={lang}>{lang}</option>)}
+                    <option value="Other" className="text-[#FFC300]">Other (Add new language)</option>
+                  </select>
+
+                  {language === "Other" && (
+                    <div className="mt-4 animate-fade-in relative">
+                      <Globe className="absolute left-4 top-3.5 h-4 w-4 text-[#FFC300]" />
+                      <input type="text" placeholder="Type new language..." value={customLanguage} onChange={e => setCustomLanguage(e.target.value)} className={inputStyle} />
+                    </div>
                   )}
                 </div>
-                <p className="text-[9px] font-bold text-[#8ECAE6]/70 uppercase tracking-widest mb-3">This text will be dispatched alongside the voice file on the specified sequence day.</p>
-                <textarea 
-                  rows="6" 
-                  value={automatedSms} 
-                  onChange={e => setAutomatedSms(e.target.value)}
-                  placeholder="e.g. God bless you for answering the call! Listen to this brief prayer from the District Minister..."
-                  className={`${inputStyle} resize-none flex-1 leading-relaxed border-[#FFC300]/20 focus:border-[#FFC300]`}
-                ></textarea>
               </div>
 
-            </div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Voice Upload Column */}
+                <div className="bg-[#001D3D] rounded-2xl p-6 text-center border-2 border-dashed border-[#003566] hover:border-[#FFC300]/50 transition-colors relative flex flex-col justify-center min-h-[280px]">
+                  {!audioUrl && (
+                    <div className="flex flex-col items-center gap-3 relative z-10">
+                      <div className="p-4 bg-[#FFC300]/10 text-[#FFC300] rounded-full border border-[#FFC300]/30 mb-2 shadow-inner">
+                        <UploadCloud size={32} />
+                      </div>
+                      <p className="font-black text-white text-sm uppercase tracking-widest">Upload Pre-Recorded MP3 Voice</p>
+                      <p className="text-[10px] text-white/50 font-bold uppercase tracking-widest">Required format for Twilio broadcast compatibility.</p>
+                      <input type="file" accept="audio/mpeg, .mp3" ref={fileInputRef} onChange={handleAudioUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                    </div>
+                  )}
 
-            <div className="pt-6 mt-6 border-t border-[#003566] flex justify-end">
-              <button onClick={saveAutomationToCloud} disabled={isSubmitting} className="px-10 py-3.5 rounded-xl font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg text-[10px] uppercase tracking-widest w-full sm:w-auto">
-                {isSubmitting ? <><Loader2 className="animate-spin" size={14} /> Securing to Global Automation...</> : <><Save size={14} /> Deploy Automations</>}
-              </button>
+                  {audioUrl && (
+                    <div className="flex flex-col items-center gap-4 relative z-10 w-full">
+                      <div className="w-full bg-[#000814] p-4 rounded-xl shadow-inner border border-[#003566]">
+                        <p className="text-[10px] font-black text-[#FFC300] uppercase tracking-widest mb-3 text-left flex items-center gap-2">
+                          <FileAudio size={14} /> MP3 Ready for Deployment
+                        </p>
+                        <audio src={audioUrl} controls className="w-full rounded-md" />
+                      </div>
+                      <button onClick={() => { setAudioUrl(null); setAudioBlob(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} className="px-6 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest text-white/50 bg-[#000814] hover:bg-[#003566] hover:text-white border border-[#003566] transition-colors w-full">
+                        Remove / Change File
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Automated SMS Column */}
+                <div className="bg-[#001D3D] rounded-2xl p-6 border border-[#003566] flex flex-col min-h-[280px]">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <MessageSquare size={16} className="text-[#FFC300]"/>
+                      <label className="text-[10px] font-black text-white uppercase tracking-widest">Automated SMS Template</label>
+                    </div>
+                    {automatedSms.trim() !== '' && (
+                      <span className="text-[8px] font-black text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded uppercase tracking-widest">
+                        Currently Saved
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[9px] font-bold text-[#8ECAE6]/70 uppercase tracking-widest mb-3">This text will be dispatched alongside the voice file on the specified sequence day.</p>
+                  <textarea 
+                    rows="6" 
+                    value={automatedSms} 
+                    onChange={e => setAutomatedSms(e.target.value)}
+                    placeholder="e.g. God bless you for answering the call! Listen to this brief prayer from the District Minister..."
+                    className={`${inputStyle} resize-none flex-1 leading-relaxed border-[#FFC300]/20 focus:border-[#FFC300]`}
+                  ></textarea>
+                </div>
+              </div>
+
+              <div className="pt-6 mt-6 border-t border-[#003566] flex justify-end">
+                <button onClick={saveAutomationToCloud} disabled={isSubmitting} className="px-10 py-3.5 rounded-xl font-black text-[#000814] bg-[#FFC300] hover:bg-[#FFD60A] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg text-[10px] uppercase tracking-widest w-full sm:w-auto">
+                  {isSubmitting ? <><Loader2 className="animate-spin" size={14} /> Securing to Global Automation...</> : <><Save size={14} /> Deploy Automations</>}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
         </div>
       </div>

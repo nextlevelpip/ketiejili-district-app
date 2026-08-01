@@ -7,7 +7,8 @@ import { collection, onSnapshot, query, orderBy, doc } from 'firebase/firestore'
 import { 
   Flame, UserCheck, Loader2, CheckCircle2, AlertCircle, Sparkles, 
   Phone, MapPin, Heart, Globe, Users, User, Shield, 
-  ArrowLeft, Calendar, BookOpen, Clock, ChevronRight, Zap
+  ArrowLeft, Calendar, BookOpen, Clock, ChevronRight, Zap, 
+  BookOpenCheck, X, Share2, MessageSquare, ThumbsUp, Send
 } from 'lucide-react';
 
 export default function PublicGateway() {
@@ -20,6 +21,7 @@ export default function PublicGateway() {
  
   // --- SYSTEM STATES ---
   const [activeForm, setActiveForm] = useState(null);
+  const [activeDevotionModal, setActiveDevotionModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [successPopup, setSuccessPopup] = useState(false);
@@ -34,11 +36,142 @@ export default function PublicGateway() {
   const [logoBase64, setLogoBase64] = useState('/logo.jpg');
   const [schedules, setSchedules] = useState([]);
 
+  // --- DEVOTION ENGAGEMENT STATES ---
+  // Index 6 lands directly on Saturday, August 1, 2026 (Conclusion of Week 31)
+  const [selectedDayIndex, setSelectedDayIndex] = useState(6); 
+  const [likesCount, setLikesCount] = useState(124);
+  const [hasLiked, setHasLiked] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [commentsList, setCommentsList] = useState([
+    { id: 1, name: "Elder Samuel", text: "Amen! True obedience is shown in our daily labor.", time: "2h ago" },
+    { id: 2, name: "Sister Grace", text: "Lord, help me to work faithfully in Your vineyard today.", time: "1h ago" }
+  ]);
+
   // --- ALTARCONNECT SOUL FORM STATE ---
   const [soulData, setSoulData] = useState({
     counselorName: '', fullName: '', phone: '', gender: '', language: '', category: 'General Prayer', customPrayer: ''
   });
   const availableLanguages = ["English", "Twi", "Konkomba", "Ga", "Ewe"];
+
+  // --- WEEKLY DEVOTION STATE (FULL MULTI-PARAGRAPH LESSONS RESTORED) ---
+  const [weeklyDevotion, setWeeklyDevotion] = useState({
+    seriesTitle: "THE TWO SONS | MATTHEW 21:31",
+    themePrayer: "Lord Jesus, I repent of my religious lip service. I have spoken polite words while my heart remained far from Your vineyard. I have promised obedience but failed to act. Today, I turn away from my rebellion. I drop my empty promises. Wash my heart with Your holy blood. Give me the grace to execute Your will through daily action. Be my Lord and Savior. Amen.",
+    days: [
+      {
+        dayName: "Sun",
+        title: "WEEKLY ANNOUNCEMENT & CHARGE",
+        dateText: "Sunday, July 26, 2026",
+        hook: "Are you honoring God with your lips while your hands refuse to work in His field?",
+        message: "Polite religious promises will not save your soul. Jesus demands your wholehearted obedience. Surrender to Him today.",
+        lesson: `My dear friend, are you honoring God with your lips while your hands refuse to work in His field?
+
+Jesus told a sharp story to religious leaders who loved polite speech. A father went to his first son and commanded him to work in the vineyard. The son answered bluntly, "I will not." But afterward, he changed his mind and went. The father went to the second son and gave the same command. That son answered politely, "I go, sir." But he never went.
+
+Jesus asked which of the two did the will of his father. They answered correctly that the first son obeyed. Jesus then delivered a devastating verdict. He said that corrupt tax collectors and prostitutes were entering the Kingdom of God ahead of respectable religious leaders. The outcasts repented and obeyed. The leaders offered pious words but refused to change.
+
+My brethren, this is the parable of Action Versus Words. In our communities, we respect the polished speech of the elder and the assemblyman. We judge the rough past of the common laborer. But God does not measure your faith by your religious vocabulary. He measures your faith by your actual obedience. Take courage today. Stop relying on polite promises and start working in the Father's field.
+
+CALL TO ACTION: Do not let polite words replace your obedience this week. Declare together, "We will obey with our actions!"`
+      },
+      {
+        dayName: "Mon",
+        title: "THE HONEST REBEL",
+        dateText: "Monday, July 27, 2026",
+        hook: "Is your past rebellion keeping you from believing that God can use your hands today?",
+        message: "Your past rebellion is no match for the cleansing blood of Jesus. Turn around and enter His vineyard today.",
+        lesson: `Jesus said, "A man had two sons. And he went to the first and said, 'Son, go and work in the vineyard today.' And he answered, 'I will not,' but afterward he changed his mind and went."
+
+My brethren, look closely at the first son. His initial response was disrespectful and rebellious. He told his father to his face that he would not work. But later, genuine regret pierced his heart. He repented. He picked up his tools and walked into the field.
+
+We see this transformation in our communities today. There are men and women who once lived in open rebellion against God. They were known sinners. Yet when the Gospel pierced their hearts, they did not just shed tears. They changed their direction. Sola Scriptura teaches us that how you finish is far more important than how you start. God honors the repentant rebel who turns his life around through action.
+
+True repentance is measured by your footsteps.
+
+APPLICATION: Do not let the shame of your past rebellion paralyze you. If you have been running away from God's call, change your mind today. Step into your local church or community square and perform a practical act of service.`
+      },
+      {
+        dayName: "Tue",
+        title: "THE POLITE HYPOCRITE",
+        dateText: "Tuesday, July 28, 2026",
+        hook: "Are you hiding your disobedience behind polite religious vocabulary?",
+        message: "Saying 'Lord, Lord' will not open the gates of heaven. You must do the will of the Father. Surrender today.",
+        lesson: `And he went to the other son and said the same. And he answered, "I go, sir," but did not go.
+
+My dear friend, look at the terrible deception of the second son. His words were perfectly respectful. He called his father "sir." He gave an immediate, willing promise to obey. Yet his feet never moved toward the vineyard. He was a master of polite disobedience.
+
+This hypocrisy is common in our communities. We love to sound holy at church meetings. We say "Amen" to every sermon. We promise to pray, to give, and to serve our neighbors. Yet when Monday arrives, we do absolutely nothing. Sola Scriptura exposes this trap. God is not impressed by polite titles or religious etiquette. Unfulfilled promises are a mockery of His authority.
+
+Polite rebellion is still rebellion.
+
+APPLICATION: Check your recent commitments today. Did you promise to help a neighbor or support a community project without following through? Do not make another empty promise. Go and fulfill your word before nightfall.`
+      },
+      {
+        dayName: "Wed",
+        title: "THE FRUIT OF REPENTANCE",
+        dateText: "Wednesday, July 29, 2026",
+        hook: "What visible proof exists in your community that your heart has truly changed?",
+        message: "A changed heart always produces a changed lifestyle. Trust Jesus today and let His love transform your actions.",
+        lesson: `Jesus asked, "Which of the two did the will of his father?" They said, "The first."
+
+My brethren, look at the clear standard of Jesus Christ. The will of the Father is not a sentiment. It is an action. The first son proved his repentance by walking into the field and working the soil. His repentance produced visible, agricultural fruit.
+
+In our communities, many people claim they have repented. Yet they still cheat in their shops. They still slander their neighbors. Sola Scriptura declares that faith without works is completely dead. John the Baptist commanded us to bear fruit in keeping with repentance. When your heart truly turns to God, your hands will automatically begin to serve your community.
+
+Real change leaves a visible trail of service.
+
+APPLICATION: Examine your daily habits today. Find one practical way to demonstrate your faith in your neighborhood. Help an elderly neighbor with her load. Clean a public path. Let your changed heart produce visible fruit.`
+      },
+      {
+        dayName: "Thu",
+        title: "THE SHOCKING QUEUE",
+        dateText: "Thursday, July 30, 2026",
+        hook: "Why are despised outcasts entering the Kingdom of God ahead of religious leaders?",
+        message: "No sin is too dark for the blood of Jesus. Drop your pride, believe His Word, and enter His Kingdom today.",
+        lesson: `Jesus said to them, "Truly, I say to you, the tax collectors and the prostitutes go into the kingdom of God before you. For John came to you in the way of righteousness, and you did not believe him, but the tax collectors and the prostitutes believed him."
+
+My dear friend, this statement shocked the religious elite to their core. In Jewish society, tax collectors and prostitutes were at the absolute bottom. Yet Jesus declared they were entering the Kingdom first. Why? Because when they heard the call to repent, they believed and changed their lives.
+
+In our communities, we often despise the broken. We look down on the drunkard or the struggling laborer. Yet when they hear the Gospel, they drop their pride and obey. Sola Scriptura warns proud churchgoers. If you refuse to humble your heart and repent, God will promote the repentant outcast over you.
+
+Humility opens the door that religious pride locks.
+
+APPLICATION: Examine your attitude toward the outcasts in your community today. Stop judging them. Pray for their salvation, and remember that God's grace is equally available to every broken soul.`
+      },
+      {
+        dayName: "Fri",
+        title: "THE FATHER'S VINEYARD",
+        dateText: "Friday, July 31, 2026",
+        hook: "Where is the vineyard God is commanding you to cultivate today?",
+        message: "You were created to serve the King of Glory. Leave your selfish pursuits and work in His harvest field today.",
+        lesson: `The father's instruction was clear and specific. "Son, go and work in the vineyard today."
+
+My brethren, look at three key words in this command. First, go. It requires initiative. Second, work. It requires effort and sweat. Third, today. It requires immediate urgency. The father did not ask his son to sit and debate agricultural theory. He commanded him to labor in the field.
+
+Your rural community is the Father's vineyard. Your local church, your family, and your marketplace are the rows of vines where God has planted you. Sola Scriptura demands that we stop delaying our service. Do not wait for a special title or an easier season. Step into your community today and cultivate peace, justice, and the Gospel of Christ.
+
+The vineyard needs workers, not spectators.
+
+APPLICATION: Identify one neglected area in your local church or community today. Do not wait for an invitation. Pick up your tools, show up, and put in an hour of hard, honest service for God's glory.`
+      },
+      {
+        dayName: "Sat",
+        title: "CONCLUSION: OBEY WITH ACTION",
+        dateText: "Saturday, August 1, 2026",
+        hook: "My brethren, will your life be remembered for polite speech or faithful labor?",
+        message: "You cannot satisfy God with polite vocabulary. Unfulfilled religious promises are empty hypocrisy. God honors the repentant rebel who goes to work.",
+        lesson: `My brethren, will your life be remembered for polite speech or faithful labor?
+
+This week, we confronted our religious lip service through The Parable of the Two Sons. Let us establish this absolute reality. You cannot satisfy the Father with polite vocabulary and unfulfilled promises. The second son said, "I go, sir," yet he never stepped into the vines. His respectful words were empty hypocrisy.
+
+God honors the repentant rebel who changes his mind and moves his feet. The first son bluntly refused, but genuine sorrow brought him into the field. His obedient labor erased his verbal defiance.
+
+In our communities, we must stop judging people by their polished speech or their past mistakes. God looks at who is working in His vineyard today. Drop your empty excuses. Step into your community with humble, hardworking obedience. Let your actions prove that you love the Father.
+
+CALL TO ACTION: Audit your promises this weekend. Have you been talking about faith while neglecting service? Repent of your passivity. Step into church tomorrow ready to back up your worship with practical, obedient labor.`
+      }
+    ]
+  });
 
   // --- OFFICIAL 8 THEMATIC TOPICS ---
   const thematicTopics = [
@@ -53,6 +186,7 @@ export default function PublicGateway() {
   ];
 
   useEffect(() => {
+    // 1. FETCH GENERAL SETTINGS OUTSIDE THE CODE
     const unsubSettings = onSnapshot(
       doc(db, 'system_settings', 'general'), 
       (docSnap) => {
@@ -68,6 +202,18 @@ export default function PublicGateway() {
       (error) => console.log("Settings snapshot notice:", error.message)
     );
 
+    // 2. FETCH ACTIVE WEEKLY DEVOTION OUTSIDE THE CODE FROM FIRESTORE
+    const unsubDevotion = onSnapshot(
+      doc(db, 'devotions', 'current_week'),
+      (docSnap) => {
+        if (docSnap.exists() && docSnap.data().days) {
+          setWeeklyDevotion(docSnap.data());
+        }
+      },
+      (error) => console.log("Using default weekly devotion fallback.", error.message)
+    );
+
+    // 3. FETCH ASSEMBLIES
     const qAssem = query(collection(db, 'assemblies'), orderBy('name', 'asc'));
     const unsubAssem = onSnapshot(
       qAssem, 
@@ -80,6 +226,7 @@ export default function PublicGateway() {
       (error) => console.log("Assemblies snapshot notice:", error.message)
     );
 
+    // 4. FETCH SCHEDULES
     const defaultSchedules = [
       { id: '1', day: 'Sundays', time: '8:00 AM - 10:30 AM', event: 'Divine Encounter Worship Service', tag: 'Featured Today' },
       { id: '2', day: 'Tuesdays', time: '6:30 PM - 8:00 PM', event: 'District Bible Study & Discipleship', tag: 'Midweek' },
@@ -103,7 +250,7 @@ export default function PublicGateway() {
       }
     );
 
-    return () => { unsubSettings(); unsubAssem(); unsubSchedules(); };
+    return () => { unsubSettings(); unsubDevotion(); unsubAssem(); unsubSchedules(); };
   }, []);
 
   const showNotification = (type, message) => {
@@ -117,6 +264,53 @@ export default function PublicGateway() {
     return val.slice(0, 10);
   };
 
+  // --- LIKE ACTION ---
+  const handleLikeToggle = () => {
+    if (!hasLiked) {
+      setLikesCount(prev => prev + 1);
+      setHasLiked(true);
+      showNotification('success', 'You blessed this devotion!');
+    } else {
+      setLikesCount(prev => prev - 1);
+      setHasLiked(false);
+    }
+  };
+
+  // --- SHARE ACTION ---
+  const handleShare = () => {
+    const activeDay = weeklyDevotion.days[selectedDayIndex];
+    const shareData = {
+      title: `${activeDay.title} | ${weeklyDevotion.seriesTitle}`,
+      text: `Read today's devotion from ${districtName}: "${activeDay.hook}"`,
+      url: window.location.href,
+    };
+
+    if (navigator.share) {
+      navigator.share(shareData).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      showNotification('info', 'Devotion link copied to clipboard!');
+    }
+  };
+
+  // --- COMMENT SUBMIT ---
+  const handleCommentSubmit = (e) => {
+    e.preventDefault();
+    if (!commentText.trim()) return;
+
+    const newComment = {
+      id: Date.now(),
+      name: "Kingdom Visitor",
+      text: commentText,
+      time: "Just now"
+    };
+
+    setCommentsList([newComment, ...commentsList]);
+    setCommentText("");
+    showNotification('success', 'Your comment has been posted!');
+  };
+
+  // --- SUBMIT ALTARCONNECT SOUL ---
   const handleSoulSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -154,6 +348,8 @@ export default function PublicGateway() {
       setIsSubmitting(false);
     }
   };
+
+  const currentDayData = weeklyDevotion.days[selectedDayIndex] || weeklyDevotion.days[0];
 
   const inputStyle = "w-full pl-11 pr-4 py-3.5 bg-[#0A0D18] border border-white/10 rounded-xl font-medium text-xs text-white outline-none focus:border-[#FF8E00] transition-all placeholder:text-white/30";
   const labelStyle = "text-[10px] font-bold text-[#FF8E00] uppercase ml-1 mb-1.5 block tracking-wider";
@@ -206,10 +402,10 @@ export default function PublicGateway() {
               {districtName}
             </h1>
             <div className="inline-flex items-center gap-1.5 text-[9px] sm:text-[11px] font-bold text-[#FF8E00] uppercase tracking-widest mt-1">
-              <span>The Church of Pentecost</span>
-              <span className="text-white/40 hidden sm:inline">•</span>
               <MapPin size={11} className="text-[#FF8E00] shrink-0" /> 
-              <span className="text-white/70 hidden sm:inline">11 Local Assemblies</span>
+              <span>11 Local Assemblies</span>
+              <span className="text-white/40 hidden sm:inline">•</span>
+              <span className="text-white/70 hidden sm:inline">The Church of Pentecost</span>
             </div>
           </div>
         </div>
@@ -368,6 +564,112 @@ export default function PublicGateway() {
         </div>
       )}
 
+      {/* DAILY DEVOTIONAL READING MODAL WITH FULL LESSON TEXT RESTORED */}
+      {activeDevotionModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[100] animate-fade-in overflow-y-auto">
+          <div className="bg-[#0A0E1A] border border-white/15 rounded-3xl max-w-2xl w-full p-6 sm:p-10 text-left shadow-2xl relative my-auto space-y-6">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div className="flex items-center gap-2 text-[#FF8E00] font-black text-xs uppercase tracking-widest">
+                <BookOpenCheck size={18} /> {weeklyDevotion.seriesTitle}
+              </div>
+              <button 
+                onClick={() => setActiveDevotionModal(false)}
+                className="p-2 text-white/50 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest block">
+                {currentDayData.dateText}
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white leading-snug">
+                {currentDayData.title}
+              </h2>
+            </div>
+
+            {/* ENTIRE MULTI-PARAGRAPH LESSON WITH WHITESPACE-PRE-LINE */}
+            <div className="text-xs sm:text-sm text-white/80 leading-relaxed space-y-4 whitespace-pre-line font-medium border-y border-white/10 py-6">
+              {currentDayData.lesson}
+            </div>
+
+            <div className="bg-[#03060D] p-5 rounded-2xl border border-[#FF8E00]/30 space-y-3">
+              <h4 className="text-xs font-black text-[#FF8E00] uppercase tracking-widest flex items-center gap-1.5">
+                <Heart size={15} /> Sinner's Prayer & Surrender
+              </h4>
+              <p className="text-xs text-white/90 italic leading-relaxed font-medium">
+                "{weeklyDevotion.themePrayer}"
+              </p>
+            </div>
+
+            {/* MODAL COMMENTS SECTION */}
+            <div className="space-y-4 pt-4 border-t border-white/10">
+              <h4 className="text-xs font-black uppercase tracking-widest text-white flex items-center gap-2">
+                <MessageSquare size={14} className="text-[#FF8E00]" /> Brethren Reflections ({commentsList.length})
+              </h4>
+              
+              <form onSubmit={handleCommentSubmit} className="flex gap-2">
+                <input 
+                  type="text" 
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Share how this devotion spoke to your heart..."
+                  className="flex-1 px-4 py-2.5 bg-[#03060D] border border-white/10 rounded-xl text-xs text-white outline-none focus:border-[#FF8E00]"
+                />
+                <button 
+                  type="submit"
+                  className="px-4 py-2.5 bg-[#FF8E00] hover:bg-[#FFA32A] text-black rounded-xl text-xs font-bold transition-all"
+                >
+                  <Send size={14} />
+                </button>
+              </form>
+
+              <div className="space-y-2.5 max-h-40 overflow-y-auto pr-1">
+                {commentsList.map((comm) => (
+                  <div key={comm.id} className="p-3 bg-black/40 rounded-xl border border-white/5 space-y-1">
+                    <div className="flex justify-between items-center text-[10px]">
+                      <span className="font-bold text-[#8ECAE6]">{comm.name}</span>
+                      <span className="text-white/40">{comm.time}</span>
+                    </div>
+                    <p className="text-xs text-white/80">{comm.text}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ACTION BAR: LIKE, SHARE & CLOSE */}
+            <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-white/10">
+              <div className="flex items-center gap-3">
+                <button 
+                  onClick={handleLikeToggle}
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                    hasLiked 
+                      ? 'bg-[#FF8E00]/20 border-[#FF8E00] text-[#FF8E00]' 
+                      : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+                  }`}
+                >
+                  <ThumbsUp size={14} className={hasLiked ? 'fill-current' : ''} /> {likesCount} Likes
+                </button>
+                <button 
+                  onClick={handleShare}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:text-white transition-all"
+                >
+                  <Share2 size={14} /> Share
+                </button>
+              </div>
+
+              <button 
+                onClick={() => setActiveDevotionModal(false)}
+                className="px-6 py-2.5 bg-white/10 hover:bg-white/20 text-white font-bold uppercase tracking-widest text-xs rounded-xl transition-all"
+              >
+                Close Reader
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* EXECUTIVE GLOW HERO SECTION WITH REPLICATED WORD EMPHASIS */}
       <section className="w-full max-w-6xl mx-auto pt-16 pb-12 px-6 text-center space-y-8 relative z-10">
         
@@ -399,11 +701,11 @@ export default function PublicGateway() {
 
           {languageMode === 'EN' ? (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
-              The Church Unleashed to <span className="text-[#FFC300]">Transform Society</span> through the <span className="text-[#FFC300]">Gospel</span> and the Power of the <span className="text-[#FFC300]">Holy Spirit</span>
+              The Church Unleashed to <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">Transform Society</span> through the <span className="text-[#FFC300]">Gospel</span> and the Power of the <span className="text-[#FFC300]">Holy Spirit</span>
             </h1>
           ) : (
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black uppercase tracking-tight leading-tight text-white">
-              Asafo a Apue Namyɛ so de <span className="text-[#FFC300]">Asɛmpa</span> no ne <span className="text-[#FFC300]">Honhom Kronkron</span> tumi ahoɔden <span className="text-[#FFC300]">resakra wiase</span>
+              Asafo a Apue Namyɛ so de <span className="text-[#FFC300]">Asɛmpa</span> no ne <span className="text-[#FFC300]">Honhom Kronkron</span> tumi ahoɔden <span className="text-[#FFC300] underline decoration-[#FFC300]/40 decoration-wavy">resakra wiase</span>
             </h1>
           )}
 
@@ -415,7 +717,7 @@ export default function PublicGateway() {
           </p>
         </div>
 
-        {/* INTERACTIVE COMMAND OPERATIONS CENTER (NO DUPLICATE HEADER) */}
+        {/* INTERACTIVE COMMAND OPERATIONS CENTER */}
         <div className="w-full max-w-5xl mx-auto mt-12 p-1 md:p-2 rounded-3xl bg-gradient-to-b from-white/15 via-white/5 to-transparent border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.8)]">
           <div className="bg-[#0A0E1A]/90 backdrop-blur-2xl rounded-[1.3rem] p-6 md:p-10 text-left border border-white/10 space-y-8">
             
@@ -446,7 +748,7 @@ export default function PublicGateway() {
               </div>
             </div>
 
-            {/* Dashboard Inner Grid: Schedule of the Day & Live Notice */}
+            {/* Dashboard Inner Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2 bg-black/40 border border-white/5 rounded-2xl p-6 space-y-3">
                 <div className="flex items-center justify-between">
@@ -523,6 +825,98 @@ export default function PublicGateway() {
               </p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* WEEKLY DEVOTION SPOTLIGHT SECTION (SUNDAY TO SATURDAY CYCLE) */}
+      <section className="w-full max-w-5xl mx-auto my-12 px-6">
+        <div className="bg-gradient-to-br from-[#0A0E1A] via-[#11172A] to-[#0A0E1A] border border-[#FF8E00]/40 rounded-3xl p-8 md:p-10 shadow-[0_0_40px_rgba(255,142,0,0.15)] space-y-6">
+          
+          <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2.5 rounded-xl bg-[#FF8E00]/10 text-[#FF8E00]">
+                <BookOpenCheck size={20} />
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest block">
+                  Weekly Devotional Series • External Firestore Sync
+                </span>
+                <h3 className="text-base sm:text-lg font-black uppercase tracking-wide text-white">
+                  {weeklyDevotion.seriesTitle}
+                </h3>
+              </div>
+            </div>
+
+            {/* WEEKLY DAY SELECTOR PILL TABS (SUN TO SAT) */}
+            <div className="flex items-center gap-1 bg-black/40 p-1 rounded-xl border border-white/10 overflow-x-auto max-w-full">
+              {weeklyDevotion.days.map((dayItem, idx) => (
+                <button
+                  key={dayItem.dayName}
+                  onClick={() => setSelectedDayIndex(idx)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap ${
+                    selectedDayIndex === idx 
+                      ? 'bg-[#FF8E00] text-black shadow' 
+                      : 'text-white/60 hover:text-white'
+                  }`}
+                >
+                  {dayItem.dayName}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest block">
+              {currentDayData.dateText}
+            </span>
+            <h4 className="text-xl sm:text-2xl font-black uppercase text-white tracking-tight">
+              {currentDayData.title}
+            </h4>
+            <p className="text-xs sm:text-sm text-white/80 font-medium leading-relaxed italic border-l-2 border-[#FF8E00] pl-3">
+              "{currentDayData.hook}"
+            </p>
+            <p className="text-xs sm:text-sm text-white/70 leading-relaxed font-normal pt-2">
+              {currentDayData.message}
+            </p>
+          </div>
+
+          {/* ENGAGEMENT BAR: LIKES, SHARES & MODAL OPEN */}
+          <div className="pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={handleLikeToggle}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  hasLiked 
+                    ? 'bg-[#FF8E00]/20 border-[#FF8E00] text-[#FF8E00]' 
+                    : 'bg-white/5 border-white/10 text-white/70 hover:text-white'
+                }`}
+              >
+                <ThumbsUp size={14} className={hasLiked ? 'fill-current' : ''} /> {likesCount} Likes
+              </button>
+
+              <button 
+                onClick={handleShare}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-white/70 hover:text-white transition-all"
+              >
+                <Share2 size={14} /> Share Word
+              </button>
+
+              <button 
+                onClick={() => setActiveDevotionModal(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-white/5 border border-white/10 text-[#8ECAE6] hover:text-white transition-all"
+              >
+                <MessageSquare size={14} /> Comment
+              </button>
+            </div>
+
+            <button
+              onClick={() => setActiveDevotionModal(true)}
+              className="w-full sm:w-auto px-6 py-3 bg-[#FF8E00] hover:bg-[#FFA32A] text-black font-black text-xs uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2"
+            >
+              <span>Read Full Lesson & Pray</span> <ChevronRight size={14} />
+            </button>
+          </div>
+
         </div>
       </section>
 
