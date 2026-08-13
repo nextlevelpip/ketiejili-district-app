@@ -26,7 +26,6 @@ export default function SystemSettings() {
   const [currentUser, setCurrentUser] = useState(null);
 
   // --- EXECUTIVE DASHBOARD TAB SWITCHER ---
-  // Options: 'network' | 'branding' | 'devotions' | 'studio'
   const [activeTab, setActiveTab] = useState('devotions'); 
 
   // --- BRANDING STATES ---
@@ -34,6 +33,11 @@ export default function SystemSettings() {
   const [districtName, setDistrictName] = useState('KATIEJELI');
   const [districtSlogan, setDistrictSlogan] = useState('District Command');
   const [logoPreview, setLogoPreview] = useState('/logo.jpg');
+
+  // --- MONTHLY FOCUS STATES ---
+  const [focusMonth, setFocusMonth] = useState('August 2026');
+  const [focusTitle, setFocusTitle] = useState('Sharing the Love of Christ with a Dying World');
+  const [focusSubtitle, setFocusSubtitle] = useState('Members Serving Beyond the Church Walls.');
 
   // --- OPERATIONAL VAULT STATES ---
   const [senderId, setSenderId] = useState('COP-KETIEJI');
@@ -68,11 +72,11 @@ export default function SystemSettings() {
   const [groupCardFilter, setGroupCardFilter] = useState('All Assemblies');
 
   // ==========================================
-  // NEW: DEVOTION PUBLISHER STATES
+  // DEVOTION PUBLISHER STATES
   // ==========================================
   const [devotionSeriesTitle, setDevotionSeriesTitle] = useState("THE TWO SONS | MATTHEW 21:31");
   const [devotionThemePrayer, setDevotionThemePrayer] = useState("Lord Jesus, I repent of my religious lip service. Wash my heart with Your holy blood. Give me the grace to execute Your will through daily action. Be my Lord and Savior. Amen.");
-  const [editingDayIndex, setEditingDayIndex] = useState(0); // 0 = Sun, 6 = Sat
+  const [editingDayIndex, setEditingDayIndex] = useState(0);
   const [isPublishingDevotion, setIsPublishingDevotion] = useState(false);
 
   const [devotionDays, setDevotionDays] = useState([
@@ -92,7 +96,6 @@ export default function SystemSettings() {
 
     const fetchSettings = async () => {
       try {
-        // 1. Fetch Frontend Branding from Firebase
         const settingsDoc = await getDoc(doc(db, 'system_settings', 'general'));
         if (settingsDoc.exists()) {
           const data = settingsDoc.data();
@@ -100,9 +103,13 @@ export default function SystemSettings() {
           if (data.districtName) setDistrictName(data.districtName);
           if (data.districtSlogan) setDistrictSlogan(data.districtSlogan);
           if (data.logoBase64) setLogoPreview(data.logoBase64);
+          
+          // Monthly Focus Hydration
+          if (data.focusMonth) setFocusMonth(data.focusMonth);
+          if (data.focusTitle) setFocusTitle(data.focusTitle);
+          if (data.focusSubtitle) setFocusSubtitle(data.focusSubtitle);
         }
 
-        // 2. Fetch Operational Vault from Supabase
         const { data: vaultData } = await supabase
           .from('district_settings')
           .select('*')
@@ -114,7 +121,6 @@ export default function SystemSettings() {
           if (vaultData.pastor_contact) setPastorContact(vaultData.pastor_contact);
         }
 
-        // 3. Fetch Existing Weekly Devotion from Firebase
         const devotionDoc = await getDoc(doc(db, 'devotions', 'current_week'));
         if (devotionDoc.exists()) {
           const devData = devotionDoc.data();
@@ -154,7 +160,6 @@ export default function SystemSettings() {
     return () => { unsubAssem(); unsubMembers(); };
   }, []);
 
-  // --- DYNAMICALLY FETCH EXISTING AUTOMATION SLOT ---
   useEffect(() => {
     const fetchExistingTemplate = async () => {
       if (language && language !== "Other" && dayNumber) {
@@ -355,7 +360,7 @@ export default function SystemSettings() {
   };
 
   // ==========================================
-  // BRANDING LOGIC
+  // BRANDING & FOCUS LOGIC
   // ==========================================
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -380,6 +385,9 @@ export default function SystemSettings() {
         districtSlogan,
         logoBase64: logoPreview,
         pastorContact,
+        focusMonth,
+        focusTitle,
+        focusSubtitle,
         lastUpdated: new Date().toISOString()
       }, { merge: true });
 
@@ -393,7 +401,7 @@ export default function SystemSettings() {
         });
 
       if (vaultError) throw vaultError;
-      showNotification('success', 'Branding & Vault configurations locked in globally.');
+      showNotification('success', 'Branding, Vault, & Monthly Focus locked in globally.');
     } catch (error) {
       console.error(error);
       showNotification('error', 'Configuration save script failed.');
@@ -499,7 +507,6 @@ export default function SystemSettings() {
                 </div>
               </div>
 
-              {/* QUICK RETURN TO PUBLIC PORTAL BUTTON */}
               <button
                 onClick={() => router.push('/')}
                 className="px-5 py-2.5 bg-[#FFC300]/10 hover:bg-[#FFC300]/20 text-[#FFC300] border border-[#FFC300]/40 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2"
@@ -509,7 +516,6 @@ export default function SystemSettings() {
               </button>
             </div>
 
-            {/* TAB SWITCHER PILLS (PREVENTS LONG TIDIOUS SCROLLING) */}
             <div className="flex items-center gap-2 bg-[#000814] p-1.5 rounded-2xl border border-[#003566] overflow-x-auto max-w-full">
               <button
                 onClick={() => setActiveTab('devotions')}
@@ -550,7 +556,7 @@ export default function SystemSettings() {
           </div>
 
           {/* ========================================================= */}
-          {/* TAB 1: WEEKLY DEVOTION PUBLISHER (SUN TO SAT CYCLE)       */}
+          {/* TAB 1: WEEKLY DEVOTION PUBLISHER                          */}
           {/* ========================================================= */}
           {activeTab === 'devotions' && (
             <form onSubmit={handlePublishDevotion} className="bg-[#000814] p-6 md:p-8 rounded-[2rem] border border-[#003566] shadow-xl space-y-8 animate-fade-in">
@@ -562,118 +568,62 @@ export default function SystemSettings() {
                 <span className="text-[10px] font-bold text-[#8ECAE6] uppercase">Syncs Direct to Landing Page</span>
               </div>
 
-              {/* SERIES & THEME PRAYER */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#001D3D] p-6 rounded-2xl border border-[#003566]">
                 <div>
                   <label className={labelStyle}>Weekly Series Title & Reference</label>
-                  <input 
-                    type="text" 
-                    value={devotionSeriesTitle} 
-                    onChange={(e) => setDevotionSeriesTitle(e.target.value)} 
-                    className={inputStyle} 
-                    required 
-                  />
+                  <input type="text" value={devotionSeriesTitle} onChange={(e) => setDevotionSeriesTitle(e.target.value)} className={inputStyle} required />
                 </div>
                 <div>
                   <label className={labelStyle}>Theme-Specific Sinner's Prayer</label>
-                  <textarea 
-                    rows={2} 
-                    value={devotionThemePrayer} 
-                    onChange={(e) => setDevotionThemePrayer(e.target.value)} 
-                    className={inputStyle} 
-                    required 
-                  />
+                  <textarea rows={2} value={devotionThemePrayer} onChange={(e) => setDevotionThemePrayer(e.target.value)} className={inputStyle} required />
                 </div>
               </div>
 
-              {/* SUNDAY TO SATURDAY ONE-DAY-AT-A-TIME EDITOR */}
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#003566] pb-3">
-                  <span className="text-xs font-black text-[#FFC300] uppercase tracking-widest">
-                    Edit Daily Lesson (Sun - Sat)
-                  </span>
-
-                  {/* PILL SWITCHER SO YOU ONLY EDIT 1 DAY AT A TIME (NOT TIDIOUS) */}
+                  <span className="text-xs font-black text-[#FFC300] uppercase tracking-widest">Edit Daily Lesson (Sun - Sat)</span>
                   <div className="flex items-center gap-1 bg-[#001D3D] p-1 rounded-xl border border-[#003566] overflow-x-auto">
                     {devotionDays.map((dayItem, idx) => (
-                      <button
-                        type="button"
-                        key={dayItem.dayName}
-                        onClick={() => setEditingDayIndex(idx)}
-                        className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap ${
-                          editingDayIndex === idx ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'
-                        }`}
-                      >
+                      <button type="button" key={dayItem.dayName} onClick={() => setEditingDayIndex(idx)} className={`px-3.5 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all whitespace-nowrap ${editingDayIndex === idx ? 'bg-[#FFC300] text-[#000814] shadow' : 'text-white/60 hover:text-white'}`}>
                         {dayItem.dayName}
                       </button>
                     ))}
                   </div>
                 </div>
 
-                {/* CURRENT SELECTED DAY EDITOR CARD */}
                 <div className="bg-[#001D3D]/60 border border-[#003566] p-6 rounded-2xl space-y-4">
                   <div className="flex items-center justify-between border-b border-[#003566] pb-3">
                     <span className="px-3 py-1 bg-[#FFC300] text-[#000814] font-black text-[10px] uppercase rounded">
                       Day {editingDayIndex + 1}: {devotionDays[editingDayIndex].dayName}
                     </span>
-                    <input 
-                      type="text" 
-                      value={devotionDays[editingDayIndex].dateText} 
-                      onChange={(e) => handleDevotionDayChange("dateText", e.target.value)}
-                      className="bg-transparent border-b border-[#003566] text-right text-xs text-white/80 focus:outline-none focus:border-[#FFC300]" 
-                    />
+                    <input type="text" value={devotionDays[editingDayIndex].dateText} onChange={(e) => handleDevotionDayChange("dateText", e.target.value)} className="bg-transparent border-b border-[#003566] text-right text-xs text-white/80 focus:outline-none focus:border-[#FFC300]" />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className={labelStyle}>Daily Title</label>
-                      <input 
-                        type="text" 
-                        value={devotionDays[editingDayIndex].title} 
-                        onChange={(e) => handleDevotionDayChange("title", e.target.value)} 
-                        className={inputStyle} 
-                      />
+                      <input type="text" value={devotionDays[editingDayIndex].title} onChange={(e) => handleDevotionDayChange("title", e.target.value)} className={inputStyle} />
                     </div>
                     <div>
                       <label className={labelStyle}>6-Second Evangelical Message</label>
-                      <input 
-                        type="text" 
-                        value={devotionDays[editingDayIndex].message} 
-                        onChange={(e) => handleDevotionDayChange("message", e.target.value)} 
-                        className={inputStyle} 
-                      />
+                      <input type="text" value={devotionDays[editingDayIndex].message} onChange={(e) => handleDevotionDayChange("message", e.target.value)} className={inputStyle} />
                     </div>
                   </div>
 
                   <div>
                     <label className={labelStyle}>Daily Hook / Question</label>
-                    <input 
-                      type="text" 
-                      value={devotionDays[editingDayIndex].hook} 
-                      onChange={(e) => handleDevotionDayChange("hook", e.target.value)} 
-                      className={inputStyle} 
-                    />
+                    <input type="text" value={devotionDays[editingDayIndex].hook} onChange={(e) => handleDevotionDayChange("hook", e.target.value)} className={inputStyle} />
                   </div>
 
                   <div>
                     <label className={labelStyle}>Full Multi-Paragraph Lesson Teaching</label>
-                    <textarea 
-                      rows={6} 
-                      value={devotionDays[editingDayIndex].lesson} 
-                      onChange={(e) => handleDevotionDayChange("lesson", e.target.value)} 
-                      className={inputStyle} 
-                      placeholder="Paste the full teaching for this day..."
-                    />
+                    <textarea rows={6} value={devotionDays[editingDayIndex].lesson} onChange={(e) => handleDevotionDayChange("lesson", e.target.value)} className={inputStyle} placeholder="Paste the full teaching for this day..." />
                   </div>
                 </div>
               </div>
 
               <div className="pt-4 border-t border-[#003566] flex justify-end">
-                <button 
-                  type="submit" 
-                  disabled={isPublishingDevotion}
-                  className="px-10 py-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg flex items-center gap-2"
-                >
+                <button type="submit" disabled={isPublishingDevotion} className="px-10 py-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black uppercase tracking-widest text-xs rounded-xl transition-all shadow-lg flex items-center gap-2">
                   {isPublishingDevotion ? <><Loader2 className="animate-spin" size={16} /> Deploying Devotion...</> : <><Send size={16} /> Deploy Devotional to Landing Page</>}
                 </button>
               </div>
@@ -685,36 +635,22 @@ export default function SystemSettings() {
           {/* ========================================================= */}
           {activeTab === 'network' && (
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start animate-fade-in">
-              
-              {/* COLUMN 1: LOCAL ASSEMBLIES CARD */}
+              {/* Keep existing Network column code here */}
               <div className="bg-[#000814] rounded-2xl border border-[#003566] shadow-xl flex flex-col h-[520px] p-6">
                 <div className="flex items-center gap-2 mb-4 pb-2 border-b border-[#003566]">
                   <MapPin className="text-[#FFC300]" size={16} />
                   <h2 className="text-xs font-black text-white uppercase tracking-widest">Local Assemblies</h2>
                 </div>
-
                 <form onSubmit={handleAddAssembly} className="flex gap-2 mb-4">
-                  <input 
-                    type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)}
-                    placeholder="Type Local Name (e.g. Central)"
-                    className="flex-1 px-4 py-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs focus:outline-none focus:border-[#FFC300] text-white placeholder:text-white/30 transition-all"
-                    required
-                  />
-                  <button type="submit" disabled={isSubmitting} className="px-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40 border border-[#FFC300]">
-                    <Plus size={14} />
-                  </button>
+                  <input type="text" value={newAssembly} onChange={e => setNewAssembly(e.target.value)} placeholder="Type Local Name (e.g. Central)" className="flex-1 px-4 py-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs focus:outline-none focus:border-[#FFC300] text-white placeholder:text-white/30 transition-all" required />
+                  <button type="submit" disabled={isSubmitting} className="px-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] rounded-xl font-black text-[10px] uppercase tracking-widest transition-colors flex items-center gap-1.5 shadow-md disabled:opacity-40 border border-[#FFC300]"><Plus size={14} /></button>
                 </form>
-
                 <div className="flex-1 overflow-y-auto pr-1 space-y-2 custom-scrollbar">
                   {assemblies.map((assem) => (
                     <div key={assem.id} className="flex items-center justify-between p-3 bg-[#001D3D] rounded-xl border border-[#003566] hover:border-[#FFC300]/30 transition-colors group">
                       {editingAssemblyId === assem.id ? (
                         <div className="flex items-center gap-2 w-full">
-                          <input 
-                            type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)}
-                            className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none"
-                            autoFocus
-                          />
+                          <input type="text" value={editingAssemblyName} onChange={e => setEditingAssemblyName(e.target.value)} className="flex-1 px-3 py-1.5 bg-[#000814] border border-[#FFC300] rounded-lg text-xs font-bold text-white focus:outline-none" autoFocus />
                           <button onClick={() => handleUpdateAssembly(assem.id, assem.name)} disabled={isSubmitting} className="p-2 bg-emerald-500/20 hover:bg-emerald-500/40 text-emerald-400 rounded-lg disabled:opacity-40 transition-colors border border-emerald-500/30"><Check size={14}/></button>
                           <button onClick={() => setEditingAssemblyId(null)} className="p-2 bg-[#000814] text-white/50 hover:bg-[#003566] hover:text-white rounded-lg transition-colors border border-[#003566]"><X size={14}/></button>
                         </div>
@@ -729,7 +665,6 @@ export default function SystemSettings() {
                       )}
                     </div>
                   ))}
-                  {assemblies.length === 0 && <p className="text-center text-[10px] font-bold text-white/40 pt-10 uppercase tracking-widest">No locals found.</p>}
                 </div>
               </div>
 
@@ -740,7 +675,6 @@ export default function SystemSettings() {
                     <Home className="text-[#FFC300]" size={16} />
                     <h2 className="text-xs font-black text-white uppercase tracking-widest">Home Cells</h2>
                   </div>
-                  
                   <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
                     <Filter size={10} className="text-[#FFC300] shrink-0" />
                     <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
@@ -786,7 +720,6 @@ export default function SystemSettings() {
                     <BookOpen className="text-[#FFC300]" size={16} />
                     <h2 className="text-xs font-black text-white uppercase tracking-widest">Bible Studies</h2>
                   </div>
-                  
                   <div className="flex items-center gap-1.5 bg-[#001D3D] px-2 py-1.5 rounded-xl border border-[#003566] shadow-sm">
                     <Filter size={10} className="text-[#FFC300] shrink-0" />
                     <select value={groupCardFilter} onChange={e => setGroupCardFilter(e.target.value)} className="bg-transparent font-black text-[9px] uppercase tracking-widest text-white/70 focus:outline-none cursor-pointer [&>option]:text-[#001D3D]">
@@ -880,6 +813,46 @@ export default function SystemSettings() {
                     placeholder="e.g. District Command Center"
                   />
                 </div>
+              </div>
+
+              {/* NEW: MONTHLY FOCUS SPOTLIGHT EDITOR */}
+              <div className="pt-6 border-t border-[#003566]">
+                <div className="flex items-center gap-2 pb-3 mb-5">
+                  <Target className="text-[#FFC300]" size={16} />
+                  <h2 className="text-sm font-black text-white uppercase tracking-widest">Monthly Focus Spotlight</h2>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className={labelStyle}>Focus Month & Year</label>
+                    <input 
+                      type="text" required value={focusMonth} 
+                      onChange={(e) => setFocusMonth(e.target.value)} 
+                      className={inputStyle} 
+                      placeholder="e.g. August 2026"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Primary Focus Title</label>
+                    <input 
+                      type="text" required value={focusTitle} 
+                      onChange={(e) => setFocusTitle(e.target.value)} 
+                      className={inputStyle} 
+                      placeholder="e.g. Sharing the Love of Christ"
+                    />
+                  </div>
+                  <div>
+                    <label className={labelStyle}>Supporting Subtitle</label>
+                    <input 
+                      type="text" required value={focusSubtitle} 
+                      onChange={(e) => setFocusSubtitle(e.target.value)} 
+                      className={inputStyle} 
+                      placeholder="e.g. Members Serving Beyond the Church Walls."
+                    />
+                  </div>
+                </div>
+                <p className="text-[8px] font-bold text-white/40 uppercase tracking-widest mt-2 ml-1">
+                  This data updates the Monthly Focus card directly on the public landing page.
+                </p>
               </div>
 
               {/* OPERATIONAL VAULT */}
