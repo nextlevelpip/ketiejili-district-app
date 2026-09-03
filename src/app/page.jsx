@@ -626,7 +626,7 @@ export default function PublicGateway() {
 
         <div className="space-y-4 max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#FF8E00]/10 border border-[#FF8E00]/30 rounded-full text-[#FF8E00] text-[10px] font-bold uppercase tracking-widest">
-            <Zap size={13} /> {languageMode === 'EN' ? '2026 KINGDOM THEME' : 'AFE 2026 BOTAEƐ'}
+            <Zap size={13} /> {languageMode === 'EN' ? '2026 THEME' : 'AFE 2026 BOTAEƐ'}
           </div>
 
           {/* DYNAMIC LOOPING WORD-BY-WORD TYPEWRITER EFFECT */}
