@@ -30,7 +30,7 @@ export default function PublicGateway() {
   
   // --- DYNAMIC SETTINGS & ACTIVITIES STATES ---
   const [areaName, setAreaName] = useState('Kete-Krachi Area'); 
-  const [districtName, setDistrictName] = useState('Ketiejli District');
+  const [districtName, setDistrictName] = useState('Katiejeli District');
   const [districtSlogan, setDistrictSlogan] = useState('Possessing the Nations: Transforming our World.');
   const [pastorContact, setPastorContact] = useState('+233 54 143 7815 / +233 20 409 2129');
   const [logoBase64, setLogoBase64] = useState('/logo.jpg');
@@ -58,7 +58,7 @@ export default function PublicGateway() {
   // --- ALTARCONNECT SOUL FORM STATE ---
   const [soulData, setSoulData] = useState({
     counselorName: '', fullName: '', phone: '', gender: '', language: 'English', category: 'General Prayer', customPrayer: ''
-  });
+  })
   const availableLanguages = ["English", "Twi", "Konkomba", "Ga", "Ewe"];
 
   // ==========================================
@@ -654,7 +654,7 @@ export default function PublicGateway() {
                 <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"></div>
                 <div>
                   <h3 className="text-sm md:text-base font-black uppercase tracking-widest text-white">Live Operations Command</h3>
-                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{areaName} Network</p>
+                  <p className="text-[10px] text-white/60 uppercase tracking-widest">{areaName}</p>
                 </div>
               </div>
               <div className="px-3.5 py-1.5 rounded-xl bg-white/5 border border-white/10 text-xs font-bold text-white">
@@ -723,7 +723,7 @@ export default function PublicGateway() {
             <div className="flex items-center gap-2.5">
               <div className="p-2.5 rounded-xl bg-[#FF8E00]/10 text-[#FF8E00]"><BookOpenCheck size={20} /></div>
               <div>
-                <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest block">Weekly Devotional Series • External Firestore Sync</span>
+                <span className="text-[10px] font-bold text-[#8ECAE6] uppercase tracking-widest block">Weekly Devotional Series</span>
                 <h3 className="text-base sm:text-lg font-black uppercase tracking-wide text-white">{weeklyDevotion.seriesTitle}</h3>
               </div>
             </div>
