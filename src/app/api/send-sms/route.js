@@ -9,7 +9,7 @@ export async function POST(request) {
     const apiKey = process.env.SMS_API_KEY;
     
     // Fallback to 'COP-Ketieji' just in case the frontend fails to send one
-    const finalSenderId = senderId || 'COP-Ketieji'; 
+    const finalSenderId = senderId || 'Ketiejili'; 
 
     if (!apiKey) {
       throw new Error('SERVER FAULT: SMS API Key is missing from Vercel environment variables.');
