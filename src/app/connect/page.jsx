@@ -1,7 +1,8 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '../firebase'; 
+import { signInAnonymously } from 'firebase/auth';
+import { db, auth } from '../firebase'; 
 import { collection, addDoc, serverTimestamp, onSnapshot, query, orderBy, doc } from 'firebase/firestore';
 import { User, Phone, MapPin, Heart, Send, CheckCircle2, Calendar, Users, Loader2, ArrowLeft } from 'lucide-react';
 
@@ -83,6 +84,12 @@ export default function ConnectKiosk() {
     }
 
     try {
+      // ====================================================
+      // SECURITY BYPASS: Issue a silent Guest Token instantly
+      // ====================================================
+      await signInAnonymously(auth);
+
+      // Secure Database Write
       await addDoc(collection(db, 'pending_connections'), {
         name: formData.fullName, 
         phone: formData.phone,
@@ -102,6 +109,7 @@ export default function ConnectKiosk() {
       });
 
     } catch (error) {
+      console.error("Submission Error:", error);
       alert("Submission failed. Please check your connection.");
     }
     setLoading(false);
