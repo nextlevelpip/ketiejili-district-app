@@ -3,32 +3,34 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
 import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone, ShieldAlert, Mic, UploadCloud, X } from 'lucide-react';
 import { db } from '../firebase';
-import { collection, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, addDoc } from 'firebase/firestore';
 
 export default function BulkSMS() {
   const [isAuthorized, setIsAuthorized] = useState(null); 
   const [members, setMembers] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [activeTab, setActiveTab] = useState('compose'); 
+  const [senderId, setSenderId] = useState('Ketiejili'); 
   
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [notification, setNotification] = useState({ type: '', message: '' });
 
-  // --- DUAL BROADCAST STATES ---
-  const [broadcastMode, setBroadcastMode] = useState('text'); // 'text' or 'voice'
+  // DUAL BROADCAST STATES
+  const [broadcastMode, setBroadcastMode] = useState('text'); 
   const [audioFile, setAudioFile] = useState(null);
 
-  // --- CUSTOM CONFIRMATION MODAL ---
+  // CUSTOM MODALS
   const [confirmModal, setConfirmModal] = useState({ isOpen: false });
+  const [successModal, setSuccessModal] = useState({ isOpen: false, details: {} }); // NEW: Premium Success Popup
 
-  // --- TARGETING FILTERS ---
+  // TARGETING FILTERS
   const [targetRole, setTargetRole] = useState('All Roles');
   const [targetAssembly, setTargetAssembly] = useState('All Assemblies');
   const [targetGender, setTargetGender] = useState('All Genders');
   const [targetDemo, setTargetDemo] = useState('All Ages');
 
-  // --- STRICT TIER 1 SECURITY CHECK ---
+  // STRICT TIER 1 SECURITY CHECK
   useEffect(() => {
     const checkClearance = () => {
       const userStr = localStorage.getItem('ketiejili_user');
@@ -44,7 +46,7 @@ export default function BulkSMS() {
     checkClearance();
   }, []);
 
-  // --- FETCH DIRECTORY & LOGS ---
+  // FETCH DIRECTORY, LOGS AND SETTINGS
   useEffect(() => {
     if (isAuthorized) {
       const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
@@ -58,7 +60,13 @@ export default function BulkSMS() {
         setSmsLogs(fetchedLogs);
       });
 
-      return () => { unsubMembers(); unsubLogs(); };
+      const unsubSettings = onSnapshot(doc(db, 'system_settings', 'general'), (docSnap) => {
+        if (docSnap.exists() && docSnap.data().senderId) {
+          setSenderId(docSnap.data().senderId);
+        }
+      });
+
+      return () => { unsubMembers(); unsubLogs(); unsubSettings(); };
     }
   }, [isAuthorized]);
 
@@ -77,7 +85,7 @@ export default function BulkSMS() {
     }
   };
 
-  // --- AGE CALCULATION ---
+  // AGE CALCULATION
   const calculateAge = (dobString) => {
     if (!dobString) return null;
     const today = new Date();
@@ -88,7 +96,7 @@ export default function BulkSMS() {
     return age;
   };
 
-  // --- SMART HIERARCHICAL FILTERING LOGIC ---
+  // SMART HIERARCHICAL FILTERING LOGIC
   const validRecipients = members.filter(m => {
     if (!m.phone || m.phone.length !== 10) return false;
 
@@ -96,7 +104,6 @@ export default function BulkSMS() {
     const matchesAssem = targetAssembly === 'All Assemblies' || m.localAssembly === targetAssembly;
     const matchesGen = targetGender === 'All Genders' || m.gender === targetGender;
     
-    // Macro-Category Role Logic
     let matchesRole = false;
     const presidingRoles = ["Presiding Brother", "Presiding Deacon", "Presiding Elder"];
     const officerRoles = ["Elder", "Deacon", "Deaconess", ...presidingRoles];
@@ -114,12 +121,10 @@ export default function BulkSMS() {
     return matchesAssem && matchesRole && matchesGen && matchesDemo;
   });
 
-  // --- SMS CALCULATIONS ---
   const characterCount = message.length;
   const smsPages = Math.ceil(characterCount / 160) || 1;
   const totalCostEstimate = validRecipients.length * (broadcastMode === 'text' ? smsPages : 1) * 0.04; 
 
-  // --- TRIGGER MODAL INSTEAD OF NATIVE ALERT ---
   const triggerBroadcast = (e) => {
     e.preventDefault();
     if (validRecipients.length === 0) {
@@ -135,12 +140,13 @@ export default function BulkSMS() {
     setConfirmModal({ isOpen: true });
   };
 
-  // --- EXECUTE BROADCAST ---
+  // EXECUTE BROADCAST (Smart Routing)
   const executeBroadcast = async () => {
     setConfirmModal({ isOpen: false });
     setIsSending(true);
 
     try {
+      // 1. Format the phone numbers
       const formattedPhones = validRecipients.map(m => {
         let num = m.phone.replace(/\D/g, '');
         if (num.startsWith('0')) {
@@ -149,23 +155,38 @@ export default function BulkSMS() {
         return num;
       });
 
-      // API Payload - includes mode to differentiate Text vs Voice
-      const response = await fetch('/api/send-sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: broadcastMode === 'text' ? message : 'Voice Broadcast File',
-          recipients: formattedPhones,
-          mode: broadcastMode
-        })
-      });
+      let response;
+
+      // 2. SMART ROUTING: Text goes to send-sms, Voice goes to send-voice
+      if (broadcastMode === 'text') {
+        response = await fetch('/api/send-sms', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: message,
+            recipients: formattedPhones,
+            senderId: senderId
+          })
+        });
+      } else {
+        // Voice uses FormData to carry the physical MP3 file
+        const formData = new FormData();
+        formData.append('file', audioFile);
+        formData.append('recipients', JSON.stringify(formattedPhones));
+        
+        response = await fetch('/api/send-voice', {
+          method: 'POST',
+          body: formData // Browser handles the boundaries automatically
+        });
+      }
 
       const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Transmission failed at the bridge.');
+      if (!response.ok || (data.status && data.status !== "success")) {
+        throw new Error(data.error || data.message || 'Transmission failed at the bridge.');
       }
 
+      // 3. Log the successful transmission
       await addDoc(collection(db, 'sms_logs'), {
         messageBody: broadcastMode === 'text' ? message : `🎤 Voice Broadcast: ${audioFile.name}`,
         recipientCount: validRecipients.length,
@@ -174,13 +195,18 @@ export default function BulkSMS() {
         timestamp: new Date().toISOString()
       });
 
-      showNotification('success', `Broadcast successfully dispatched to ${validRecipients.length} members!`);
+      // 4. Trigger the premium success modal
+      setSuccessModal({ 
+        isOpen: true, 
+        details: { count: validRecipients.length, mode: broadcastMode === 'voice' ? 'Voice' : 'Text SMS' } 
+      });
+      
       setMessage('');
       setAudioFile(null);
       
     } catch (error) {
       console.error(error);
-      showNotification('error', 'Failed to send broadcast. Please check your connection.');
+      showNotification('error', `Failed: ${error.message}`);
     } finally {
       setIsSending(false);
     }
@@ -194,10 +220,9 @@ export default function BulkSMS() {
     "Presiding Elder", "Presiding Deacon", "Presiding Brother"
   ];
 
-  // FIXED: Dropdown Visibility Fix Applied
   const filterSelectStyle = "w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none focus:border-[#FFC300] transition-all text-white placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
 
-  // --- ACCESS DENIED SCREEN ---
+  // ACCESS DENIED SCREEN
   if (isAuthorized === false) {
     return (
       <DashboardLayout>
@@ -217,14 +242,39 @@ export default function BulkSMS() {
     );
   }
 
-  // --- LOADING SCREEN ---
   if (isAuthorized === null) return <DashboardLayout><div className="flex justify-center items-center h-[60vh]"><Loader2 size={32} className="animate-spin text-[#FFC300]" /></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
-        {/* CUSTOM CONFIRMATION MODAL OVERLAY */}
+        {/* PREMIUM SUCCESS MODAL */}
+        {successModal.isOpen && (
+          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/90 backdrop-blur-md animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm p-10 text-center relative overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
+               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-emerald-500/10 blur-[80px] rounded-full pointer-events-none"></div>
+               
+               <div className="w-24 h-24 bg-emerald-500/10 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-6 text-emerald-400 relative z-10 shadow-inner">
+                  <CheckCircle2 size={48} />
+               </div>
+               
+               <h2 className="text-lg font-black text-white uppercase tracking-widest mb-2 relative z-10">Broadcast Deployed</h2>
+               
+               <p className="text-[10px] font-bold text-white/60 leading-relaxed uppercase tracking-widest mb-8 relative z-10">
+                 Successfully transmitted <span className="text-[#FFC300]">{successModal.details.mode}</span> to <span className="text-white">{successModal.details.count} members</span>.
+               </p>
+
+               <button 
+                 onClick={() => setSuccessModal({ isOpen: false, details: {} })}
+                 className="w-full py-4 bg-[#FFC300] hover:bg-[#FFD60A] text-[#000814] font-black uppercase tracking-widest text-[10px] rounded-xl transition-all shadow-lg relative z-10"
+               >
+                 Close Dashboard
+               </button>
+            </div>
+          </div>
+        )}
+
+        {/* CUSTOM CONFIRMATION MODAL */}
         {confirmModal.isOpen && (
           <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
@@ -268,9 +318,7 @@ export default function BulkSMS() {
             </div>
           )}
 
-          {/* ========================================================= */}
-          {/* STICKY HEADER & TABS (Locks to top when scrolling down) */}
-          {/* ========================================================= */}
+          {/* STICKY HEADER & TABS */}
           <div className="sticky top-0 z-30 bg-[#001D3D] pt-2 pb-4 -mx-4 px-4 md:-mx-8 md:px-8 border-b border-[#003566] mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div className="bg-[#000814] p-3 rounded-xl text-[#FFC300] border border-[#003566] hidden md:block"><MessageSquare size={24} /></div>
@@ -354,22 +402,30 @@ export default function BulkSMS() {
                   <div className="flex-1 flex flex-col">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-[#003566]">
                       
-                      {/* DUAL BROADCAST TOGGLE */}
-                      <div className="flex bg-[#001D3D] p-1 rounded-xl border border-[#003566]">
-                        <button 
-                          type="button"
-                          onClick={() => setBroadcastMode('text')} 
-                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'text' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
-                        >
-                          <MessageSquare size={12} /> Text SMS
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => setBroadcastMode('voice')} 
-                          className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'voice' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
-                        >
-                          <Mic size={12} /> Voice Broadcast
-                        </button>
+                      <div className="flex items-center gap-3">
+                        {/* DUAL BROADCAST TOGGLE */}
+                        <div className="flex bg-[#001D3D] p-1 rounded-xl border border-[#003566]">
+                          <button 
+                            type="button"
+                            onClick={() => setBroadcastMode('text')} 
+                            className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'text' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
+                          >
+                            <MessageSquare size={12} /> Text SMS
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setBroadcastMode('voice')} 
+                            className={`px-4 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${broadcastMode === 'voice' ? 'bg-[#FFC300] text-[#000814] shadow-sm' : 'text-white/40 hover:text-white'}`}
+                          >
+                            <Mic size={12} /> Voice Broadcast
+                          </button>
+                        </div>
+
+                        {/* SENDER ID VERIFICATION BADGE */}
+                        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#FFC300]/10 border border-[#FFC300]/20 rounded-lg">
+                          <span className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Active Sender ID:</span>
+                          <span className="text-xs font-black text-white tracking-widest">{senderId}</span>
+                        </div>
                       </div>
 
                       {broadcastMode === 'text' && (
