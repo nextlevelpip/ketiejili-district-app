@@ -95,7 +95,7 @@ export default function ConnectKiosk() {
         phone: formData.phone,
         localAssembly: formData.localAssembly,
         gender: formData.gender,
-        dateOfBirth: formData.dob,
+        dob: formData.dob,
         connectionType: formData.connectionType,
         message: formData.message,
         timestamp: serverTimestamp(),
