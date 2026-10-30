@@ -4,7 +4,7 @@ import DashboardLayout from "../../components/DashboardLayout";
 import { 
   MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, 
   Loader2, Smartphone, ShieldAlert, Mic, UploadCloud, X, 
-  Eye, Trash2, RotateCcw, Info, Target
+  Eye, Trash2, RotateCcw, Info, Target, Award
 } from 'lucide-react';
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
@@ -12,7 +12,7 @@ import { collection, doc, onSnapshot, addDoc, deleteDoc } from 'firebase/firesto
 export default function BulkSMS() {
   const [isAuthorized, setIsAuthorized] = useState(null); 
   const [members, setMembers] = useState([]);
-  const [appointments, setAppointments] = useState([]); // LEADERSHIP APPOINTMENTS STATE
+  const [appointments, setAppointments] = useState([]);
   const [smsLogs, setSmsLogs] = useState([]);
   const [activeTab, setActiveTab] = useState('compose'); 
   const [senderId, setSenderId] = useState('Ketiejili'); 
@@ -33,7 +33,8 @@ export default function BulkSMS() {
 
   // TARGETING FILTERS
   const [targetRole, setTargetRole] = useState('All Roles');
-  const [targetCommittee, setTargetCommittee] = useState('All Committees / Ministries'); // NEW COMMITTEE FILTER
+  const [targetCommittee, setTargetCommittee] = useState('All Committees / Ministries');
+  const [targetDesignation, setTargetDesignation] = useState('All Designations');
   const [targetAssembly, setTargetAssembly] = useState('All Assemblies');
   const [targetGender, setTargetGender] = useState('All Genders');
   const [targetDemo, setTargetDemo] = useState('All Ages');
@@ -62,7 +63,6 @@ export default function BulkSMS() {
         setMembers(fetched);
       });
 
-      // SYNC WITH PRESBYTERY APPOINTMENTS
       const unsubAppts = onSnapshot(collection(db, 'leadership_appointments'), (snapshot) => {
         const fetchedAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setAppointments(fetchedAppts);
@@ -115,7 +115,7 @@ export default function BulkSMS() {
     return age;
   };
 
-  // STANDARD + DYNAMIC COMMITTEES LIST
+  // STANDARD DEFINITIONS
   const baseCommittees = [
     "Audit Committee", "Bible Study/Home Cell", "Chaplaincy Committee", "Children's Ministry",
     "Counselling Committee", "Estate Committee", "Evangelism Ministry", "Executive Committee",
@@ -129,6 +129,21 @@ export default function BulkSMS() {
     ...new Set([
       ...baseCommittees,
       ...appointments.map(a => a.committee).filter(Boolean)
+    ])
+  ].sort();
+
+  const standardDesignations = [
+    "Chairman/Leaders", "Assistant Leader", "Bible Study Leader", "Home Cell Leader",
+    "Discipleship Leader", "Secretary", "Financial Secretary", "Bible Study Secretary",
+    "Home Cell Secretary", "Discipleship Secretary", "Treasurer", "Organizer", "Co-opted", "Member"
+  ];
+
+  const allAvailableDesignations = [
+    ...new Set([
+      ...standardDesignations,
+      ...appointments
+        .map(a => a.designation)
+        .filter(d => d && d !== "Chairman" && d !== "Leader")
     ])
   ].sort();
 
@@ -156,17 +171,34 @@ export default function BulkSMS() {
     else if (targetDemo === '13 - 35') matchesDemo = age !== null && age >= 13 && age <= 35;
     else if (targetDemo === '> 35') matchesDemo = age !== null && age > 35;
 
-    // Committee & Ministry Leadership Logic
-    let matchesCommittee = true;
-    if (targetCommittee === 'All Appointed Leaders') {
-      matchesCommittee = appointments.some(a => a.memberId === m.id || a.memberPhone === m.phone);
-    } else if (targetCommittee !== 'All Committees / Ministries') {
-      matchesCommittee = appointments.some(a => 
-        (a.memberId === m.id || a.memberPhone === m.phone) && a.committee === targetCommittee
-      );
+    // Committee & Designation Joint Match Logic
+    let matchesLeadership = true;
+    const memberAppointments = appointments.filter(a => a.memberId === m.id || a.memberPhone === m.phone);
+
+    if (targetCommittee !== 'All Committees / Ministries' || targetDesignation !== 'All Designations') {
+      if (memberAppointments.length === 0) {
+        matchesLeadership = false;
+      } else {
+        const matchesCommitteeCondition = (targetCommittee === 'All Committees / Ministries') ||
+          (targetCommittee === 'All Appointed Leaders') ||
+          memberAppointments.some(a => a.committee === targetCommittee);
+
+        const matchesDesignationCondition = (targetDesignation === 'All Designations') ||
+          memberAppointments.some(a => {
+            const isChairmanOrLeader = targetDesignation === "Chairman/Leaders" && (a.designation === "Chairman" || a.designation === "Leader" || a.designation === "Chairman/Leaders");
+            const desigMatch = isChairmanOrLeader || (a.designation === targetDesignation);
+            
+            if (targetCommittee === 'All Committees / Ministries' || targetCommittee === 'All Appointed Leaders') {
+              return desigMatch;
+            }
+            return desigMatch && a.committee === targetCommittee;
+          });
+
+        matchesLeadership = matchesCommitteeCondition && matchesDesignationCondition;
+      }
     }
     
-    return matchesAssem && matchesRole && matchesCommittee && matchesGen && matchesDemo;
+    return matchesAssem && matchesRole && matchesLeadership && matchesGen && matchesDemo;
   });
 
   const characterCount = message.length;
@@ -234,7 +266,7 @@ export default function BulkSMS() {
       await addDoc(collection(db, 'sms_logs'), {
         messageBody: broadcastMode === 'text' ? message : `🎤 Voice Broadcast: ${audioFile.name}`,
         recipientCount: validRecipients.length,
-        targetFilters: `${targetAssembly}, ${targetRole}, ${targetCommittee}, ${targetGender}, ${targetDemo}`,
+        targetFilters: `${targetAssembly}, ${targetRole}, ${targetCommittee}, ${targetDesignation}, ${targetGender}, ${targetDemo}`,
         estimatedCost: totalCostEstimate,
         timestamp: new Date().toISOString()
       });
@@ -255,7 +287,6 @@ export default function BulkSMS() {
     }
   };
 
-  // DELETE LOG HANDLER
   const handleDeleteLog = async () => {
     if (!deleteConfirmModal.logId) return;
     try {
@@ -269,7 +300,6 @@ export default function BulkSMS() {
     }
   };
 
-  // RESEND / RE-ARM BROADCAST HANDLER
   const handleResend = (log) => {
     if (log.messageBody.includes('Voice Broadcast:')) {
       setBroadcastMode('voice');
@@ -286,8 +316,9 @@ export default function BulkSMS() {
       if (parts[0]) setTargetAssembly(parts[0]);
       if (parts[1]) setTargetRole(parts[1]);
       if (parts[2]) setTargetCommittee(parts[2]);
-      if (parts[3]) setTargetGender(parts[3]);
-      if (parts[4]) setTargetDemo(parts[4]);
+      if (parts[3]) setTargetDesignation(parts[3]);
+      if (parts[4]) setTargetGender(parts[4]);
+      if (parts[5]) setTargetDemo(parts[5]);
     }
 
     setActiveTab('compose');
@@ -303,7 +334,6 @@ export default function BulkSMS() {
 
   const filterSelectStyle = "w-full p-2.5 bg-[#001D3D] border border-[#003566] rounded-xl font-bold text-xs outline-none focus:border-[#FFC300] transition-all text-white placeholder:text-white/30 [&>option]:bg-[#001D3D] [&>option]:text-white";
 
-  // ACCESS DENIED SCREEN
   if (isAuthorized === false) {
     return (
       <DashboardLayout>
@@ -541,7 +571,7 @@ export default function BulkSMS() {
                       </select>
                     </div>
 
-                    {/* NEW: COMMITTEE & MINISTRY FILTER */}
+                    {/* COMMITTEE / MINISTRY FILTER */}
                     <div>
                       <label className="text-[9px] font-black text-[#FFC300] uppercase tracking-widest ml-1 mb-1 flex items-center gap-1">
                         <Target size={11} /> Committee / Ministry
@@ -551,6 +581,19 @@ export default function BulkSMS() {
                         <option value="All Appointed Leaders">All Appointed Leaders (Any Committee)</option>
                         <optgroup label="Committees & Ministries">
                           {allAvailableCommittees.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
+
+                    {/* DESIGNATION FILTER (CHAIRMAN/LEADERS REFINED) */}
+                    <div>
+                      <label className="text-[9px] font-black text-[#8ECAE6] uppercase tracking-widest ml-1 mb-1 flex items-center gap-1">
+                        <Award size={11} /> Specific Designation / Rank
+                      </label>
+                      <select value={targetDesignation} onChange={e => setTargetDesignation(e.target.value)} className={filterSelectStyle}>
+                        <option value="All Designations">All Designations</option>
+                        <optgroup label="Leadership Roles">
+                          {allAvailableDesignations.map(d => <option key={d} value={d}>{d}</option>)}
                         </optgroup>
                       </select>
                     </div>
