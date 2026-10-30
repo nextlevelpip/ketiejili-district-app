@@ -1,13 +1,18 @@
 "use client";
 import { useState, useEffect } from 'react';
 import DashboardLayout from "../../components/DashboardLayout";
-import { MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, Loader2, Smartphone, ShieldAlert, Mic, UploadCloud, X } from 'lucide-react';
+import { 
+  MessageSquare, Send, History, Users, AlertCircle, CheckCircle2, 
+  Loader2, Smartphone, ShieldAlert, Mic, UploadCloud, X, 
+  Eye, Trash2, RotateCcw, Info, Target
+} from 'lucide-react';
 import { db } from '../firebase';
-import { collection, doc, onSnapshot, addDoc } from 'firebase/firestore';
+import { collection, doc, onSnapshot, addDoc, deleteDoc } from 'firebase/firestore';
 
 export default function BulkSMS() {
   const [isAuthorized, setIsAuthorized] = useState(null); 
   const [members, setMembers] = useState([]);
+  const [appointments, setAppointments] = useState([]); // LEADERSHIP APPOINTMENTS STATE
   const [smsLogs, setSmsLogs] = useState([]);
   const [activeTab, setActiveTab] = useState('compose'); 
   const [senderId, setSenderId] = useState('Ketiejili'); 
@@ -22,10 +27,13 @@ export default function BulkSMS() {
 
   // CUSTOM MODALS
   const [confirmModal, setConfirmModal] = useState({ isOpen: false });
-  const [successModal, setSuccessModal] = useState({ isOpen: false, details: {} }); // NEW: Premium Success Popup
+  const [successModal, setSuccessModal] = useState({ isOpen: false, details: {} });
+  const [viewLogModal, setViewLogModal] = useState({ isOpen: false, log: null });
+  const [deleteConfirmModal, setDeleteConfirmModal] = useState({ isOpen: false, logId: null });
 
   // TARGETING FILTERS
   const [targetRole, setTargetRole] = useState('All Roles');
+  const [targetCommittee, setTargetCommittee] = useState('All Committees / Ministries'); // NEW COMMITTEE FILTER
   const [targetAssembly, setTargetAssembly] = useState('All Assemblies');
   const [targetGender, setTargetGender] = useState('All Genders');
   const [targetDemo, setTargetDemo] = useState('All Ages');
@@ -46,12 +54,18 @@ export default function BulkSMS() {
     checkClearance();
   }, []);
 
-  // FETCH DIRECTORY, LOGS AND SETTINGS
+  // FETCH DIRECTORY, APPOINTMENTS, LOGS AND SETTINGS
   useEffect(() => {
     if (isAuthorized) {
       const unsubMembers = onSnapshot(collection(db, 'members'), (snapshot) => {
         const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setMembers(fetched);
+      });
+
+      // SYNC WITH PRESBYTERY APPOINTMENTS
+      const unsubAppts = onSnapshot(collection(db, 'leadership_appointments'), (snapshot) => {
+        const fetchedAppts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setAppointments(fetchedAppts);
       });
 
       const unsubLogs = onSnapshot(collection(db, 'sms_logs'), (snapshot) => {
@@ -66,7 +80,12 @@ export default function BulkSMS() {
         }
       });
 
-      return () => { unsubMembers(); unsubLogs(); unsubSettings(); };
+      return () => { 
+        unsubMembers(); 
+        unsubAppts();
+        unsubLogs(); 
+        unsubSettings(); 
+      };
     }
   }, [isAuthorized]);
 
@@ -96,6 +115,23 @@ export default function BulkSMS() {
     return age;
   };
 
+  // STANDARD + DYNAMIC COMMITTEES LIST
+  const baseCommittees = [
+    "Audit Committee", "Bible Study/Home Cell", "Chaplaincy Committee", "Children's Ministry",
+    "Counselling Committee", "Estate Committee", "Evangelism Ministry", "Executive Committee",
+    "Finance Committee", "Home and Urban Missions", "Marriage Committee", "Men's Ministry",
+    "Ministerial Committee", "Missions Committee", "Music Committee", "PEMEM",
+    "Pensions Committee", "PENTSOS Committee", "Persons with Disabilities Committee",
+    "Prisons Ministry", "Transport Committee", "Welfare Committee", "Women's Ministry", "Youth Ministry"
+  ];
+
+  const allAvailableCommittees = [
+    ...new Set([
+      ...baseCommittees,
+      ...appointments.map(a => a.committee).filter(Boolean)
+    ])
+  ].sort();
+
   // SMART HIERARCHICAL FILTERING LOGIC
   const validRecipients = members.filter(m => {
     if (!m.phone || m.phone.length !== 10) return false;
@@ -104,6 +140,7 @@ export default function BulkSMS() {
     const matchesAssem = targetAssembly === 'All Assemblies' || m.localAssembly === targetAssembly;
     const matchesGen = targetGender === 'All Genders' || m.gender === targetGender;
     
+    // Macro-Category Role Logic
     let matchesRole = false;
     const presidingRoles = ["Presiding Brother", "Presiding Deacon", "Presiding Elder"];
     const officerRoles = ["Elder", "Deacon", "Deaconess", ...presidingRoles];
@@ -113,12 +150,23 @@ export default function BulkSMS() {
     else if (targetRole === 'Presiding') matchesRole = presidingRoles.includes(m.churchRole);
     else matchesRole = m.churchRole === targetRole;
     
+    // Demographic Age Logic
     let matchesDemo = true;
     if (targetDemo === '< 13') matchesDemo = age !== null && age < 13;
     else if (targetDemo === '13 - 35') matchesDemo = age !== null && age >= 13 && age <= 35;
     else if (targetDemo === '> 35') matchesDemo = age !== null && age > 35;
+
+    // Committee & Ministry Leadership Logic
+    let matchesCommittee = true;
+    if (targetCommittee === 'All Appointed Leaders') {
+      matchesCommittee = appointments.some(a => a.memberId === m.id || a.memberPhone === m.phone);
+    } else if (targetCommittee !== 'All Committees / Ministries') {
+      matchesCommittee = appointments.some(a => 
+        (a.memberId === m.id || a.memberPhone === m.phone) && a.committee === targetCommittee
+      );
+    }
     
-    return matchesAssem && matchesRole && matchesGen && matchesDemo;
+    return matchesAssem && matchesRole && matchesCommittee && matchesGen && matchesDemo;
   });
 
   const characterCount = message.length;
@@ -140,13 +188,12 @@ export default function BulkSMS() {
     setConfirmModal({ isOpen: true });
   };
 
-  // EXECUTE BROADCAST (Smart Routing)
+  // EXECUTE BROADCAST
   const executeBroadcast = async () => {
     setConfirmModal({ isOpen: false });
     setIsSending(true);
 
     try {
-      // 1. Format the phone numbers
       const formattedPhones = validRecipients.map(m => {
         let num = m.phone.replace(/\D/g, '');
         if (num.startsWith('0')) {
@@ -157,7 +204,6 @@ export default function BulkSMS() {
 
       let response;
 
-      // 2. SMART ROUTING: Text goes to send-sms, Voice goes to send-voice
       if (broadcastMode === 'text') {
         response = await fetch('/api/send-sms', {
           method: 'POST',
@@ -169,14 +215,13 @@ export default function BulkSMS() {
           })
         });
       } else {
-        // Voice uses FormData to carry the physical MP3 file
         const formData = new FormData();
         formData.append('file', audioFile);
         formData.append('recipients', JSON.stringify(formattedPhones));
         
         response = await fetch('/api/send-voice', {
           method: 'POST',
-          body: formData // Browser handles the boundaries automatically
+          body: formData
         });
       }
 
@@ -186,16 +231,14 @@ export default function BulkSMS() {
         throw new Error(data.error || data.message || 'Transmission failed at the bridge.');
       }
 
-      // 3. Log the successful transmission
       await addDoc(collection(db, 'sms_logs'), {
         messageBody: broadcastMode === 'text' ? message : `🎤 Voice Broadcast: ${audioFile.name}`,
         recipientCount: validRecipients.length,
-        targetFilters: `${targetAssembly}, ${targetRole}, ${targetGender}, ${targetDemo}`,
+        targetFilters: `${targetAssembly}, ${targetRole}, ${targetCommittee}, ${targetGender}, ${targetDemo}`,
         estimatedCost: totalCostEstimate,
         timestamp: new Date().toISOString()
       });
 
-      // 4. Trigger the premium success modal
       setSuccessModal({ 
         isOpen: true, 
         details: { count: validRecipients.length, mode: broadcastMode === 'voice' ? 'Voice' : 'Text SMS' } 
@@ -210,6 +253,44 @@ export default function BulkSMS() {
     } finally {
       setIsSending(false);
     }
+  };
+
+  // DELETE LOG HANDLER
+  const handleDeleteLog = async () => {
+    if (!deleteConfirmModal.logId) return;
+    try {
+      await deleteDoc(doc(db, 'sms_logs', deleteConfirmModal.logId));
+      showNotification('success', 'Broadcast record deleted successfully.');
+    } catch (err) {
+      console.error(err);
+      showNotification('error', 'Failed to delete record.');
+    } finally {
+      setDeleteConfirmModal({ isOpen: false, logId: null });
+    }
+  };
+
+  // RESEND / RE-ARM BROADCAST HANDLER
+  const handleResend = (log) => {
+    if (log.messageBody.includes('Voice Broadcast:')) {
+      setBroadcastMode('voice');
+      setMessage('');
+      showNotification('success', 'Voice mode primed. Please re-attach your audio file to dispatch.');
+    } else {
+      setBroadcastMode('text');
+      setMessage(log.messageBody);
+      showNotification('success', 'Message loaded into Composer. Ready for transmission.');
+    }
+
+    if (log.targetFilters) {
+      const parts = log.targetFilters.split(',').map(s => s.trim());
+      if (parts[0]) setTargetAssembly(parts[0]);
+      if (parts[1]) setTargetRole(parts[1]);
+      if (parts[2]) setTargetCommittee(parts[2]);
+      if (parts[3]) setTargetGender(parts[3]);
+      if (parts[4]) setTargetDemo(parts[4]);
+    }
+
+    setActiveTab('compose');
   };
 
   const uniqueAssemblies = [...new Set(members.map(m => m.localAssembly).filter(Boolean))];
@@ -248,9 +329,102 @@ export default function BulkSMS() {
     <DashboardLayout>
       <div className="min-h-full bg-[#001D3D] p-4 md:p-8 text-white relative overflow-hidden pb-20">
         
+        {/* PREMIUM VIEW MODAL */}
+        {viewLogModal.isOpen && viewLogModal.log && (
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+            <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="p-6 border-b border-[#003566] flex items-center justify-between bg-[#000814]">
+                <div className="flex items-center gap-2 text-[#FFC300]">
+                  <Info size={18} />
+                  <h3 className="text-xs font-black uppercase tracking-widest text-white">Broadcast Details</h3>
+                </div>
+                <button 
+                  onClick={() => setViewLogModal({ isOpen: false, log: null })}
+                  className="p-1 rounded-lg text-white/40 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <div>
+                  <span className="text-[9px] font-black text-white/40 uppercase tracking-widest block mb-1">Message Content</span>
+                  <div className="p-4 bg-[#000814] border border-[#003566] rounded-xl text-xs font-medium text-white/90 leading-relaxed whitespace-pre-wrap max-h-56 overflow-y-auto custom-scrollbar">
+                    {viewLogModal.log.messageBody}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-[#000814] p-3 rounded-xl border border-[#003566]">
+                    <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block mb-0.5">Dispatched At</span>
+                    <span className="font-bold text-white text-[11px]">{new Date(viewLogModal.log.timestamp).toLocaleString()}</span>
+                  </div>
+                  <div className="bg-[#000814] p-3 rounded-xl border border-[#003566]">
+                    <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block mb-0.5">Recipients Reached</span>
+                    <span className="font-black text-[#FFC300] text-sm">{viewLogModal.log.recipientCount} Phones</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-[#000814] p-3 rounded-xl border border-[#003566]">
+                    <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block mb-0.5">Target Audience</span>
+                    <span className="text-[10px] font-bold text-white/80">{viewLogModal.log.targetFilters}</span>
+                  </div>
+                  <div className="bg-[#000814] p-3 rounded-xl border border-[#003566]">
+                    <span className="text-[8px] font-black text-white/40 uppercase tracking-widest block mb-0.5">Estimated Cost</span>
+                    <span className="font-mono font-bold text-emerald-400">GHS {viewLogModal.log.estimatedCost?.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-[#003566] bg-[#000814] flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    const selected = viewLogModal.log;
+                    setViewLogModal({ isOpen: false, log: null });
+                    handleResend(selected);
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-[#FFC300] text-[#000814] hover:bg-[#FFD60A] transition-all flex items-center gap-1.5"
+                >
+                  <RotateCcw size={12} /> Resend Broadcast
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DELETE CONFIRMATION MODAL */}
+        {deleteConfirmModal.isOpen && (
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
+            <div className="bg-[#001D3D] border border-red-500/30 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center animate-in zoom-in-95 duration-200">
+              <div className="w-14 h-14 bg-red-500/10 border border-red-500/30 rounded-full flex items-center justify-center mx-auto mb-4 text-red-400">
+                <Trash2 size={24} />
+              </div>
+              <h3 className="text-sm font-black text-white uppercase tracking-widest mb-2">Delete Log Entry?</h3>
+              <p className="text-[10px] font-bold text-white/50 leading-relaxed uppercase tracking-widest mb-6">
+                This action will permanently remove this record from your dispatch history.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDeleteConfirmModal({ isOpen: false, logId: null })}
+                  className="flex-1 py-3 text-[10px] font-black text-white/60 bg-[#000814] hover:bg-white/5 border border-[#003566] rounded-xl uppercase tracking-widest transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteLog}
+                  className="flex-1 py-3 text-[10px] font-black text-white bg-red-600 hover:bg-red-500 rounded-xl uppercase tracking-widest transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* PREMIUM SUCCESS MODAL */}
         {successModal.isOpen && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/90 backdrop-blur-md animate-fade-in">
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
             <div className="bg-[#001D3D] border border-[#003566] rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] w-full max-w-sm p-10 text-center relative overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-emerald-500/10 blur-[80px] rounded-full pointer-events-none"></div>
                
@@ -274,9 +448,9 @@ export default function BulkSMS() {
           </div>
         )}
 
-        {/* CUSTOM CONFIRMATION MODAL */}
+        {/* CONFIRM TRANSMISSION MODAL */}
         {confirmModal.isOpen && (
-          <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-[#000814]/80 backdrop-blur-sm animate-fade-in">
+          <div className="fixed inset-0 z-[999999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
             <div className="bg-[#001D3D] border border-[#003566] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden scale-100 animate-in zoom-in-95 duration-200">
               <div className="p-8 text-center">
                 <div className="w-16 h-16 bg-[#FFC300]/10 border border-[#FFC300]/30 rounded-full flex items-center justify-center mx-auto mb-5 text-[#FFC300]">
@@ -312,7 +486,7 @@ export default function BulkSMS() {
         <div className="relative z-10 space-y-6 animate-fade-in max-w-7xl mx-auto">
           
           {notification.message && (
-            <div className={`fixed top-10 right-10 z-50 flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in text-xs uppercase tracking-widest font-black ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
+            <div className={`fixed top-10 right-10 z-[999999] flex items-center gap-3 px-6 py-4 rounded-xl shadow-2xl animate-fade-in text-xs uppercase tracking-widest font-black ${notification.type === 'success' ? 'bg-[#FFC300] text-[#000814]' : 'bg-red-500 text-white'}`}>
               {notification.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
               <span>{notification.message}</span>
             </div>
@@ -356,6 +530,7 @@ export default function BulkSMS() {
                         {uniqueAssemblies.map(a => <option key={a} value={a}>{a}</option>)}
                       </select>
                     </div>
+
                     <div>
                       <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1 mb-1 block">Church Role</label>
                       <select value={targetRole} onChange={e => setTargetRole(e.target.value)} className={filterSelectStyle}>
@@ -365,6 +540,21 @@ export default function BulkSMS() {
                         {churchRoles.map(r => <option key={r} value={r}>{r}</option>)}
                       </select>
                     </div>
+
+                    {/* NEW: COMMITTEE & MINISTRY FILTER */}
+                    <div>
+                      <label className="text-[9px] font-black text-[#FFC300] uppercase tracking-widest ml-1 mb-1 flex items-center gap-1">
+                        <Target size={11} /> Committee / Ministry
+                      </label>
+                      <select value={targetCommittee} onChange={e => setTargetCommittee(e.target.value)} className={filterSelectStyle}>
+                        <option value="All Committees / Ministries">All Committees / Ministries</option>
+                        <option value="All Appointed Leaders">All Appointed Leaders (Any Committee)</option>
+                        <optgroup label="Committees & Ministries">
+                          {allAvailableCommittees.map(c => <option key={c} value={c}>{c}</option>)}
+                        </optgroup>
+                      </select>
+                    </div>
+
                     <div>
                       <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1 mb-1 block">Demographic (Age)</label>
                       <select value={targetDemo} onChange={e => setTargetDemo(e.target.value)} className={filterSelectStyle}>
@@ -374,6 +564,7 @@ export default function BulkSMS() {
                         <option value="> 35">Adults (&gt; 35)</option>
                       </select>
                     </div>
+
                     <div>
                       <label className="text-[9px] font-black text-white/50 uppercase tracking-widest ml-1 mb-1 block">Gender</label>
                       <select value={targetGender} onChange={e => setTargetGender(e.target.value)} className={filterSelectStyle}>
@@ -403,7 +594,6 @@ export default function BulkSMS() {
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 pb-4 border-b border-[#003566]">
                       
                       <div className="flex items-center gap-3">
-                        {/* DUAL BROADCAST TOGGLE */}
                         <div className="flex bg-[#001D3D] p-1 rounded-xl border border-[#003566]">
                           <button 
                             type="button"
@@ -421,7 +611,6 @@ export default function BulkSMS() {
                           </button>
                         </div>
 
-                        {/* SENDER ID VERIFICATION BADGE */}
                         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#FFC300]/10 border border-[#FFC300]/20 rounded-lg">
                           <span className="text-[8px] font-black text-[#FFC300] uppercase tracking-widest">Active Sender ID:</span>
                           <span className="text-xs font-black text-white tracking-widest">{senderId}</span>
@@ -487,8 +676,14 @@ export default function BulkSMS() {
           ) : (
             /* DISPATCH HISTORY TAB */
             <div className="bg-[#000814] rounded-2xl shadow-xl border border-[#003566] overflow-hidden animate-fade-in">
-              <div className="p-5 border-b border-[#003566] bg-[#001D3D]">
-                <h2 className="text-xs font-black text-white uppercase tracking-widest">Recent Broadcasts</h2>
+              <div className="p-5 border-b border-[#003566] bg-[#001D3D] flex items-center justify-between">
+                <div>
+                  <h2 className="text-xs font-black text-white uppercase tracking-widest">Recent Broadcasts</h2>
+                  <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mt-0.5">Manage, review, or re-arm dispatched transmissions</p>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-[#FFC300] bg-[#000814] px-3 py-1 rounded-lg border border-[#003566]">
+                  {smsLogs.length} Total Logs
+                </span>
               </div>
               <div className="overflow-x-auto custom-scrollbar">
                 <table className="w-full text-left text-xs whitespace-nowrap">
@@ -499,6 +694,7 @@ export default function BulkSMS() {
                       <th className="p-4">Target Audience</th>
                       <th className="p-4 text-center">Recipients</th>
                       <th className="p-4 text-right">Est. Cost</th>
+                      <th className="p-4 text-center w-28">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#003566]">
@@ -525,10 +721,35 @@ export default function BulkSMS() {
                         <td className="p-4 text-right font-mono font-bold text-white">
                           GHS {log.estimatedCost?.toFixed(2)}
                         </td>
+                        <td className="p-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              onClick={() => setViewLogModal({ isOpen: true, log })}
+                              title="View Full Message"
+                              className="p-1.5 bg-[#001D3D] hover:bg-[#FFC300] text-white/60 hover:text-[#000814] border border-[#003566] rounded-lg transition-colors"
+                            >
+                              <Eye size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleResend(log)}
+                              title="Resend / Load into Composer"
+                              className="p-1.5 bg-[#001D3D] hover:bg-emerald-500 text-white/60 hover:text-white border border-[#003566] rounded-lg transition-colors"
+                            >
+                              <RotateCcw size={13} />
+                            </button>
+                            <button
+                              onClick={() => setDeleteConfirmModal({ isOpen: true, logId: log.id })}
+                              title="Delete Record"
+                              className="p-1.5 bg-[#001D3D] hover:bg-red-600 text-white/60 hover:text-white border border-[#003566] rounded-lg transition-colors"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))}
                     {smsLogs.length === 0 && (
-                      <tr><td colSpan="5" className="p-10 text-center text-white/50 font-bold italic text-xs">No broadcasts have been sent yet.</td></tr>
+                      <tr><td colSpan="6" className="p-10 text-center text-white/50 font-bold italic text-xs">No broadcasts have been sent yet.</td></tr>
                     )}
                   </tbody>
                 </table>
